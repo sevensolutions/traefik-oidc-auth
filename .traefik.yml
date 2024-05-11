@@ -1,0 +1,22 @@
+# The name of your plugin as displayed in the Plugins Catalog web UI.
+displayName: OIDC Authentication
+
+# For now, `middleware` is the only type available.
+type: middleware
+
+# The import path of your plugin.
+import: github.com/sevensolutions/traefik-oidc-auth
+
+# A brief description of what your plugin is doing.
+summary: "A traefik Plugin for securing the upstream service with OpenID Connect using the Relying Party Flow."
+
+# Medias associated to the plugin (optional)
+iconPath: .assets/icon.png
+# bannerPath: .assets/banner.png
+
+# Configuration data for your plugin.
+# This is mandatory, and Plugins Catalog will try to execute the plugin with the data you provide as part of its startup validity tests.
+testData:
+  ProviderURL: "my-provider-url.com"
+  ClientID: "<CLIENT_ID>"
+  ClientSecret: "<CLIENT_SECRET>"
