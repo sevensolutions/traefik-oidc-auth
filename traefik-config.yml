@@ -1,0 +1,23 @@
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: true
+
+entryPoints:
+  web:
+    address: :80
+
+# Enable API and dashboard
+api:
+  insecure: true
+  dashboard: true
+  debug: true
+
+experimental:
+  localPlugins:
+    traefik-oidc-auth:
+      moduleName: github.com/sevensolutions/traefik-oidc-auth
+
+providers:
+  file:
+    filename: /etc/traefik/configs/http.yml
+    watch: true

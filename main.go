@@ -23,12 +23,17 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) {
+		toa.redirectToProvider(rw, req)
+		return
+	}
+
 	if strings.HasPrefix(req.RequestURI, toa.Config.LogoutUri) {
 		toa.handleLogout(rw, req)
 		return
 	}
 
-	cookie, err := req.Cookie("Authorization")
+	cookie, err := req.Cookie(toa.Config.StateCookie.Name)
 
 	if err == nil && strings.HasPrefix(cookie.Value, "Bearer ") {
 		token := strings.Trim(strings.TrimPrefix(cookie.Value, "Bearer "), " ")
@@ -40,7 +45,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			isValid, username, err := introspectToken(toa, token)
 			if err != nil {
 				log("ERROR", "Verifying token: %s", err.Error())
-				toa.redirectToProvider(rw, req)
+				toa.handleUnauthorized(rw, req)
 				return
 			}
 
@@ -50,14 +55,14 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 		if !ok {
 			http.SetCookie(rw, &http.Cookie{
-				Name:    "Authorization",
+				Name:    toa.Config.StateCookie.Name,
 				Value:   "",
-				Path:    "/",
+				Path:    toa.Config.StateCookie.Path,
 				Expires: time.Now().Add(-24 * time.Hour),
 				MaxAge:  -1,
 			})
 
-			toa.redirectToProvider(rw, req)
+			toa.handleUnauthorized(rw, req)
 			return
 		}
 
@@ -70,7 +75,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	toa.redirectToProvider(rw, req)
+	toa.handleUnauthorized(rw, req)
 }
 
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
@@ -95,6 +100,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		return
 	}
 
+	redirectUrl := state.RedirectUrl
+
 	if state.Action == "Login" {
 		token, err := exchangeAuthCode(toa, req, authCode, state)
 
@@ -106,26 +113,29 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		http.SetCookie(rw, &http.Cookie{
-			Name:     "Authorization",
+			Name:     toa.Config.StateCookie.Name,
 			Value:    "Bearer " + token,
-			Secure:   true,
-			HttpOnly: true,
-			Path:     "/",
-			SameSite: http.SameSiteDefaultMode,
-			//SameSite: http.SameSiteStrictMode,
+			Secure:   toa.Config.StateCookie.Secure,
+			HttpOnly: toa.Config.StateCookie.HttpOnly,
+			Path:     toa.Config.StateCookie.Path,
+			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
 		})
+
+		if toa.Config.PostLoginRedirectUri != "" {
+			redirectUrl = ensureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
+		}
 	} else if state.Action == "Logout" {
 		// Clear the cookie
 		http.SetCookie(rw, &http.Cookie{
-			Name:    "Authorization",
+			Name:    toa.Config.StateCookie.Name,
 			Value:   "",
-			Path:    "/",
+			Path:    toa.Config.StateCookie.Path,
 			Expires: time.Now().Add(-24 * time.Hour),
 			MaxAge:  -1,
 		})
 	}
 
-	http.Redirect(rw, req, state.RedirectUrl, http.StatusFound)
+	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
 
 func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request) {
@@ -142,9 +152,10 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 
 	postLogoutUri := host + toa.Config.RedirectUri
 
+	// TODO: Grab redirect uri from query-param, if any
 	state := OidcState{
 		Action:      "Logout",
-		RedirectUrl: "",
+		RedirectUrl: ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri),
 	}
 
 	base64State, err := state.base64Encode()
@@ -153,16 +164,16 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}
 
 	endSessionURL.RawQuery = url.Values{
-		"client_id":                {toa.Config.ClientID},
+		"client_id":                {toa.Config.Provider.ClientID},
 		"post_logout_redirect_uri": {postLogoutUri},
 		"state":                    {base64State},
 	}.Encode()
 
 	// Clear the cookie
 	http.SetCookie(rw, &http.Cookie{
-		Name:    "Authorization",
+		Name:    toa.Config.StateCookie.Name,
 		Value:   "",
-		Path:    "/",
+		Path:    toa.Config.StateCookie.Path,
 		Expires: time.Now().Add(-24 * time.Hour),
 		MaxAge:  -1,
 	})
@@ -170,11 +181,20 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
 
+func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
+	if toa.Config.LoginUri == "" {
+		toa.redirectToProvider(rw, req)
+	} else {
+		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+	}
+}
+
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
 	log("INFO", "Redirecting to OIDC provider...")
 
 	host := getFullHost(req)
 
+	// TODO: Grab redirect uri from query-param, if any
 	originalUrl := fmt.Sprintf("%s%s", host, req.RequestURI)
 	redirectUrl := host + toa.Config.RedirectUri
 
@@ -196,7 +216,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	redirectURL.RawQuery = url.Values{
 		"response_type": {"code"},
 		"scope":         {"openid profile email"},
-		"client_id":     {toa.Config.ClientID},
+		"client_id":     {toa.Config.Provider.ClientID},
 		"redirect_uri":  {redirectUrl},
 		"state":         {stateBase64},
 	}.Encode()

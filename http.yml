@@ -1,0 +1,27 @@
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          Provider:
+            UrlEnv: "PROVIDER_URL"
+            ClientIDEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+          Scopes: ["openid", "profile", "email"]
+          # If set, only the /login endpoint will initiate the login flow
+          #LoginUri: "/login"
+          #PostLoginRedirectUri: "/"
+
+  routers:
+    whoami:
+      entryPoints:
+        - web
+      rule: "HostRegexp(`.+`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]

@@ -157,8 +157,8 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint,
 		url.Values{
 			"grant_type":    {"authorization_code"},
-			"client_id":     {oidcAuth.Config.ClientID},
-			"client_secret": {oidcAuth.Config.ClientSecret},
+			"client_id":     {oidcAuth.Config.Provider.ClientID},
+			"client_secret": {oidcAuth.Config.Provider.ClientSecret},
 			"code":          {authCode},
 			"redirect_uri":  {redirectUrl},
 		})
@@ -203,7 +203,7 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, err
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(oidcAuth.Config.ClientID, oidcAuth.Config.ClientSecret)
+	req.SetBasicAuth(oidcAuth.Config.Provider.ClientID, oidcAuth.Config.Provider.ClientSecret)
 
 	resp, err := client.Do(req)
 	if err != nil {

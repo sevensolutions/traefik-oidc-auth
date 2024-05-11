@@ -7,25 +7,11 @@ services:
       - "9080:80"
       - "8080:8080"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "./http.yml:/etc/traefik/configs/http.yml:ro"
       - ".:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
-    command:
-      - "--api.insecure=true"
-      - "--api.dashboard=true"
-      - "--api.debug=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entryPoints.web.address=:80"
-      - "--experimental.localPlugins.traefik-oidc-auth.moduleName=github.com/sevensolutions/traefik-oidc-auth"
+    env_file:
+      - ./.env
 
   whoami:
     image: "traefik/whoami:latest"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=HostRegexp(`.+`)"
-      - "traefik.http.routers.whoami.entrypoints=web"
-      - "traefik.http.routers.whoami.middlewares=oidc-auth"
-      - "traefik.http.middlewares.oidc-auth.plugin.traefik-oidc-auth.ProviderURL=${PROVIDER_URL}"
-      - "traefik.http.middlewares.oidc-auth.plugin.traefik-oidc-auth.ClientID=${CLIENT_ID}"
-      - "traefik.http.middlewares.oidc-auth.plugin.traefik-oidc-auth.ClientSecret=${CLIENT_SECRET}"
-      - "traefik.http.middlewares.oidc-auth.plugin.traefik-oidc-auth.UsernameHeaderName=X-Forwarded-User"

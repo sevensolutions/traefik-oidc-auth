@@ -17,6 +17,19 @@ func log(level string, format string, a ...interface{}) {
 	os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
 }
 
+func parseCookieSameSite(sameSite string) http.SameSite {
+	switch sameSite {
+	case "none":
+		return http.SameSiteNoneMode
+	case "lax":
+		return http.SameSiteLaxMode
+	case "strict":
+		return http.SameSiteStrictMode
+	default:
+		return http.SameSiteDefaultMode
+	}
+}
+
 func parseUrl(rawUrl string) (*url.URL, error) {
 	if rawUrl == "" {
 		return nil, errors.New("invalid empty url")
@@ -50,6 +63,15 @@ func getFullHost(req *http.Request) string {
 	}
 
 	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+func ensureAbsoluteUrl(req *http.Request, url string) string {
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return url
+	} else {
+		host := getFullHost(req)
+		return host + url
+	}
 }
 
 func (state *OidcState) base64Encode() (string, error) {
