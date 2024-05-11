@@ -2,7 +2,7 @@
 
 <p align="left" style="text-align:left;">
   <a href="https://github.com/sevensolutions/traefik-oidc-auth">
-    <img alt="Logo" src=".assets/logo.png" width="300" />
+    <img alt="Logo" src=".assets/icon.png" width="150" />
   </a>
 </p>
 
