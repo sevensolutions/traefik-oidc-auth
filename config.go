@@ -47,6 +47,7 @@ type StateCookieConfig struct {
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
+		Provider:              &ProviderConfig{},
 		Scopes:                []string{"openid"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
