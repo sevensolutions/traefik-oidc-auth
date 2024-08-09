@@ -17,6 +17,8 @@ iconPath: .assets/icon.png
 # Configuration data for your plugin.
 # This is mandatory, and Plugins Catalog will try to execute the plugin with the data you provide as part of its startup validity tests.
 testData:
-  ProviderURL: "my-provider-url.com"
-  ClientId: "<CLIENT_ID>"
-  ClientSecret: "<CLIENT_SECRET>"
+  Provider:
+    Url: "https://..."
+    ClientId: "<YourClientId>"
+    ClientSecret: "<YourClientSecret>"
+  Scopes: ["openid", "profile", "email"]
