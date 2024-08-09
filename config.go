@@ -70,6 +70,13 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, errors.New("missing provider configuration")
 	}
 
+	// Hack: Trick to traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
+	if config.Provider.Url == "https://..." {
+		return &TraefikOidcAuth{
+			next: next,
+		}, nil
+	}
+
 	if config.Provider.Url == "" && config.Provider.UrlEnv != "" {
 		config.Provider.Url = os.Getenv(config.Provider.UrlEnv)
 	}
