@@ -183,7 +183,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}
 
 	endSessionURL.RawQuery = url.Values{
-		"client_id":                {toa.Config.Provider.ClientID},
+		"client_id":                {toa.Config.Provider.ClientId},
 		"post_logout_redirect_uri": {callbackUri},
 		"state":                    {base64State},
 	}.Encode()
@@ -227,7 +227,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	redirectURL.RawQuery = url.Values{
 		"response_type": {"code"},
 		"scope":         {"openid profile email"},
-		"client_id":     {toa.Config.Provider.ClientID},
+		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {redirectUrl},
 		"state":         {stateBase64},
 	}.Encode()

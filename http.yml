@@ -11,7 +11,7 @@ http:
         traefik-oidc-auth:
           Provider:
             UrlEnv: "PROVIDER_URL"
-            ClientIDEnv: "CLIENT_ID"
+            ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
           Scopes: ["openid", "profile", "email"]
           # If set, only the /login endpoint will initiate the login flow
@@ -20,8 +20,7 @@ http:
 
   routers:
     whoami:
-      entryPoints:
-        - web
+      entryPoints: ["web"]
       rule: "HostRegexp(`.+`)"
       service: whoami
       middlewares: ["oidc-auth@file"]

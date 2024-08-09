@@ -30,8 +30,8 @@ type Config struct {
 type ProviderConfig struct {
 	Url             string `json:"url"`
 	UrlEnv          string `json:"url_env"`
-	ClientID        string `json:"client_id"`
-	ClientIDEnv     string `json:"client_id_env"`
+	ClientId        string `json:"client_id"`
+	ClientIdEnv     string `json:"client_id_env"`
 	ClientSecret    string `json:"client_secret"`
 	ClientSecretEnv string `json:"client_secret_env"`
 }
@@ -73,8 +73,8 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if config.Provider.Url == "" && config.Provider.UrlEnv != "" {
 		config.Provider.Url = os.Getenv(config.Provider.UrlEnv)
 	}
-	if config.Provider.ClientID == "" && config.Provider.ClientIDEnv != "" {
-		config.Provider.ClientID = os.Getenv(config.Provider.ClientIDEnv)
+	if config.Provider.ClientId == "" && config.Provider.ClientIdEnv != "" {
+		config.Provider.ClientId = os.Getenv(config.Provider.ClientIdEnv)
 	}
 	if config.Provider.ClientSecret == "" && config.Provider.ClientSecretEnv != "" {
 		config.Provider.ClientSecret = os.Getenv(config.Provider.ClientSecretEnv)
