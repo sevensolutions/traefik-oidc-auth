@@ -18,7 +18,7 @@ type TraefikOidcAuth struct {
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if strings.HasPrefix(req.RequestURI, toa.Config.RedirectUri) {
+	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) {
 		toa.handleCallback(rw, req)
 		return
 	}
@@ -79,13 +79,6 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 }
 
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
-	authCode := req.URL.Query().Get("code")
-	if authCode == "" {
-		log("WARN", "Code is missing, redirect to Provider")
-		toa.redirectToProvider(rw, req)
-		return
-	}
-
 	base64State := req.URL.Query().Get("state")
 	if base64State == "" {
 		log("WARN", "State is missing, redirect to Provider")
@@ -103,15 +96,28 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	redirectUrl := state.RedirectUrl
 
 	if state.Action == "Login" {
-		token, err := exchangeAuthCode(toa, req, authCode, state)
-
-		log("INFO", "Exchange Auth Code completed: %+v", token)
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			log("ERROR", "Exchange Auth Code: %s", err.Error())
+		authCode := req.URL.Query().Get("code")
+		if authCode == "" {
+			log("WARN", "Code is missing, redirect to Provider")
+			toa.redirectToProvider(rw, req)
 			return
 		}
 
+		token, err := exchangeAuthCode(toa, req, authCode, state)
+		if err != nil {
+			log("ERROR", "Exchange Auth Code: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		redactedToken := token
+		if len(redactedToken) > 16 {
+			redactedToken = redactedToken[0:16] + " *** REDACTED ***"
+		}
+
+		log("INFO", "Exchange Auth Code completed. Token: %+v", redactedToken)
+
+		// Set the cookie
 		http.SetCookie(rw, &http.Cookie{
 			Name:     toa.Config.StateCookie.Name,
 			Value:    "Bearer " + token,
@@ -121,10 +127,13 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
 		})
 
+		// If we have a static redirect uri, use this one
 		if toa.Config.PostLoginRedirectUri != "" {
 			redirectUrl = ensureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 		}
 	} else if state.Action == "Logout" {
+		log("DEBUG", "Post logout. Clearing cookie.")
+
 		// Clear the cookie
 		http.SetCookie(rw, &http.Cookie{
 			Name:    toa.Config.StateCookie.Name,
@@ -134,6 +143,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			MaxAge:  -1,
 		})
 	}
+
+	log("INFO", "Redirecting to %s", redirectUrl)
 
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
@@ -146,37 +157,36 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
 	if err != nil {
 		log("ERROR", "Error while parsing the AuthorizationEndpoint: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	host := getFullHost(req)
+	callbackUri := ensureAbsoluteUrl(req, toa.Config.CallbackUri)
+	redirectUri := ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
-	postLogoutUri := host + toa.Config.RedirectUri
+	if req.URL.Query().Get("redirect_uri") != "" {
+		redirectUri = ensureAbsoluteUrl(req, req.URL.Query().Get("redirect_uri"))
+	} else if req.URL.Query().Get("post_logout_redirect_uri") != "" {
+		redirectUri = ensureAbsoluteUrl(req, req.URL.Query().Get("post_logout_redirect_uri"))
+	}
 
-	// TODO: Grab redirect uri from query-param, if any
 	state := OidcState{
 		Action:      "Logout",
-		RedirectUrl: ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri),
+		RedirectUrl: redirectUri,
 	}
 
 	base64State, err := state.base64Encode()
 	if err != nil {
 		log("ERROR", "Failed to serialize state: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	endSessionURL.RawQuery = url.Values{
 		"client_id":                {toa.Config.Provider.ClientID},
-		"post_logout_redirect_uri": {postLogoutUri},
+		"post_logout_redirect_uri": {callbackUri},
 		"state":                    {base64State},
 	}.Encode()
-
-	// Clear the cookie
-	http.SetCookie(rw, &http.Cookie{
-		Name:    toa.Config.StateCookie.Name,
-		Value:   "",
-		Path:    toa.Config.StateCookie.Path,
-		Expires: time.Now().Add(-24 * time.Hour),
-		MaxAge:  -1,
-	})
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
@@ -194,9 +204,8 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 
 	host := getFullHost(req)
 
-	// TODO: Grab redirect uri from query-param, if any
 	originalUrl := fmt.Sprintf("%s%s", host, req.RequestURI)
-	redirectUrl := host + toa.Config.RedirectUri
+	redirectUrl := host + toa.Config.CallbackUri
 
 	state := OidcState{
 		Action:      "Login",
@@ -211,6 +220,8 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	redirectURL, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
 	if err != nil {
 		log("ERROR", "Error while parsing the AuthorizationEndpoint: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	redirectURL.RawQuery = url.Values{

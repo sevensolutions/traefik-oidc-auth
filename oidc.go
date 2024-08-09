@@ -152,7 +152,7 @@ func GetOidcDiscovery(providerUrl *url.URL) (*OidcDiscovery, error) {
 func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *OidcState) (string, error) {
 	host := getFullHost(req)
 
-	redirectUrl := host + oidcAuth.Config.RedirectUri
+	redirectUrl := host + oidcAuth.Config.CallbackUri
 
 	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint,
 		url.Values{

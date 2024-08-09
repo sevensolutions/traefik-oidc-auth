@@ -11,7 +11,7 @@ type Config struct {
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
 
-	RedirectUri string `json:"redirect_uri"`
+	CallbackUri string `json:"callback_uri"`
 
 	// The URL used to start authorization when needed.
 	// All other requests that are not already authorized will return a 401 Unauthorized.
@@ -44,10 +44,11 @@ type StateCookieConfig struct {
 	SameSite string `json:"same_site"`
 }
 
+// Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
 		Scopes:                []string{"openid"},
-		RedirectUri:           "/oidc/callback",
+		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
 		StateCookie: &StateCookieConfig{
@@ -61,6 +62,7 @@ func CreateConfig() *Config {
 	}
 }
 
+// Will be called by traefik
 func New(uctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	log("INFO", "Loading Configuration...")
 
@@ -69,9 +71,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	}
 
 	if config.Provider.Url == "" && config.Provider.UrlEnv != "" {
-		log("DEBUG", "Using URL ENV")
 		config.Provider.Url = os.Getenv(config.Provider.UrlEnv)
-		log("DEBUG", "Using URL ENV"+config.Provider.Url)
 	}
 	if config.Provider.ClientID == "" && config.Provider.ClientIDEnv != "" {
 		config.Provider.ClientID = os.Getenv(config.Provider.ClientIDEnv)
@@ -94,7 +94,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	log("INFO", "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
 
-	log("INFO", "Configuration loaded. Provider.Url: %v", parsedURL)
+	log("INFO", "Configuration loaded. Provider Url: %v", parsedURL)
 
 	return &TraefikOidcAuth{
 		next:              next,
