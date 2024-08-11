@@ -25,7 +25,7 @@ experimental:
   plugins:
     traefik-oidc-auth:
       moduleName: "github.com/sevensolutions/traefik-oidc-auth"
-      version: "v0.1.0"
+      version: "v0.2.0"
 ```
 
 Add a middleware and reference it in a route.
@@ -91,7 +91,7 @@ http:
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| AssertClaims | no | `AssertClaims[]` | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
+| AssertClaims | no | `ClaimAssertion[]` | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
 
 ### ClaimAssertion Block
 
