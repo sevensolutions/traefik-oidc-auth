@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   traefik:
-    image: "traefik:v3.0"
+    image: "traefik:v3.1.2"
     ports:
       - "9080:80"
       - "8080:8080"

@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type TraefikOidcAuth struct {
@@ -117,6 +120,10 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		log("INFO", "Exchange Auth Code completed. Token: %+v", redactedToken)
 
+		if !toa.isAuthorized(rw, token) {
+			return
+		}
+
 		// Set the cookie
 		http.SetCookie(rw, &http.Cookie{
 			Name:     toa.Config.StateCookie.Name,
@@ -189,6 +196,64 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}.Encode()
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
+}
+
+func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, token string) bool {
+	authorization := toa.Config.Authorization
+
+	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
+		claims := jwt.MapClaims{}
+		_, _, err := jwt.NewParser().ParseUnverified(token, claims)
+		if err != nil {
+			log("ERROR", "Failed to parse JWT token: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return false
+		}
+
+		for _, assertion := range authorization.AssertClaims {
+			found := false
+			isArray := assertion.Values != nil && len(assertion.Values) > 0
+
+			for key, val := range claims {
+				strVal := fmt.Sprintf("%v", val)
+				if key == assertion.Name {
+					if isArray {
+
+						for _, x := range fixGH10996(assertion.Values) {
+							log("DEBUG", "XX: %s", x)
+						}
+
+						// Note: Fix for https://github.com/traefik/traefik/issues/10996
+						if slices.Contains(fixGH10996(assertion.Values), strVal) {
+							found = true
+							break
+						}
+					} else if assertion.Value == "" || assertion.Value == strVal {
+						found = true
+						break
+					}
+				}
+			}
+
+			if !found {
+				if isArray {
+					log("WARN", "Unauthorized. Missing claim %s with value one of [%s].", assertion.Name, strings.Join(assertion.Values, ", "))
+				} else {
+					log("WARN", "Unauthorized. Missing claim %s with value %s.", assertion.Name, assertion.Value)
+				}
+
+				log("INFO", "Available claims are:")
+				for key, val := range claims {
+					log("INFO", "  %v = %v", key, val)
+				}
+
+				http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {

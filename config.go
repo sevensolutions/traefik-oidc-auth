@@ -25,6 +25,8 @@ type Config struct {
 
 	UsernameClaim      string `json:"user_claim_name"`
 	UsernameHeaderName string `json:"user_header_name"`
+
+	Authorization *AuthorizationConfig `json:"authorization"`
 }
 
 type ProviderConfig struct {
@@ -44,6 +46,16 @@ type StateCookieConfig struct {
 	SameSite string `json:"same_site"`
 }
 
+type AuthorizationConfig struct {
+	AssertClaims []ClaimAssertion `json:"assert_claims"`
+}
+
+type ClaimAssertion struct {
+	Name   string   `json:"name"`
+	Value  string   `json:"value"`
+	Values []string `json:"values"`
+}
+
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
@@ -60,6 +72,7 @@ func CreateConfig() *Config {
 			SameSite: "default",
 		},
 		UsernameClaim: "preferred_username",
+		Authorization: &AuthorizationConfig{},
 	}
 }
 

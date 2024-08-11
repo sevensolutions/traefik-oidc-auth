@@ -47,6 +47,10 @@ http:
             ClientId: "<YourClientId>"
             ClientSecret: "<YourClientSecret>"
           Scopes: ["openid", "profile", "email"]
+          Authorization:
+            AssertClaims:
+              - Name: "preferred_username"
+                Values: "alice@gmail.com,bob@gmail.com"
 
   routers:
     whoami:
@@ -58,29 +62,44 @@ http:
 
 ## 🛠 Configuration Options
 
-### Plugin Block
+### Plugin Config Block
 
-| Name | Required | Default | Description |
-|---|---|---|---|
-| Provider | yes | *none* | Identity Provider Configuration. See *Provider* block. |
-| Scopes | no | `["openid"]` | A list of scopes to request from the IDP. |
-| CallbackUri | no | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. |
-| LoginUri | no | `null` | An optional url, which should trigger the login-flow. By default every url triggers a login-flow, if the user is not already logged in. If you set this to eg. `/login`, only this url will trigger a login-flow while all other requests return *Unauthorized*.  |
-| PostLoginRedirectUri | no | `null` | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
-| LogoutUri | no | `/logout` | The url which should trigger a logout-flow. |
-| PostLogoutRedirectUri | no | `/` | The url where the user should be redirected after logout. |
-| UsernameClaim | no | `preferred_username` | The access_token-claim where to read the username from. |
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Provider | yes | `Provider` | *none* | Identity Provider Configuration. See *Provider* block. |
+| Scopes | no | `string[]` | `["openid"]` | A list of scopes to request from the IDP. |
+| CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. |
+| LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. By default every url triggers a login-flow, if the user is not already logged in. If you set this to eg. `/login`, only this url will trigger a login-flow while all other requests return *Unauthorized*.  |
+| PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
+| LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
+| PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
+| UsernameClaim | no | `string` | `preferred_username` | The access_token-claim where to read the username from. |
+| Authorization | no | `Authorization` | *none* | Authorization Configuration. See *Authorization* block. |
 
 ### Provider Block
 
-| Name | Required | Description |
-|---|---|---|
-| Url | no | The full URL of the Identity Provider. This is required, if *UrlEnv* is not used. |
-| UrlEnv | no | The name of an environment variable, containing the full URL of the Identity Provider. This is required, if *Url* is not used. |
-| ClientId | no | The client id of the application. This is required, if *ClientIdEnv* is not used. |
-| ClientIdEnv | no | The name of an environment variable, containing the client id. This is required, if *ClientId* is not used. |
-| ClientSecret | no | The client secret of the application. This is required, if *ClientSecretEnv* is not used. |
-| ClientSecretEnv | no | The name of an environment variable, containing the client secret. This is required, if *ClientSecret* is not used. |
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Url | no | `string` | *none* | The full URL of the Identity Provider. This is required, if *UrlEnv* is not used. |
+| UrlEnv | no | `string` | *none* | The name of an environment variable, containing the full URL of the Identity Provider. This is required, if *Url* is not used. |
+| ClientId | no | `string` | *none* | The client id of the application. This is required, if *ClientIdEnv* is not used. |
+| ClientIdEnv | no | `string` | *none* | The name of an environment variable, containing the client id. This is required, if *ClientId* is not used. |
+| ClientSecret | no | `string` | *none* | The client secret of the application. This is required, if *ClientSecretEnv* is not used. |
+| ClientSecretEnv | no | `string` | *none* | The name of an environment variable, containing the client secret. This is required, if *ClientSecret* is not used. |
+
+### Authorization Block
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| AssertClaims | no | `AssertClaims[]` | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
+
+### ClaimAssertion Block
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Name | yes | `string` | *none* | The name of the claim in the access token. |
+| Value | no | `string` | *none* | The required value of the claim. If *Value* and *Values* are not set, only the presence of the claim will be checked. |
+| Values | no | `string[]` | *none* | An array of allowed strings. The user is authorized if the claim matched any of these. |
 
 ## 🧪 Local Development
 
