@@ -47,7 +47,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		if token != "" {
 			isValid, username, err := introspectToken(toa, token)
 			if err != nil {
-				log("ERROR", "Verifying token: %s", err.Error())
+				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
 				toa.handleUnauthorized(rw, req)
 				return
 			}
@@ -84,14 +84,14 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
 	base64State := req.URL.Query().Get("state")
 	if base64State == "" {
-		log("WARN", "State is missing, redirect to Provider")
+		log(toa.Config.LogLevel, LogLevelWarn, "State is missing, redirect to Provider")
 		toa.redirectToProvider(rw, req)
 		return
 	}
 
 	state, err := base64DecodeState(base64State)
 	if err != nil {
-		log("WARN", "State is invalid, redirect to Provider")
+		log(toa.Config.LogLevel, LogLevelWarn, "State is invalid, redirect to Provider")
 		toa.redirectToProvider(rw, req)
 		return
 	}
@@ -101,14 +101,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			log("WARN", "Code is missing, redirect to Provider")
+			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing, redirect to Provider")
 			toa.redirectToProvider(rw, req)
 			return
 		}
 
 		token, err := exchangeAuthCode(toa, req, authCode, state)
 		if err != nil {
-			log("ERROR", "Exchange Auth Code: %s", err.Error())
+			log(toa.Config.LogLevel, LogLevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -118,7 +118,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			redactedToken = redactedToken[0:16] + " *** REDACTED ***"
 		}
 
-		log("INFO", "Exchange Auth Code completed. Token: %+v", redactedToken)
+		log(toa.Config.LogLevel, LogLevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
 		if !toa.isAuthorized(rw, token) {
 			return
@@ -139,7 +139,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			redirectUrl = ensureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 		}
 	} else if state.Action == "Logout" {
-		log("DEBUG", "Post logout. Clearing cookie.")
+		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
 		http.SetCookie(rw, &http.Cookie{
@@ -151,19 +151,19 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		})
 	}
 
-	log("INFO", "Redirecting to %s", redirectUrl)
+	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
 
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
 
 func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request) {
-	log("INFO", "Logging out...")
+	log(toa.Config.LogLevel, LogLevelInfo, "Logging out...")
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 
 	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
 	if err != nil {
-		log("ERROR", "Error while parsing the AuthorizationEndpoint: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -184,7 +184,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 
 	base64State, err := state.base64Encode()
 	if err != nil {
-		log("ERROR", "Failed to serialize state: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelError, "Failed to serialize state: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -205,7 +205,7 @@ func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, token string) b
 		claims := jwt.MapClaims{}
 		_, _, err := jwt.NewParser().ParseUnverified(token, claims)
 		if err != nil {
-			log("ERROR", "Failed to parse JWT token: %s", err.Error())
+			log(toa.Config.LogLevel, LogLevelError, "Failed to parse JWT token: %s", err.Error())
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return false
 		}
@@ -232,14 +232,14 @@ func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, token string) b
 
 			if !found {
 				if isArray {
-					log("WARN", "Unauthorized. Missing claim %s with value one of [%s].", assertion.Name, strings.Join(assertion.Values, ", "))
+					log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Missing claim %s with value one of [%s].", assertion.Name, strings.Join(assertion.Values, ", "))
 				} else {
-					log("WARN", "Unauthorized. Missing claim %s with value %s.", assertion.Name, assertion.Value)
+					log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Missing claim %s with value %s.", assertion.Name, assertion.Value)
 				}
 
-				log("INFO", "Available claims are:")
+				log(toa.Config.LogLevel, LogLevelInfo, "Available claims are:")
 				for key, val := range claims {
-					log("INFO", "  %v = %v", key, val)
+					log(toa.Config.LogLevel, LogLevelInfo, "  %v = %v", key, val)
 				}
 
 				http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -260,7 +260,7 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
-	log("INFO", "Redirecting to OIDC provider...")
+	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to OIDC provider...")
 
 	host := getFullHost(req)
 
@@ -275,11 +275,11 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	stateBytes, _ := json.Marshal(state)
 	stateBase64 := base64.StdEncoding.EncodeToString(stateBytes)
 
-	log("INFO", "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
+	log(toa.Config.LogLevel, LogLevelInfo, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 
 	redirectURL, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
 	if err != nil {
-		log("ERROR", "Error while parsing the AuthorizationEndpoint: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}

@@ -12,9 +12,17 @@ import (
 	"time"
 )
 
-func log(level string, format string, a ...interface{}) {
-	currentTime := time.Now().Format("2006-01-02 15:04:05")
-	os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
+func log(minLevel string, level string, format string, a ...interface{}) {
+	minLevel = strings.ToUpper(minLevel)
+	level = strings.ToUpper(level)
+
+	if (level == LogLevelError && (minLevel == LogLevelError || minLevel == LogLevelWarn || minLevel == LogLevelInfo || minLevel == LogLevelDebug)) ||
+		(level == LogLevelWarn && (minLevel == LogLevelWarn || minLevel == LogLevelInfo || minLevel == LogLevelDebug)) ||
+		(level == LogLevelInfo && (minLevel == LogLevelInfo || minLevel == LogLevelDebug)) ||
+		(level == LogLevelDebug && minLevel == LogLevelDebug) {
+		currentTime := time.Now().Format("2006-01-02 15:04:05")
+		os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
+	}
 }
 
 func parseCookieSameSite(sameSite string) http.SameSite {

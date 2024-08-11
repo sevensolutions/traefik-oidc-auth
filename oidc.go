@@ -107,7 +107,7 @@ type OidcState struct {
 	RedirectUrl string `json:"redirect_url"`
 }
 
-func GetOidcDiscovery(providerUrl *url.URL) (*OidcDiscovery, error) {
+func GetOidcDiscovery(logLevel string, providerUrl *url.URL) (*OidcDiscovery, error) {
 	wellKnownUrl := *providerUrl
 
 	wellKnownUrl.Path = path.Join(wellKnownUrl.Path, ".well-known/openid-configuration")
@@ -125,7 +125,7 @@ func GetOidcDiscovery(providerUrl *url.URL) (*OidcDiscovery, error) {
 	resp, err := http.Get(wellKnownUrl.String())
 
 	if err != nil {
-		log("ERROR", "http-get discovery endpoints - Err: %s", err.Error())
+		log(logLevel, LogLevelError, "http-get discovery endpoints - Err: %s", err.Error())
 		return nil, errors.New("HTTP GET error")
 	}
 
@@ -133,7 +133,7 @@ func GetOidcDiscovery(providerUrl *url.URL) (*OidcDiscovery, error) {
 
 	// Check if the response status code is successful
 	if resp.StatusCode >= 300 {
-		log("ERROR", "http-get OIDC discovery endpoints - http status code: %s", resp.Status)
+		log(logLevel, LogLevelError, "http-get OIDC discovery endpoints - http status code: %s", resp.Status)
 		return nil, errors.New("HTTP error - Status code: " + resp.Status)
 	}
 
@@ -142,7 +142,7 @@ func GetOidcDiscovery(providerUrl *url.URL) (*OidcDiscovery, error) {
 	err = json.NewDecoder(resp.Body).Decode(&document)
 
 	if err != nil {
-		log("ERROR", "Failed to decode OIDC discovery document. Status code: %s", err.Error())
+		log(logLevel, LogLevelError, "Failed to decode OIDC discovery document. Status code: %s", err.Error())
 		return &document, errors.New("Failed to decode OIDC discovery document. Status code: " + err.Error())
 	}
 
@@ -164,21 +164,21 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		})
 
 	if err != nil {
-		log("ERROR", "Sending AuthorizationCode in POST: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "Sending AuthorizationCode in POST: %s", err.Error())
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log("ERROR", "Received bad HTTP response from Provider: %s", string(body))
+		log(oidcAuth.Config.LogLevel, LogLevelError, "Received bad HTTP response from Provider: %s", string(body))
 		return "", err
 	}
 
 	var tokenResponse OidcTokenResponse
 	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
 	if err != nil {
-		log("ERROR", "Decoding ProviderTokenResponse: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "Decoding ProviderTokenResponse: %s", err.Error())
 		return "", err
 	}
 
@@ -207,7 +207,7 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, err
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log("ERROR", "Error on introspection request: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "Error on introspection request: %s", err.Error())
 		return false, "", err
 	}
 
@@ -217,7 +217,7 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, err
 	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
 
 	if err != nil {
-		log("ERROR", "Failed to decode introspection response: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "Failed to decode introspection response: %s", err.Error())
 		return false, "", err
 	}
 

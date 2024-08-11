@@ -7,7 +7,16 @@ import (
 	"os"
 )
 
+const (
+	LogLevelDebug string = "DEBUG"
+	LogLevelInfo  string = "INFO"
+	LogLevelWarn  string = "WARN"
+	LogLevelError string = "ERROR"
+)
+
 type Config struct {
+	LogLevel string `json:"log_level"`
+
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
 
@@ -59,6 +68,7 @@ type ClaimAssertion struct {
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
+		LogLevel:              LogLevelError,
 		Provider:              &ProviderConfig{},
 		Scopes:                []string{"openid"},
 		CallbackUri:           "/oidc/callback",
@@ -78,7 +88,7 @@ func CreateConfig() *Config {
 
 // Will be called by traefik
 func New(uctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	log("INFO", "Loading Configuration...")
+	log(config.LogLevel, LogLevelInfo, "Loading Configuration...")
 
 	if config.Provider == nil {
 		return nil, errors.New("missing provider configuration")
@@ -103,19 +113,19 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	parsedURL, err := parseUrl(config.Provider.Url)
 	if err != nil {
-		log("ERROR", "Error while parsing Provider.Url: %s", err.Error())
+		log(config.LogLevel, LogLevelError, "Error while parsing Provider.Url: %s", err.Error())
 		return nil, err
 	}
 
-	oidcDiscoveryDocument, err := GetOidcDiscovery(parsedURL)
+	oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, parsedURL)
 	if err != nil {
-		log("ERROR", "Error while retrieving discovery document: %s", err.Error())
+		log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
 		return nil, err
 	}
 
-	log("INFO", "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
+	log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
 
-	log("INFO", "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
 
 	return &TraefikOidcAuth{
 		next:              next,

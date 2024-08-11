@@ -9,6 +9,7 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
+          LogLevel: DEBUG
           Provider:
             UrlEnv: "PROVIDER_URL"
             ClientIdEnv: "CLIENT_ID"
