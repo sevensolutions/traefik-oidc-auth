@@ -15,6 +15,12 @@ http:
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
           Scopes: ["openid", "profile", "email"]
+          Headers:
+            MapClaims:
+              - Claim: "preferred_username"
+                Header: "X-Oidc-Username"
+              - Claim: "sub"
+                Header: "X-Oidc-Subject"
           # If set, only the /login endpoint will initiate the login flow
           #LoginUri: "/login"
           #PostLoginRedirectUri: "/"

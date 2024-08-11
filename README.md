@@ -51,7 +51,13 @@ http:
             AssertClaims:
               - Name: "preferred_username"
                 Values: "alice@gmail.com,bob@gmail.com"
-
+          Headers:
+            MapClaims:
+              - Claim: "preferred_username"
+                Header: "X-Oidc-Username"
+              - Claim: "sub"
+                Header: "X-Oidc-Subject"
+  
   routers:
     whoami:
       entryPoints: ["web"]
@@ -73,8 +79,8 @@ http:
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
-| UsernameClaim | no | `string` | `preferred_username` | The access_token-claim where to read the username from. |
 | Authorization | no | `Authorization` | *none* | Authorization Configuration. See *Authorization* block. |
+| Headers | no | `Headers` | *none* | Header Configuration. See *Headers* block. |
 
 ### Provider Block
 
@@ -100,6 +106,19 @@ http:
 | Name | yes | `string` | *none* | The name of the claim in the access token. |
 | Value | no | `string` | *none* | The required value of the claim. If *Value* and *Values* are not set, only the presence of the claim will be checked. |
 | Values | no | `string[]` | *none* | An array of allowed strings. The user is authorized if the claim matched any of these. |
+
+### Headers Block
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| MapClaims | no | `ClaimHeader[]` | *none* | A list of claims which should be mapped as headers when the request will be sent to the upstream. See *ClaimHeader* block. |
+
+### ClaimHeader Block
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Claim | no | `string` | *none* | The name of the claim |
+| Header | no | `string` | *none* | The name of the header which should receive the claim value. |
 
 ## 🧪 Local Development
 

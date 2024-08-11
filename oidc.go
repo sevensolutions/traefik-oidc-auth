@@ -185,7 +185,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse.AccessToken, nil
 }
 
-func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, error) {
+func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, map[string]interface{}, error) {
 	client := &http.Client{}
 
 	data := url.Values{
@@ -199,7 +199,7 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, err
 	)
 
 	if err != nil {
-		return false, "", err
+		return false, nil, err
 	}
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -208,7 +208,7 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, err
 	resp, err := client.Do(req)
 	if err != nil {
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Error on introspection request: %s", err.Error())
-		return false, "", err
+		return false, nil, err
 	}
 
 	defer resp.Body.Close()
@@ -218,17 +218,17 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, string, err
 
 	if err != nil {
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Failed to decode introspection response: %s", err.Error())
-		return false, "", err
+		return false, nil, err
 	}
 
-	username := ""
+	// username := ""
 
-	if oidcAuth.Config.UsernameClaim != "" {
-		val, ok := introspectResponse[oidcAuth.Config.UsernameClaim]
-		if ok {
-			username = val.(string)
-		}
-	}
+	// if oidcAuth.Config.UsernameClaim != "" {
+	// 	val, ok := introspectResponse[oidcAuth.Config.UsernameClaim]
+	// 	if ok {
+	// 		username = val.(string)
+	// 	}
+	// }
 
-	return introspectResponse["active"].(bool), username, nil
+	return introspectResponse["active"].(bool), introspectResponse, nil
 }

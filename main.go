@@ -42,10 +42,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		token := strings.Trim(strings.TrimPrefix(cookie.Value, "Bearer "), " ")
 
 		var ok = false
-		var usernameClaim string
 
 		if token != "" {
-			isValid, username, err := introspectToken(toa, token)
+			isValid, claims, err := introspectToken(toa, token)
 			if err != nil {
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
 				toa.handleUnauthorized(rw, req)
@@ -53,7 +52,17 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			}
 
 			ok = isValid
-			usernameClaim = username
+
+			if ok {
+				for _, claimMap := range toa.Config.Headers.MapClaims {
+					for claimName, claimValue := range claims {
+						if claimName == claimMap.Claim {
+							req.Header.Set(claimMap.Header, fmt.Sprintf("%s", claimValue))
+							break
+						}
+					}
+				}
+			}
 		}
 
 		if !ok {
@@ -67,10 +76,6 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 			toa.handleUnauthorized(rw, req)
 			return
-		}
-
-		if len(toa.Config.UsernameHeaderName) > 0 && len(usernameClaim) > 0 {
-			req.Header.Set(toa.Config.UsernameHeaderName, usernameClaim)
 		}
 
 		// Forward the request
