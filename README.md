@@ -117,8 +117,8 @@ http:
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| Claim | no | `string` | *none* | The name of the claim |
-| Header | no | `string` | *none* | The name of the header which should receive the claim value. |
+| Claim | yes | `string` | *none* | The name of the claim |
+| Header | yes | `string` | *none* | The name of the header which should receive the claim value. |
 
 ## 🧪 Local Development
 
