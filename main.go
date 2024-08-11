@@ -218,11 +218,6 @@ func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, token string) b
 				strVal := fmt.Sprintf("%v", val)
 				if key == assertion.Name {
 					if isArray {
-
-						for _, x := range fixGH10996(assertion.Values) {
-							log("DEBUG", "XX: %s", x)
-						}
-
 						// Note: Fix for https://github.com/traefik/traefik/issues/10996
 						if slices.Contains(fixGH10996(assertion.Values), strVal) {
 							found = true
