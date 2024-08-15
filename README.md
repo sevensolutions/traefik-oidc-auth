@@ -6,7 +6,7 @@
   </a>
 </p>
 
-A traefik Plugin for securing the upstream service with OpenID Connect using the Relying Party Flow.
+A traefik Plugin for securing the upstream service with OpenID Connect acting as a relying party.
 
 > [!NOTE]  
 > This document always represents the latest version, which may not have been released yet.  
