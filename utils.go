@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -116,4 +117,24 @@ func fixGH10996(ymlArray []string) []string {
 
 	// Remove the first two entries. I don't know what they are.
 	return realArray[2:]
+}
+
+func ParseBigInt(s string) (*big.Int, error) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return big.NewInt(0).SetBytes(b), nil
+}
+
+func ParseInt(s string) (int, error) {
+	v, err := ParseBigInt(s)
+
+	if err != nil {
+		return -1, err
+	}
+
+	return int(v.Int64()), nil
 }

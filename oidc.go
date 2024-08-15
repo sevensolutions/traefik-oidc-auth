@@ -10,7 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type OidcEndpoints struct {
@@ -214,54 +215,33 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse.AccessToken, nil
 }
 
-func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, map[string]interface{}, error) {
-	client := &http.Client{}
+func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.MapClaims, error) {
+	claims := jwt.MapClaims{}
 
-	data := url.Values{
-		"token": {token},
-	}
-
-	req, err := http.NewRequest(
-		http.MethodPost,
-		oidcAuth.DiscoveryDocument.IntrospectionEndpoint,
-		strings.NewReader(data.Encode()),
-	)
-
+	err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, false)
 	if err != nil {
 		return false, nil, err
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(oidcAuth.Config.Provider.ClientId, oidcAuth.Config.Provider.ClientSecret)
+	parser := jwt.NewParser()
 
-	resp, err := client.Do(req)
-	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Error on introspection request: %s", err.Error())
-		return false, nil, err
-	}
-
-	defer resp.Body.Close()
-
-	var introspectResponse map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
+	_, err = parser.ParseWithClaims(tokenString, &claims, oidcAuth.Jwks.Keyfunc)
 
 	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Failed to decode introspection response: %s", err.Error())
-		return false, nil, err
+		err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, true)
+		if err != nil {
+			return false, nil, err
+		}
+
+		_, err = parser.ParseWithClaims(tokenString, &claims, oidcAuth.Jwks.Keyfunc)
+
+		if err != nil {
+			return false, nil, err
+		}
 	}
 
-	// username := ""
+	// TODO: Remove this. I don't know why, but ParseWithClaims() isn't returning claims
+	_, _, err = parser.ParseUnverified(tokenString, claims)
 
-	// if oidcAuth.Config.UsernameClaim != "" {
-	// 	val, ok := introspectResponse[oidcAuth.Config.UsernameClaim]
-	// 	if ok {
-	// 		username = val.(string)
-	// 	}
-	// }
-
-	if introspectResponse["active"] != nil {
-		return introspectResponse["active"].(bool), introspectResponse, nil
-	} else {
-		return false, nil, errors.New("received invalid introspection response")
-	}
+	return true, &claims, nil
 }

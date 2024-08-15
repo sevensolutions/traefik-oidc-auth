@@ -20,6 +20,7 @@ type TraefikOidcAuth struct {
 	ProviderURL       *url.URL
 	Config            *Config
 	DiscoveryDocument *OidcDiscovery
+	Jwks              *JwksHandler
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -46,7 +47,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		var ok = false
 
 		if token != "" {
-			isValid, claims, err := introspectToken(toa, token)
+			isValid, claims, err := validateToken(toa, token)
 			if err != nil {
 				// TODO: Should we return InternalServerError here?
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
@@ -56,9 +57,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 			ok = isValid
 
-			if ok {
+			if ok && claims != nil {
 				for _, claimMap := range toa.Config.Headers.MapClaims {
-					for claimName, claimValue := range claims {
+					for claimName, claimValue := range *claims {
 						if claimName == claimMap.Claim {
 							req.Header.Set(claimMap.Header, fmt.Sprintf("%s", claimValue))
 							break
@@ -314,13 +315,14 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		urlValues.Add("code_challenge_method", "S256")
 		urlValues.Add("code_challenge", codeChallenge)
 
+		// TODO: Make configurable and encrypt cookie
 		http.SetCookie(rw, &http.Cookie{
-			Name:     "CodeVerifier", // TODO: Make configurable
+			Name:     "CodeVerifier",
 			Value:    codeVerifier,
 			Secure:   true,
 			HttpOnly: true,
 			Path:     toa.Config.CallbackUri,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteDefaultMode,
 		})
 	}
 

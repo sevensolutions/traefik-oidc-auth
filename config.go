@@ -141,5 +141,8 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		ProviderURL:       parsedURL,
 		Config:            config,
 		DiscoveryDocument: oidcDiscoveryDocument,
+		Jwks: &JwksHandler{
+			Url: oidcDiscoveryDocument.JWKSURI,
+		},
 	}, nil
 }
