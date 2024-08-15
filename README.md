@@ -73,7 +73,7 @@ http:
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | Provider | yes | `Provider` | *none* | Identity Provider Configuration. See *Provider* block. |
-| Scopes | no | `string[]` | `["openid"]` | A list of scopes to request from the IDP. |
+| Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. |
 | LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. By default every url triggers a login-flow, if the user is not already logged in. If you set this to eg. `/login`, only this url will trigger a login-flow while all other requests return *Unauthorized*.  |
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |

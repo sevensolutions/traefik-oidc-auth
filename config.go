@@ -78,7 +78,7 @@ func CreateConfig() *Config {
 	return &Config{
 		LogLevel:              LogLevelError,
 		Provider:              &ProviderConfig{},
-		Scopes:                []string{"openid"},
+		Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",

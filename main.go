@@ -291,7 +291,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 
 	redirectURL.RawQuery = url.Values{
 		"response_type": {"code"},
-		"scope":         {"openid profile email"},
+		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {redirectUrl},
 		"state":         {stateBase64},
