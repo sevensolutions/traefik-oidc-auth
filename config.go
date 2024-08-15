@@ -44,6 +44,7 @@ type ProviderConfig struct {
 	ClientIdEnv     string `json:"client_id_env"`
 	ClientSecret    string `json:"client_secret"`
 	ClientSecretEnv string `json:"client_secret_env"`
+	UsePkce         bool   `json:"use_pkce"`
 }
 
 type StateCookieConfig struct {

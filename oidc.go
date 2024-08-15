@@ -1,8 +1,11 @@
 package traefik_oidc_auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -149,19 +152,45 @@ func GetOidcDiscovery(logLevel string, providerUrl *url.URL) (*OidcDiscovery, er
 	return &document, nil
 }
 
+func randomBytesInHex(count int) (string, error) {
+	buf := make([]byte, count)
+	_, err := io.ReadFull(rand.Reader, buf)
+	if err != nil {
+		return "", fmt.Errorf("could not generate %d random bytes: %v", count, err)
+	}
+
+	return hex.EncodeToString(buf), nil
+}
+
 func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *OidcState) (string, error) {
 	host := getFullHost(req)
 
 	redirectUrl := host + oidcAuth.Config.CallbackUri
 
-	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint,
-		url.Values{
-			"grant_type":    {"authorization_code"},
-			"client_id":     {oidcAuth.Config.Provider.ClientId},
-			"client_secret": {oidcAuth.Config.Provider.ClientSecret},
-			"code":          {authCode},
-			"redirect_uri":  {redirectUrl},
-		})
+	urlValues := url.Values{
+		"grant_type":   {"authorization_code"},
+		"client_id":    {oidcAuth.Config.Provider.ClientId},
+		"code":         {authCode},
+		"redirect_uri": {redirectUrl},
+	}
+
+	if oidcAuth.Config.Provider.ClientSecret != "" {
+		urlValues.Add("client_secret", oidcAuth.Config.Provider.ClientSecret)
+	}
+
+	if oidcAuth.Config.Provider.UsePkce {
+		codeVerifierCookie, err := req.Cookie("CodeVerifier")
+		if err != nil {
+			return "", err
+		}
+		codeVerifier := codeVerifierCookie.Value
+
+		log(oidcAuth.Config.LogLevel, LogLevelDebug, "Code Verifier: %s", codeVerifier)
+
+		urlValues.Add("code_verifier", codeVerifier)
+	}
+
+	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint, urlValues)
 
 	if err != nil {
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Sending AuthorizationCode in POST: %s", err.Error())
@@ -230,5 +259,9 @@ func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, map[string]
 	// 	}
 	// }
 
-	return introspectResponse["active"].(bool), introspectResponse, nil
+	if introspectResponse["active"] != nil {
+		return introspectResponse["active"].(bool), introspectResponse, nil
+	} else {
+		return false, nil, errors.New("received invalid introspection response")
+	}
 }

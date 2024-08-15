@@ -1,9 +1,11 @@
 package traefik_oidc_auth
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -46,6 +48,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		if token != "" {
 			isValid, claims, err := introspectToken(toa, token)
 			if err != nil {
+				// TODO: Should we return InternalServerError here?
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
 				toa.handleUnauthorized(rw, req)
 				return
@@ -289,13 +292,39 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		return
 	}
 
-	redirectURL.RawQuery = url.Values{
+	urlValues := url.Values{
 		"response_type": {"code"},
 		"scope":         {"openid profile email"},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {redirectUrl},
 		"state":         {stateBase64},
-	}.Encode()
+	}
+
+	if toa.Config.Provider.UsePkce {
+		codeVerifier, err := randomBytesInHex(32)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		sha2 := sha256.New()
+		io.WriteString(sha2, codeVerifier)
+		codeChallenge := base64.RawURLEncoding.EncodeToString(sha2.Sum(nil))
+
+		urlValues.Add("code_challenge_method", "S256")
+		urlValues.Add("code_challenge", codeChallenge)
+
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "CodeVerifier", // TODO: Make configurable
+			Value:    codeVerifier,
+			Secure:   true,
+			HttpOnly: true,
+			Path:     toa.Config.CallbackUri,
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
+
+	redirectURL.RawQuery = urlValues.Encode()
 
 	http.Redirect(rw, req, redirectURL.String(), http.StatusFound)
 }
