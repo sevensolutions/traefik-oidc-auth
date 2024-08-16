@@ -226,7 +226,7 @@ func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.Ma
 	}
 
 	parser := jwt.NewParser(
-		jwt.WithIssuer(oidcAuth.Config.Provider.Url),
+		jwt.WithIssuer(oidcAuth.DiscoveryDocument.Issuer),
 		jwt.WithExpirationRequired(),
 	)
 
