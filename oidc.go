@@ -184,9 +184,11 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		if err != nil {
 			return "", err
 		}
-		codeVerifier := codeVerifierCookie.Value
 
-		log(oidcAuth.Config.LogLevel, LogLevelDebug, "Code Verifier: %s", codeVerifier)
+		codeVerifier, err := decrypt(codeVerifierCookie.Value, oidcAuth.Config.Secret)
+		if err != nil {
+			return "", err
+		}
 
 		urlValues.Add("code_verifier", codeVerifier)
 	}

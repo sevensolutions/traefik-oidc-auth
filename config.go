@@ -17,6 +17,8 @@ const (
 type Config struct {
 	LogLevel string `json:"log_level"`
 
+	Secret string `json:"secret"`
+
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
 
@@ -78,6 +80,7 @@ type ClaimHeaderConfig struct {
 func CreateConfig() *Config {
 	return &Config{
 		LogLevel:              LogLevelError,
+		Secret:                "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
 		Provider:              &ProviderConfig{},
 		Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
