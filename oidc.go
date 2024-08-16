@@ -225,9 +225,12 @@ func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.Ma
 		return false, nil, err
 	}
 
-	parser := jwt.NewParser()
+	parser := jwt.NewParser(
+		jwt.WithIssuer(oidcAuth.Config.Provider.Url),
+		jwt.WithExpirationRequired(),
+	)
 
-	_, err = parser.ParseWithClaims(tokenString, &claims, oidcAuth.Jwks.Keyfunc)
+	_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
 
 	if err != nil {
 		err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, true)
@@ -235,15 +238,12 @@ func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.Ma
 			return false, nil, err
 		}
 
-		_, err = parser.ParseWithClaims(tokenString, &claims, oidcAuth.Jwks.Keyfunc)
+		_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
 
 		if err != nil {
 			return false, nil, err
 		}
 	}
-
-	// TODO: Remove this. I don't know why, but ParseWithClaims() isn't returning claims
-	_, _, err = parser.ParseUnverified(tokenString, claims)
 
 	return true, &claims, nil
 }
