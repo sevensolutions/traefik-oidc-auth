@@ -46,6 +46,7 @@ http:
             Url: "https://..."
             ClientId: "<YourClientId>"
             ClientSecret: "<YourClientSecret>"
+            #UsePkce: true # Or use PKCE instead of a secret
           Scopes: ["openid", "profile", "email"]
           Authorization:
             AssertClaims:
@@ -72,6 +73,7 @@ http:
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
+| Secret | no | `string` | `MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ`| A secret used for encryption. Must be a 32 character string. |
 | Provider | yes | `Provider` | *none* | Identity Provider Configuration. See *Provider* block. |
 | Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. |
@@ -90,8 +92,9 @@ http:
 | UrlEnv | no | `string` | *none* | The name of an environment variable, containing the full URL of the Identity Provider. This is required, if *Url* is not used. |
 | ClientId | no | `string` | *none* | The client id of the application. This is required, if *ClientIdEnv* is not used. |
 | ClientIdEnv | no | `string` | *none* | The name of an environment variable, containing the client id. This is required, if *ClientId* is not used. |
-| ClientSecret | no | `string` | *none* | The client secret of the application. This is required, if *ClientSecretEnv* is not used. |
-| ClientSecretEnv | no | `string` | *none* | The name of an environment variable, containing the client secret. This is required, if *ClientSecret* is not used. |
+| ClientSecret | no | `string` | *none* | The client secret of the application. This is required, if *ClientSecretEnv* is not used and *UsePkce* is false. |
+| ClientSecretEnv | no | `string` | *none* | The name of an environment variable, containing the client secret. This is required, if *ClientSecret* and *UsePkce* are not used. |
+| UsePkce | no | `bool` | `false`| Enable PKCE. In this case, a client secret is not needed. |
 
 ### Authorization Block
 
