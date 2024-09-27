@@ -230,39 +230,47 @@ func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
 	authorization := toa.Config.Authorization
 
 	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
-		for _, assertion := range authorization.AssertClaims {
-			found := false
-			isArray := assertion.Values != nil && len(assertion.Values) > 0
+		parsed := parseJsonRecursively(*claims)
 
-			for key, val := range *claims {
-				strVal := fmt.Sprintf("%v", val)
-				if key == assertion.Name {
-					if isArray {
-						if slices.Contains(assertion.Values, strVal) {
-							found = true
-							break
-						}
-					} else if assertion.Value == "" || assertion.Value == strVal {
-						found = true
-						break
-					}
-				}
-			}
-
-			if !found {
-				if isArray {
-					log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Missing claim %s with value one of [%s].", assertion.Name, strings.Join(assertion.Values, ", "))
-				} else {
-					log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Missing claim %s with value %s.", assertion.Name, assertion.Value)
-				}
-
-				log(toa.Config.LogLevel, LogLevelInfo, "Available claims are:")
-				for key, val := range *claims {
-					log(toa.Config.LogLevel, LogLevelInfo, "  %v = %v", key, val)
-				}
-
+		assertions: for _, assertion := range authorization.AssertClaims {
+			value, ok := parsed[assertion.Name]
+			if !ok {
+				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Unable to find claim %s in token claims.", assertion.Name)
 				return false
 			}
+
+			switch val := value.(type) {
+				// the value is any array
+				case []string:
+					if assertion.ContainsAny != nil && len(assertion.ContainsAny) > 0 {
+						// check whether any of the values of `ContainsAny` is contained in `val`
+						for _, inner_val := range val {
+							if slices.Contains(assertion.ContainsAny, inner_val) {
+								continue assertions
+							}
+						}
+						log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected claim %s of type array to contain any of [%s].", assertion.Name, strings.Join(assertion.ContainsAny, ", "))
+					} else if assertion.Contains == "" || slices.Contains(val, assertion.Contains) {
+						continue assertions
+					} else {
+						log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected claim %s of type array to contain %s.", assertion.Name, assertion.Contains)
+					}
+				// the value is of type int or string
+				case string:
+					if assertion.Values != nil && len(assertion.Values) > 0 {
+						// check whether any of the values contains `val`
+						if slices.Contains(assertion.Values, val) {
+							continue assertions
+						}
+						log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected value of claim %s to be one of [%s].", assertion.Name, strings.Join(assertion.Values, ", "))
+					} else if assertion.Value == "" || assertion.Value == val {
+						continue assertions
+					} else {
+						log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected value of claim %s to be %s.", assertion.Name, assertion.Value)
+					}
+			}
+
+			return false
 		}
 	}
 

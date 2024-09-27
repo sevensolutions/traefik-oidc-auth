@@ -8,8 +8,8 @@
 
 A traefik Plugin for securing the upstream service with OpenID Connect acting as a relying party.
 
-> [!NOTE]  
-> This document always represents the latest version, which may not have been released yet.  
+> [!NOTE]
+> This document always represents the latest version, which may not have been released yet.
 > Therefore, some features may not be available currently but will be available soon.
 > You can use the GIT-Tags to check individual versions.
 
@@ -52,13 +52,17 @@ http:
             AssertClaims:
               - Name: "preferred_username"
                 Values: "alice@gmail.com,bob@gmail.com"
+              - Name: "roles"
+                ContainsAny: "admin,media"
+              - Name: "user.first_name"
+                Value: "Alice"
           Headers:
             MapClaims:
               - Claim: "preferred_username"
                 Header: "X-Oidc-Username"
               - Claim: "sub"
                 Header: "X-Oidc-Subject"
-  
+
   routers:
     whoami:
       entryPoints: ["web"]
@@ -110,11 +114,27 @@ http:
 
 ### ClaimAssertion Block
 
+If the `Name` property is set without any further properties only the presence of a claim with such a name is checked.
+
+Should the value of the claim with this name be of type array the `Contains` and `ContainsAny` assertions are used. For all other types the value is stringified and the `Value` and `Values`
+assertions are used.
+
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | Name | yes | `string` | *none* | The name of the claim in the access token. |
-| Value | no | `string` | *none* | The required value of the claim. If *Value* and *Values* are not set, only the presence of the claim will be checked. |
+| Value | no | `string` | *none* | The required value of the claim. |
 | Values | no | `string[]` | *none* | An array of allowed strings. The user is authorized if the claim matched any of these. |
+| Contains | no | `string` | *none* | The required value the claim array has to contain.
+| ContainsAny | no | `string[]` | *none* | An array of allowed strings. The user is authorized if any entry of the claim array matched any of these. |
+
+> [!NOTE]
+> When creating assertions for nested values you can use the dot notation as name of the claim:
+>
+> **Example**:
+> ```typescript
+> { "outer": { "inner": 111 } }
+> ```
+> To create an assertion for the `inner` key you can use `outer.inner` as name of the claim
 
 ### Headers Block
 
@@ -141,5 +161,5 @@ CLIENT_SECRET=...
 
 The run `docker compose up` to run traefik locally.
 
-Now browse to http://localhost:9080. You should be redirected to your IDP.  
+Now browse to http://localhost:9080. You should be redirected to your IDP.
 After you've logged in, you should be redirected back to http://localhost:9080 and see a WHOAMI page.

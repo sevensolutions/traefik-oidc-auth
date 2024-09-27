@@ -113,6 +113,35 @@ func base64DecodeState(base64State string) (*OidcState, error) {
 	return &state, nil
 }
 
+// Parse a json object into usable form. All values are either strings or arrays of strings
+// Nested objects are flattened to keys with dot-notation (e.g. { "test": { "asdf": 1 }} becomes { "test.asdf": "1" })
+// An exception are object arrays: The objects of the array are simply stringified but not flattened in any way
+func parseJsonRecursively(object map[string]interface{}) map[string]interface{} {
+	m := make(map[string]interface{})
+	for key, val := range object {
+		switch val := val.(type) {
+			// the value is any array
+			case []interface{}:
+				arr := make([]string, len(val))
+				for index, inner_val := range val {
+					arr[index] = fmt.Sprintf("%v", inner_val)
+				}
+				m[key] = arr
+			// the value is an object itself
+			case map[string]interface{}:
+				for inner_key, inner_val := range parseJsonRecursively(val) {
+					m[fmt.Sprintf("%s.%s", key, inner_key)] = inner_val
+				}
+			// the value is of type int or string
+			case string:
+				m[key] = val
+			case int:
+				m[key] = fmt.Sprintf("%d", val)
+		}
+	}
+	return m
+}
+
 func ParseBigInt(s string) (*big.Int, error) {
 	b, err := base64.RawURLEncoding.DecodeString(s)
 
