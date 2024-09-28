@@ -1,9 +1,11 @@
 package traefik_oidc_auth
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -18,6 +20,7 @@ type TraefikOidcAuth struct {
 	ProviderURL       *url.URL
 	Config            *Config
 	DiscoveryDocument *OidcDiscovery
+	Jwks              *JwksHandler
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -44,8 +47,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		var ok = false
 
 		if token != "" {
-			isValid, claims, err := introspectToken(toa, token)
+			isValid, claims, err := validateToken(toa, token)
 			if err != nil {
+				// TODO: Should we return InternalServerError here?
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
 				toa.handleUnauthorized(rw, req)
 				return
@@ -53,9 +57,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 			ok = isValid
 
-			if ok {
+			if ok && claims != nil {
 				for _, claimMap := range toa.Config.Headers.MapClaims {
-					for claimName, claimValue := range claims {
+					for claimName, claimValue := range *claims {
 						if claimName == claimMap.Claim {
 							req.Header.Set(claimMap.Header, fmt.Sprintf("%s", claimValue))
 							break
@@ -123,9 +127,16 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			redactedToken = redactedToken[0:16] + " *** REDACTED ***"
 		}
 
+		_, claims, err := validateToken(toa, token)
+		if err != nil {
+			log(toa.Config.LogLevel, LogLevelError, "Returned token is not valid: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		log(toa.Config.LogLevel, LogLevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
-		if !toa.isAuthorized(rw, token) {
+		if !toa.isAuthorized(rw, claims) {
 			return
 		}
 
@@ -137,6 +148,17 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			HttpOnly: toa.Config.StateCookie.HttpOnly,
 			Path:     toa.Config.StateCookie.Path,
 			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
+		})
+
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "CodeVerifier",
+			Value:    "",
+			Expires:  time.Now().Add(-24 * time.Hour),
+			MaxAge:   -1,
+			Secure:   true,
+			HttpOnly: true,
+			Path:     toa.Config.CallbackUri,
+			SameSite: http.SameSiteDefaultMode,
 		})
 
 		// If we have a static redirect uri, use this one
@@ -203,23 +225,15 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, token string) bool {
+func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, claims *jwt.MapClaims) bool {
 	authorization := toa.Config.Authorization
 
 	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
-		claims := jwt.MapClaims{}
-		_, _, err := jwt.NewParser().ParseUnverified(token, claims)
-		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Failed to parse JWT token: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return false
-		}
-
 		for _, assertion := range authorization.AssertClaims {
 			found := false
 			isArray := assertion.Values != nil && len(assertion.Values) > 0
 
-			for key, val := range claims {
+			for key, val := range *claims {
 				strVal := fmt.Sprintf("%v", val)
 				if key == assertion.Name {
 					if isArray {
@@ -243,7 +257,7 @@ func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, token string) b
 				}
 
 				log(toa.Config.LogLevel, LogLevelInfo, "Available claims are:")
-				for key, val := range claims {
+				for key, val := range *claims {
 					log(toa.Config.LogLevel, LogLevelInfo, "  %v = %v", key, val)
 				}
 
@@ -280,7 +294,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	stateBytes, _ := json.Marshal(state)
 	stateBase64 := base64.StdEncoding.EncodeToString(stateBytes)
 
-	log(toa.Config.LogLevel, LogLevelInfo, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
+	log(toa.Config.LogLevel, LogLevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 
 	redirectURL, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
 	if err != nil {
@@ -289,13 +303,46 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		return
 	}
 
-	redirectURL.RawQuery = url.Values{
+	urlValues := url.Values{
 		"response_type": {"code"},
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {redirectUrl},
 		"state":         {stateBase64},
-	}.Encode()
+	}
+
+	if toa.Config.Provider.UsePkce {
+		codeVerifier, err := randomBytesInHex(32)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		sha2 := sha256.New()
+		io.WriteString(sha2, codeVerifier)
+		codeChallenge := base64.RawURLEncoding.EncodeToString(sha2.Sum(nil))
+
+		urlValues.Add("code_challenge_method", "S256")
+		urlValues.Add("code_challenge", codeChallenge)
+
+		encryptedCodeVerifier, err := encrypt(codeVerifier, toa.Config.Secret)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// TODO: Make configurable
+		http.SetCookie(rw, &http.Cookie{
+			Name:     "CodeVerifier",
+			Value:    encryptedCodeVerifier,
+			Secure:   true,
+			HttpOnly: true,
+			Path:     toa.Config.CallbackUri,
+			SameSite: http.SameSiteDefaultMode,
+		})
+	}
+
+	redirectURL.RawQuery = urlValues.Encode()
 
 	http.Redirect(rw, req, redirectURL.String(), http.StatusFound)
 }

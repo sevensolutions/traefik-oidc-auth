@@ -1,13 +1,17 @@
 package traefik_oidc_auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type OidcEndpoints struct {
@@ -149,19 +153,47 @@ func GetOidcDiscovery(logLevel string, providerUrl *url.URL) (*OidcDiscovery, er
 	return &document, nil
 }
 
+func randomBytesInHex(count int) (string, error) {
+	buf := make([]byte, count)
+	_, err := io.ReadFull(rand.Reader, buf)
+	if err != nil {
+		return "", fmt.Errorf("could not generate %d random bytes: %v", count, err)
+	}
+
+	return hex.EncodeToString(buf), nil
+}
+
 func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *OidcState) (string, error) {
 	host := getFullHost(req)
 
 	redirectUrl := host + oidcAuth.Config.CallbackUri
 
-	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint,
-		url.Values{
-			"grant_type":    {"authorization_code"},
-			"client_id":     {oidcAuth.Config.Provider.ClientId},
-			"client_secret": {oidcAuth.Config.Provider.ClientSecret},
-			"code":          {authCode},
-			"redirect_uri":  {redirectUrl},
-		})
+	urlValues := url.Values{
+		"grant_type":   {"authorization_code"},
+		"client_id":    {oidcAuth.Config.Provider.ClientId},
+		"code":         {authCode},
+		"redirect_uri": {redirectUrl},
+	}
+
+	if oidcAuth.Config.Provider.ClientSecret != "" {
+		urlValues.Add("client_secret", oidcAuth.Config.Provider.ClientSecret)
+	}
+
+	if oidcAuth.Config.Provider.UsePkce {
+		codeVerifierCookie, err := req.Cookie("CodeVerifier")
+		if err != nil {
+			return "", err
+		}
+
+		codeVerifier, err := decrypt(codeVerifierCookie.Value, oidcAuth.Config.Secret)
+		if err != nil {
+			return "", err
+		}
+
+		urlValues.Add("code_verifier", codeVerifier)
+	}
+
+	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint, urlValues)
 
 	if err != nil {
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Sending AuthorizationCode in POST: %s", err.Error())
@@ -185,50 +217,41 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse.AccessToken, nil
 }
 
-func introspectToken(oidcAuth *TraefikOidcAuth, token string) (bool, map[string]interface{}, error) {
-	client := &http.Client{}
+func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.MapClaims, error) {
+	claims := jwt.MapClaims{}
 
-	data := url.Values{
-		"token": {token},
-	}
-
-	req, err := http.NewRequest(
-		http.MethodPost,
-		oidcAuth.DiscoveryDocument.IntrospectionEndpoint,
-		strings.NewReader(data.Encode()),
-	)
-
+	err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, false)
 	if err != nil {
 		return false, nil, err
 	}
 
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(oidcAuth.Config.Provider.ClientId, oidcAuth.Config.Provider.ClientSecret)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Error on introspection request: %s", err.Error())
-		return false, nil, err
+	options := []jwt.ParserOption{
+		jwt.WithExpirationRequired(),
 	}
 
-	defer resp.Body.Close()
-
-	var introspectResponse map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
-
-	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Failed to decode introspection response: %s", err.Error())
-		return false, nil, err
+	if oidcAuth.Config.Provider.ValidateIssuer {
+		options = append(options, jwt.WithIssuer(oidcAuth.Config.Provider.ValidIssuer))
+	}
+	if oidcAuth.Config.Provider.ValidateAudience {
+		options = append(options, jwt.WithAudience(oidcAuth.Config.Provider.ValidAudience))
 	}
 
-	// username := ""
+	parser := jwt.NewParser(options...)
 
-	// if oidcAuth.Config.UsernameClaim != "" {
-	// 	val, ok := introspectResponse[oidcAuth.Config.UsernameClaim]
-	// 	if ok {
-	// 		username = val.(string)
-	// 	}
-	// }
+	_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
 
-	return introspectResponse["active"].(bool), introspectResponse, nil
+	if err != nil {
+		err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, true)
+		if err != nil {
+			return false, nil, err
+		}
+
+		_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
+
+		if err != nil {
+			return false, nil, err
+		}
+	}
+
+	return true, &claims, nil
 }

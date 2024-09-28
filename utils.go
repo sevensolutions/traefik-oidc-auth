@@ -1,10 +1,14 @@
 package traefik_oidc_auth
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -116,4 +120,78 @@ func fixGH10996(ymlArray []string) []string {
 
 	// Remove the first two entries. I don't know what they are.
 	return realArray[2:]
+}
+
+func ParseBigInt(s string) (*big.Int, error) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return big.NewInt(0).SetBytes(b), nil
+}
+
+func ParseInt(s string) (int, error) {
+	v, err := ParseBigInt(s)
+
+	if err != nil {
+		return -1, err
+	}
+
+	return int(v.Int64()), nil
+}
+
+func encrypt(plaintext string, secret string) (string, error) {
+	aes, err := aes.NewCipher([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(aes)
+	if err != nil {
+		return "", err
+	}
+
+	// We need a 12-byte nonce for GCM (modifiable if you use cipher.NewGCMWithNonceSize())
+	// A nonce should always be randomly generated for every encryption.
+	nonce := make([]byte, gcm.NonceSize())
+	_, err = rand.Read(nonce)
+	if err != nil {
+		return "", err
+	}
+
+	// ciphertext here is actually nonce+ciphertext
+	// So that when we decrypt, just knowing the nonce size
+	// is enough to separate it from the ciphertext.
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+func decrypt(ciphertext string, secret string) (string, error) {
+	cipherbytes, err := base64.StdEncoding.DecodeString(ciphertext)
+	ciphertext = string(cipherbytes)
+
+	aes, err := aes.NewCipher([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(aes)
+	if err != nil {
+		return "", err
+	}
+
+	// Since we know the ciphertext is actually nonce+ciphertext
+	// And len(nonce) == NonceSize(). We can separate the two.
+	nonceSize := gcm.NonceSize()
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+
+	plaintext, err := gcm.Open(nil, []byte(nonce), []byte(ciphertext), nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(plaintext), nil
 }
