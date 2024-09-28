@@ -136,7 +136,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		log(toa.Config.LogLevel, LogLevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
-		if !toa.isAuthorized(rw, claims) {
+		if !toa.isAuthorized(claims) {
+			http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 
@@ -225,7 +226,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, claims *jwt.MapClaims) bool {
+func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
 	authorization := toa.Config.Authorization
 
 	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
@@ -237,8 +238,7 @@ func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, claims *jwt.Map
 				strVal := fmt.Sprintf("%v", val)
 				if key == assertion.Name {
 					if isArray {
-						// Note: Fix for https://github.com/traefik/traefik/issues/10996
-						if slices.Contains(fixGH10996(assertion.Values), strVal) {
+						if slices.Contains(assertion.Values, strVal) {
 							found = true
 							break
 						}
@@ -261,7 +261,6 @@ func (toa *TraefikOidcAuth) isAuthorized(rw http.ResponseWriter, claims *jwt.Map
 					log(toa.Config.LogLevel, LogLevelInfo, "  %v = %v", key, val)
 				}
 
-				http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return false
 			}
 		}

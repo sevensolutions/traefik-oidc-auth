@@ -113,15 +113,6 @@ func base64DecodeState(base64State string) (*OidcState, error) {
 	return &state, nil
 }
 
-func fixGH10996(ymlArray []string) []string {
-	firstEntry := ymlArray[0]
-
-	realArray := strings.Split(firstEntry, "║")
-
-	// Remove the first two entries. I don't know what they are.
-	return realArray[2:]
-}
-
 func ParseBigInt(s string) (*big.Int, error) {
 	b, err := base64.RawURLEncoding.DecodeString(s)
 
