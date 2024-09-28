@@ -270,6 +270,11 @@ func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
 					}
 			}
 
+			log(toa.Config.LogLevel, LogLevelInfo, "Available claims are:")
+			for key, val := range *claims {
+				log(toa.Config.LogLevel, LogLevelInfo, "  %v = %v", key, val)
+			}
+
 			return false
 		}
 	}
