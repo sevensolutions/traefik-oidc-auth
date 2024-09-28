@@ -40,13 +40,23 @@ type Config struct {
 }
 
 type ProviderConfig struct {
-	Url             string `json:"url"`
-	UrlEnv          string `json:"url_env"`
+	Url    string `json:"url"`
+	UrlEnv string `json:"url_env"`
+
 	ClientId        string `json:"client_id"`
 	ClientIdEnv     string `json:"client_id_env"`
 	ClientSecret    string `json:"client_secret"`
 	ClientSecretEnv string `json:"client_secret_env"`
-	UsePkce         bool   `json:"use_pkce"`
+
+	UsePkce bool `json:"use_pkce"`
+
+	ValidateAudience bool   `json:"validate_audience"`
+	ValidAudience    string `json:"valid_audience"`
+	ValidAudienceEnv string `json:"valid_audience_env"`
+
+	ValidateIssuer bool   `json:"validate_issuer"`
+	ValidIssuer    string `json:"valid_issuer"`
+	ValidIssuerEnv string `json:"valid_issuer_env"`
 }
 
 type StateCookieConfig struct {
@@ -79,9 +89,12 @@ type ClaimHeaderConfig struct {
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
-		LogLevel:              LogLevelError,
-		Secret:                "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
-		Provider:              &ProviderConfig{},
+		LogLevel: LogLevelError,
+		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
+		Provider: &ProviderConfig{
+			ValidateIssuer:   true,
+			ValidateAudience: true,
+		},
 		Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
@@ -122,6 +135,12 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if config.Provider.ClientSecret == "" && config.Provider.ClientSecretEnv != "" {
 		config.Provider.ClientSecret = os.Getenv(config.Provider.ClientSecretEnv)
 	}
+	if config.Provider.ValidIssuer == "" && config.Provider.ValidIssuerEnv != "" {
+		config.Provider.ValidIssuer = os.Getenv(config.Provider.ValidIssuerEnv)
+	}
+	if config.Provider.ValidAudience == "" && config.Provider.ValidAudienceEnv != "" {
+		config.Provider.ValidAudience = os.Getenv(config.Provider.ValidAudienceEnv)
+	}
 
 	parsedURL, err := parseUrl(config.Provider.Url)
 	if err != nil {
@@ -133,6 +152,14 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if err != nil {
 		log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
 		return nil, err
+	}
+
+	// Apply defaults
+	if config.Provider.ValidIssuer == "" {
+		config.Provider.ValidIssuer = oidcDiscoveryDocument.Issuer
+	}
+	if config.Provider.ValidAudience == "" {
+		config.Provider.ValidAudience = config.Provider.ClientId
 	}
 
 	log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)

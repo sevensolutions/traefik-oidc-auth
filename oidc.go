@@ -225,10 +225,18 @@ func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.Ma
 		return false, nil, err
 	}
 
-	parser := jwt.NewParser(
-		jwt.WithIssuer(oidcAuth.DiscoveryDocument.Issuer),
+	options := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
-	)
+	}
+
+	if oidcAuth.Config.Provider.ValidateIssuer {
+		options = append(options, jwt.WithIssuer(oidcAuth.Config.Provider.ValidIssuer))
+	}
+	if oidcAuth.Config.Provider.ValidateAudience {
+		options = append(options, jwt.WithAudience(oidcAuth.Config.Provider.ValidAudience))
+	}
+
+	parser := jwt.NewParser(options...)
 
 	_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
 
