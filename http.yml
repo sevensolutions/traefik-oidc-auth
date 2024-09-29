@@ -23,6 +23,12 @@ http:
                 Header: "X-Oidc-Username"
               - Claim: "sub"
                 Header: "X-Oidc-Subject"
+          # Authorization:
+          #   AssertClaims:
+          #     - Name: roles
+          #       AnyOf: ["admin", "media"]
+          #     - Name: some.nested.key
+          #       AnyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
           #LoginUri: "/login"
           #PostLoginRedirectUri: "/"

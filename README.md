@@ -51,11 +51,11 @@ http:
           Authorization:
             AssertClaims:
               - Name: "preferred_username"
-                Values: "alice@gmail.com,bob@gmail.com"
+                AnyOf: ["alice@gmail.com", "bob@gmail.com"]
               - Name: "roles"
-                ContainsAny: "admin,media"
+                AllOf: ["admin", "media"]
               - Name: "user.first_name"
-                Value: "Alice"
+                AnyOf: ["Alice"]
           Headers:
             MapClaims:
               - Claim: "preferred_username"
@@ -114,27 +114,69 @@ http:
 
 ### ClaimAssertion Block
 
-If the `Name` property is set without any further properties only the presence of a claim with such a name is checked.
-
-Should the value of the claim with this name be of type array the `Contains` and `ContainsAny` assertions are used. For all other types the value is stringified and the `Value` and `Values`
-assertions are used.
+If only the `Name` property is set and no additional assertions are defined it is only checked whether there exist any matches for the name of this claim without any verification on their values.
+Additionaly, the `Name` field can be any [json path](https://jsonpath.com/). The `Name` gets prefixed with `$.` to match from the root element. The usage of json paths allows for assertions on deeply nested json structures.
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | Name | yes | `string` | *none* | The name of the claim in the access token. |
-| Value | no | `string` | *none* | The required value of the claim. |
-| Values | no | `string[]` | *none* | An array of allowed strings. The user is authorized if the claim matched any of these. |
-| Contains | no | `string` | *none* | The required value the claim array has to contain.
-| ContainsAny | no | `string[]` | *none* | An array of allowed strings. The user is authorized if any entry of the claim array matched any of these. |
+| AnyOf | no | `string[]` | *none* | An array of allowed strings. The user is authorized if any value matching the name of the claim contains (or is) a value of this array. |
+| AllOf | no | `string[]` | *none* | An array of required strings. The user is only authorized if any value matching the name of the claim contains (or is) a value of this array and all values of this array are covered in the end. |
 
-> [!NOTE]
-> When creating assertions for nested values you can use the dot notation as name of the claim:
->
-> **Example**:
-> ```typescript
-> { "outer": { "inner": 111 } }
-> ```
-> To create an assertion for the `inner` key you can use `outer.inner` as name of the claim
+It is possible to combine `AnyOf` and `AllOf` quantifiers for one assertion
+
+<details>
+  <summary>
+    <b>Examples</b>
+  </summary>
+  All of the examples below work on this json structure:
+
+  ```json
+  {
+      "store": {
+        "bicycle": {
+          "color": "red",
+          "price": 19.95
+        },
+        "book": [
+          {
+            "author": "Herman Melville",
+            "category": "fiction",
+            "isbn": "0-553-21311-3",
+            "price": 8.99,
+            "title": "Moby Dick"
+          },
+          {
+            "author": "J. R. R. Tolkien",
+            "category": "fiction",
+            "isbn": "0-395-19395-8",
+            "price": 22.99,
+            "title": "The Lord of the Rings"
+          }
+        ],
+      }
+    }
+  ```
+
+  **Example**: Expect array to contain a set of values
+  ```yaml
+  Name: store.book[*].price
+  AllOf: [ 22.99, 8.99 ]
+  ```
+  This assertion would succeed as the `book` array contains all values specified by the `AllOf` quantifier
+  ```yaml
+  Name: store.book[*].price
+  AllOf: [ 22.99, 8.99, 1 ]
+  ```
+  This assertion would fail as the `book` array contains no entry for which the `price` is `1`
+
+  **Example**: Expect object key to be any value of a set of values
+  ```yaml
+  Name: store.bicycle.color
+  AnyOf: [ "red", "blue", "green" ]
+  ```
+  This assertion would succeed as the `store` object contains a `bicycle` object whose `color` is `red`
+</details>
 
 ### Headers Block
 
