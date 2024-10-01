@@ -72,9 +72,9 @@ type AuthorizationConfig struct {
 }
 
 type ClaimAssertion struct {
-	Name   string   `json:"name"`
-	Value  string   `json:"value"`
-	Values []string `json:"values"`
+	Name  string   `json:"name"`
+	AnyOf []string `json:"anyOf"`
+	AllOf []string `json:"allOf"`
 }
 
 type HeadersConfig struct {

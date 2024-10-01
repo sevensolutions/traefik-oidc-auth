@@ -8,11 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type TraefikOidcAuth struct {
@@ -224,49 +221,6 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}.Encode()
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
-}
-
-func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
-	authorization := toa.Config.Authorization
-
-	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
-		for _, assertion := range authorization.AssertClaims {
-			found := false
-			isArray := assertion.Values != nil && len(assertion.Values) > 0
-
-			for key, val := range *claims {
-				strVal := fmt.Sprintf("%v", val)
-				if key == assertion.Name {
-					if isArray {
-						if slices.Contains(assertion.Values, strVal) {
-							found = true
-							break
-						}
-					} else if assertion.Value == "" || assertion.Value == strVal {
-						found = true
-						break
-					}
-				}
-			}
-
-			if !found {
-				if isArray {
-					log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Missing claim %s with value one of [%s].", assertion.Name, strings.Join(assertion.Values, ", "))
-				} else {
-					log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Missing claim %s with value %s.", assertion.Name, assertion.Value)
-				}
-
-				log(toa.Config.LogLevel, LogLevelInfo, "Available claims are:")
-				for key, val := range *claims {
-					log(toa.Config.LogLevel, LogLevelInfo, "  %v = %v", key, val)
-				}
-
-				return false
-			}
-		}
-	}
-
-	return true
 }
 
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
