@@ -16,6 +16,15 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 > [!WARNING]
 > This middleware is under development and only tested against [ZITADEL](https://zitadel.com/) yet. Although it should be compatible with any OIDC-compatible IDP.
 
+## Tested Providers
+
+| Provider | Status | Notes |
+|---|---|---|
+| [ZITADEL](https://zitadel.com/) | ✅ | |
+| [Kanidm](https://github.com/kanidm/kanidm) | ✅ | See [GH-12](https://github.com/sevensolutions/traefik-oidc-auth/issues/12) |
+| [Microsoft EntraID](https://learn.microsoft.com/de-de/entra/identity/) | ⚠️ | See [GH-15](https://github.com/sevensolutions/traefik-oidc-auth/issues/15) |
+| [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
+
 ## 💡 Getting Started
 
 Enable the plugin in your traefik configuration.
