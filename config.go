@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const (
@@ -95,7 +96,9 @@ func CreateConfig() *Config {
 			ValidateIssuer:   true,
 			ValidateAudience: true,
 		},
-		Scopes:                []string{"openid", "profile", "email"},
+		// Note: It looks like we're not allowed to specify a default value for arrays here.
+		// Maybe a traefik bug. So I've moved this to the New() method.
+		//Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
@@ -142,6 +145,11 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		config.Provider.ValidAudience = os.Getenv(config.Provider.ValidAudienceEnv)
 	}
 
+	// Specify default scopes if not provided
+	if config.Scopes == nil || len(config.Scopes) == 0 {
+		config.Scopes = []string{"openid", "profile", "email"}
+	}
+
 	parsedURL, err := parseUrl(config.Provider.Url)
 	if err != nil {
 		log(config.LogLevel, LogLevelError, "Error while parsing Provider.Url: %s", err.Error())
@@ -165,6 +173,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 
 	return &TraefikOidcAuth{
 		next:              next,

@@ -8,8 +8,20 @@ services:
       - "./traefik-config.yml:/etc/traefik/traefik.yml:ro"
       - "./http.yml:/etc/traefik/configs/http.yml:ro"
       - ".:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - ./.env
 
   whoami:
     image: "traefik/whoami:latest"
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.whoami.rule=HostRegexp(`.+`)
+    #   - traefik.http.routers.whoami.middlewares=auth
+    #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.logLevel=DEBUG
+    #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.provider.urlEnv=PROVIDER_URL
+    #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.provider.usepkce=true
+    #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.provider.clientidEnv=CLIENT_ID
+    #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.provider.clientsecretEnv=CLIENT_SECRET
+    #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.scopes=openid,profile
+    #   #- traefik.http.middlewares.auth.plugin.traefik-oidc-auth.scopes[0]=openid

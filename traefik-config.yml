@@ -21,3 +21,6 @@ providers:
   file:
     filename: /etc/traefik/configs/http.yml
     watch: true
+  # docker:
+  #   endpoint: "unix:///var/run/docker.sock"
+  #   exposedByDefault: false
