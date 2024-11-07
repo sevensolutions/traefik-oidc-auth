@@ -50,6 +50,7 @@ type ProviderConfig struct {
 	ClientSecretEnv string `json:"client_secret_env"`
 
 	UsePkce bool `json:"use_pkce"`
+	UseIdToken bool `json:"use_id_token"`
 
 	ValidateAudience bool   `json:"validate_audience"`
 	ValidAudience    string `json:"valid_audience"`

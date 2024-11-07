@@ -97,6 +97,7 @@ type OidcDiscovery struct {
 
 type OidcTokenResponse struct {
 	AccessToken  string `json:"access_token"`
+	IdToken      string `json:"id_token"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
@@ -214,7 +215,13 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		return "", err
 	}
 
-	return tokenResponse.AccessToken, nil
+	if oidcAuth.Config.Provider.UseIdToken {
+		log(oidcAuth.Config.LogLevel, LogLevelDebug, "Using ID Token as configured")
+		return tokenResponse.IdToken, nil
+	} else {
+		log(oidcAuth.Config.LogLevel, LogLevelDebug, "Using Access Token as configured")
+		return tokenResponse.AccessToken, nil
+	}
 }
 
 func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.MapClaims, error) {
