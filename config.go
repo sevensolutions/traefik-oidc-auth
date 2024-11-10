@@ -159,25 +159,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, err
 	}
 
-	oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, parsedURL)
-	if err != nil {
-		log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
-		return nil, err
-	}
-
-	// Apply defaults
-	if config.Provider.ValidIssuer == "" {
-		config.Provider.ValidIssuer = oidcDiscoveryDocument.Issuer
-	}
-	if config.Provider.ValidAudience == "" {
-		config.Provider.ValidAudience = config.Provider.ClientId
-	}
-
-	log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
-
-	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
-	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
-
 	if config.Provider.TokenValidation == "" {
 		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
 		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
@@ -187,14 +168,13 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}
 	}
 
+	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
+
 	return &TraefikOidcAuth{
-		next:              next,
-		ProviderURL:       parsedURL,
-		Config:            config,
-		SessionStorage:    CreateCookieSessionStorage(),
-		DiscoveryDocument: oidcDiscoveryDocument,
-		Jwks: &JwksHandler{
-			Url: oidcDiscoveryDocument.JWKSURI,
-		},
+		next:           next,
+		ProviderURL:    parsedURL,
+		Config:         config,
+		SessionStorage: CreateCookieSessionStorage(),
 	}, nil
 }
