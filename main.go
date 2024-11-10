@@ -109,12 +109,12 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, 
 		return false, nil, nil
 	}
 
-	if toa.Config.Provider.VerificationToken == "AccessToken" {
+	if toa.Config.Provider.TokenValidation == "AccessToken" {
 		return validateToken(toa, session.AccessToken)
-	} else if toa.Config.Provider.VerificationToken == "IdToken" {
+	} else if toa.Config.Provider.TokenValidation == "IdToken" {
 		return validateToken(toa, session.IdToken)
 	} else {
-		return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for VerificationToken", toa.Config.Provider.VerificationToken))
+		return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation))
 	}
 }
 
@@ -152,12 +152,12 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		usedToken := ""
 
-		if toa.Config.Provider.VerificationToken == "AccessToken" {
+		if toa.Config.Provider.TokenValidation == "AccessToken" {
 			usedToken = token.AccessToken
-		} else if toa.Config.Provider.VerificationToken == "IdToken" {
+		} else if toa.Config.Provider.TokenValidation == "IdToken" {
 			usedToken = token.IdToken
 		} else {
-			log(toa.Config.LogLevel, LogLevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.VerificationToken)
+			log(toa.Config.LogLevel, LogLevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 		}
 

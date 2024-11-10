@@ -59,8 +59,8 @@ type ProviderConfig struct {
 	ValidIssuer    string `json:"valid_issuer"`
 	ValidIssuerEnv string `json:"valid_issuer_env"`
 
-	// AccessToken or IdToken
-	VerificationToken string `json:"verification_token"`
+	// AccessToken or IdToken (maybe later "Introspection")
+	TokenValidation string `json:"verification_token"`
 }
 
 type StateCookieConfig struct {
@@ -96,9 +96,8 @@ func CreateConfig() *Config {
 		LogLevel: LogLevelError,
 		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
 		Provider: &ProviderConfig{
-			ValidateIssuer:    true,
-			ValidateAudience:  true,
-			VerificationToken: "AccessToken",
+			ValidateIssuer:   true,
+			ValidateAudience: true,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
@@ -178,6 +177,15 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
+
+	if config.Provider.TokenValidation == "" {
+		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
+		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
+			config.Provider.TokenValidation = "IdToken"
+		} else {
+			config.Provider.TokenValidation = "AccessToken"
+		}
+	}
 
 	return &TraefikOidcAuth{
 		next:              next,
