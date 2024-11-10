@@ -97,6 +97,7 @@ type OidcDiscovery struct {
 
 type OidcTokenResponse struct {
 	AccessToken  string `json:"access_token"`
+	IdToken      string `json:"id_token"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
@@ -163,7 +164,7 @@ func randomBytesInHex(count int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *OidcState) (string, error) {
+func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *OidcState) (*OidcTokenResponse, error) {
 	host := getFullHost(req)
 
 	redirectUrl := host + oidcAuth.Config.CallbackUri
@@ -182,12 +183,12 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	if oidcAuth.Config.Provider.UsePkce {
 		codeVerifierCookie, err := req.Cookie("CodeVerifier")
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		codeVerifier, err := decrypt(codeVerifierCookie.Value, oidcAuth.Config.Secret)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		urlValues.Add("code_verifier", codeVerifier)
@@ -197,24 +198,24 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 
 	if err != nil {
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Sending AuthorizationCode in POST: %s", err.Error())
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Received bad HTTP response from Provider: %s", string(body))
-		return "", err
+		return nil, err
 	}
 
-	var tokenResponse OidcTokenResponse
-	err = json.NewDecoder(resp.Body).Decode(&tokenResponse)
+	tokenResponse := &OidcTokenResponse{}
+	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
 	if err != nil {
 		log(oidcAuth.Config.LogLevel, LogLevelError, "Decoding ProviderTokenResponse: %s", err.Error())
-		return "", err
+		return nil, err
 	}
 
-	return tokenResponse.AccessToken, nil
+	return tokenResponse, nil
 }
 
 func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.MapClaims, error) {

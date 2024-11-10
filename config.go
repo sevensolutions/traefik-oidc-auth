@@ -58,6 +58,9 @@ type ProviderConfig struct {
 	ValidateIssuer bool   `json:"validate_issuer"`
 	ValidIssuer    string `json:"valid_issuer"`
 	ValidIssuerEnv string `json:"valid_issuer_env"`
+
+	// AccessToken or IdToken
+	VerificationToken string `json:"verification_token"`
 }
 
 type StateCookieConfig struct {
@@ -93,8 +96,9 @@ func CreateConfig() *Config {
 		LogLevel: LogLevelError,
 		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
 		Provider: &ProviderConfig{
-			ValidateIssuer:   true,
-			ValidateAudience: true,
+			ValidateIssuer:    true,
+			ValidateAudience:  true,
+			VerificationToken: "AccessToken",
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.

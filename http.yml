@@ -15,6 +15,7 @@ http:
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: true
+            VerificationToken: "IdToken"
             #ValidAudience: "280538749656466235"
           Scopes: ["openid", "profile", "email"]
           Headers:
