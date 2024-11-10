@@ -34,7 +34,7 @@ experimental:
   plugins:
     traefik-oidc-auth:
       moduleName: "github.com/sevensolutions/traefik-oidc-auth"
-      version: "v0.3.0"
+      version: "v0.3.2"
 ```
 
 Add a middleware and reference it in a route.
