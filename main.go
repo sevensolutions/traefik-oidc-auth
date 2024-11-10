@@ -10,12 +10,15 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type TraefikOidcAuth struct {
 	next              http.Handler
 	ProviderURL       *url.URL
 	Config            *Config
+	SessionStorage    SessionStorage
 	DiscoveryDocument *OidcDiscovery
 	Jwks              *JwksHandler
 }
@@ -38,13 +41,13 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 	cookie, err := req.Cookie(toa.Config.StateCookie.Name)
 
-	if err == nil && strings.HasPrefix(cookie.Value, "Bearer ") {
-		token := strings.Trim(strings.TrimPrefix(cookie.Value, "Bearer "), " ")
+	if err == nil {
+		sessionTicket := cookie.Value
 
 		var ok = false
 
-		if token != "" {
-			isValid, claims, err := validateToken(toa, token)
+		if sessionTicket != "" {
+			isValid, claims, err := validateSessionTicket(toa, sessionTicket)
 			if err != nil {
 				// TODO: Should we return InternalServerError here?
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
@@ -85,6 +88,28 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	}
 
 	toa.handleUnauthorized(rw, req)
+}
+
+func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, *jwt.MapClaims, error) {
+	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket")
+		return false, nil, err
+	}
+
+	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Reading session failed: %v", err)
+		return false, nil, err
+	}
+	if session == nil {
+		log(toa.Config.LogLevel, LogLevelDebug, "No session found")
+		return false, nil, nil
+	}
+
+	log(toa.Config.LogLevel, LogLevelDebug, "Session found")
+
+	return validateToken(toa, session.AccessToken)
 }
 
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
@@ -138,10 +163,31 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
+		session := SessionState{
+			AccessToken: token,
+		}
+		sessionId := GenerateSessionId()
+
+		sessionTicket, err := toa.SessionStorage.StoreSession(sessionId, session)
+		if err != nil {
+			log(toa.Config.LogLevel, LogLevelError, "Failed to store session: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		log(toa.Config.LogLevel, LogLevelDebug, "Session stored. Id %s", sessionId)
+
+		encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
+		if err != nil {
+			log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session ticket: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		// Set the cookie
 		http.SetCookie(rw, &http.Cookie{
 			Name:     toa.Config.StateCookie.Name,
-			Value:    "Bearer " + token,
+			Value:    encryptedSessionTicket,
 			Secure:   toa.Config.StateCookie.Secure,
 			HttpOnly: toa.Config.StateCookie.HttpOnly,
 			Path:     toa.Config.StateCookie.Path,

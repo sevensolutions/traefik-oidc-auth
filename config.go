@@ -179,6 +179,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		next:              next,
 		ProviderURL:       parsedURL,
 		Config:            config,
+		SessionStorage:    CreateCookieSessionStorage(),
 		DiscoveryDocument: oidcDiscoveryDocument,
 		Jwks: &JwksHandler{
 			Url: oidcDiscoveryDocument.JWKSURI,
