@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,9 +19,57 @@ type TraefikOidcAuth struct {
 	Config            *Config
 	DiscoveryDocument *OidcDiscovery
 	Jwks              *JwksHandler
+	Lock              sync.RWMutex
+}
+
+// Make sure we fetch oidc discovery document during first request - avoid race condition
+// Perform lock when changing document - we are in concurrent environment
+func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
+	var config = toa.Config
+	var parsedURL = toa.ProviderURL
+	if toa.DiscoveryDocument == nil {
+		toa.Lock.Lock()
+		defer toa.Lock.Unlock()
+		// check again after lock
+		if toa.DiscoveryDocument == nil {
+			var jwks = &JwksHandler{}
+			toa.Jwks = jwks
+			log(config.LogLevel, LogLevelInfo, "Getting OIDC discovery document...")
+
+			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, parsedURL)
+			if err != nil {
+				log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
+				return err
+			}
+
+			// Apply defaults
+			if config.Provider.ValidIssuer == "" {
+				config.Provider.ValidIssuer = oidcDiscoveryDocument.Issuer
+			}
+			if config.Provider.ValidAudience == "" {
+				config.Provider.ValidAudience = config.Provider.ClientId
+			}
+
+			log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
+
+			toa.DiscoveryDocument = oidcDiscoveryDocument
+			toa.Jwks.Url = oidcDiscoveryDocument.JWKSURI
+		}
+		return nil
+	}
+
+	return nil
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	err := toa.EnsureOidcDiscovery()
+
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Error getting oidc discovery: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) {
 		toa.handleCallback(rw, req)
 		return
