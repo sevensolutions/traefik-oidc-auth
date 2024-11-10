@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const (
@@ -154,6 +155,9 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		log(config.LogLevel, LogLevelError, "Error while parsing Provider.Url: %s", err.Error())
 		return nil, err
 	}
+
+	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 
 	return &TraefikOidcAuth{
 		next:        next,

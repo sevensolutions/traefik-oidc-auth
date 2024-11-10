@@ -34,7 +34,7 @@ func EnsureOidcDiscovery(toa *TraefikOidcAuth) (*TraefikOidcAuth, error) {
 		if toa.DiscoveryDocument == nil {
 			var jwks = &JwksHandler{}
 			toa.Jwks = jwks
-			log(config.LogLevel, LogLevelError, "OIDC discovery document is nil, GetOidcDiscovery")
+			log(config.LogLevel, LogLevelInfo, "Getting OIDC discovery document...")
 
 			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, parsedURL)
 			if err != nil {
@@ -51,9 +51,6 @@ func EnsureOidcDiscovery(toa *TraefikOidcAuth) (*TraefikOidcAuth, error) {
 			}
 
 			log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
-
-			log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
-			log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 
 			toa.DiscoveryDocument = oidcDiscoveryDocument
 			toa.Jwks.Url = oidcDiscoveryDocument.JWKSURI
