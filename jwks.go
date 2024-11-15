@@ -168,8 +168,8 @@ func (h *JwksHandler) findEcdsaKey(kid string) *EcdsaKey {
 }
 
 func extractKeys(keys *JwksKeys) ([]*RsaKey, []*EcdsaKey, error) {
-	rsaKeys := []*RsaKey{}
-	ecdsaKeys := []*EcdsaKey{}
+	var rsaKeys []*RsaKey
+	var ecdsaKeys []*EcdsaKey
 
 	for i := 0; i < len(keys.Keys); i++ {
 		k := keys.Keys[i]

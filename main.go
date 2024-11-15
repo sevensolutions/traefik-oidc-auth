@@ -55,7 +55,7 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 				config.Provider.ValidAudience = config.Provider.ClientId
 			}
 
-			log(config.LogLevel, LogLevelInfo, "OIDC Discovery successfull. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
+			log(config.LogLevel, LogLevelInfo, "OIDC Discovery successful. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
 
 			toa.DiscoveryDocument = oidcDiscoveryDocument
 			toa.Jwks.Url = oidcDiscoveryDocument.JWKSURI
@@ -192,7 +192,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
-		token, err := exchangeAuthCode(toa, req, authCode, state)
+		token, err := exchangeAuthCode(toa, req, authCode)
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -378,7 +378,10 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 
 		sha2 := sha256.New()
-		io.WriteString(sha2, codeVerifier)
+		if _, writeErr := io.WriteString(sha2, codeVerifier); writeErr != nil {
+			http.Error(rw, writeErr.Error(), http.StatusInternalServerError)
+			return
+		}
 		codeChallenge := base64.RawURLEncoding.EncodeToString(sha2.Sum(nil))
 
 		urlValues.Add("code_challenge_method", "S256")
