@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -218,10 +219,10 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse, nil
 }
 
-func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.MapClaims, error) {
+func (toa *TraefikOidcAuth) validateToken(tokenString string) (bool, map[string]interface{}, error) {
 	claims := jwt.MapClaims{}
 
-	err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, false)
+	err := toa.Jwks.EnsureLoaded(toa, false)
 	if err != nil {
 		return false, nil, err
 	}
@@ -230,29 +231,75 @@ func validateToken(oidcAuth *TraefikOidcAuth, tokenString string) (bool, *jwt.Ma
 		jwt.WithExpirationRequired(),
 	}
 
-	if oidcAuth.Config.Provider.ValidateIssuer {
-		options = append(options, jwt.WithIssuer(oidcAuth.Config.Provider.ValidIssuer))
+	if toa.Config.Provider.ValidateIssuer {
+		options = append(options, jwt.WithIssuer(toa.Config.Provider.ValidIssuer))
 	}
-	if oidcAuth.Config.Provider.ValidateAudience {
-		options = append(options, jwt.WithAudience(oidcAuth.Config.Provider.ValidAudience))
+	if toa.Config.Provider.ValidateAudience {
+		options = append(options, jwt.WithAudience(toa.Config.Provider.ValidAudience))
 	}
 
 	parser := jwt.NewParser(options...)
 
-	_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
+	_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 	if err != nil {
-		err := oidcAuth.Jwks.EnsureLoaded(oidcAuth, true)
+		err := toa.Jwks.EnsureLoaded(toa, true)
 		if err != nil {
 			return false, nil, err
 		}
 
-		_, err = parser.ParseWithClaims(tokenString, claims, oidcAuth.Jwks.Keyfunc)
+		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 		if err != nil {
 			return false, nil, err
 		}
 	}
 
-	return true, &claims, nil
+	return true, claims, nil
+}
+
+func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]interface{}, error) {
+	client := &http.Client{}
+
+	data := url.Values{
+		"token": {token},
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		toa.DiscoveryDocument.IntrospectionEndpoint,
+		strings.NewReader(data.Encode()),
+	)
+
+	if err != nil {
+		return false, nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(toa.Config.Provider.ClientId, toa.Config.Provider.ClientSecret)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Error on introspection request: %s", err.Error())
+		return false, nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var introspectResponse map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
+
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Failed to decode introspection response: %s", err.Error())
+		return false, nil, err
+	}
+
+	// TODO: Remove
+	toa.logAvailableClaims(introspectResponse)
+
+	if introspectResponse["active"] != nil {
+		return introspectResponse["active"].(bool), introspectResponse, nil
+	} else {
+		return false, nil, errors.New("received invalid introspection response")
+	}
 }

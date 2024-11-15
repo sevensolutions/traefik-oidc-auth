@@ -13,8 +13,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type TraefikOidcAuth struct {
@@ -108,7 +106,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 			if ok && claims != nil {
 				for _, claimMap := range toa.Config.Headers.MapClaims {
-					for claimName, claimValue := range *claims {
+					for claimName, claimValue := range claims {
 						if claimName == claimMap.Claim {
 							req.Header.Set(claimMap.Header, fmt.Sprintf("%s", claimValue))
 							break
@@ -141,7 +139,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	toa.handleUnauthorized(rw, req)
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, *jwt.MapClaims, error) {
+func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, map[string]interface{}, error) {
 	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
@@ -159,9 +157,11 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, 
 	}
 
 	if toa.Config.Provider.TokenValidation == "AccessToken" {
-		return validateToken(toa, session.AccessToken)
+		return toa.validateToken(session.AccessToken)
 	} else if toa.Config.Provider.TokenValidation == "IdToken" {
-		return validateToken(toa, session.IdToken)
+		return toa.validateToken(session.IdToken)
+	} else if toa.Config.Provider.TokenValidation == "Introspection" {
+		return toa.introspectToken(session.AccessToken)
 	} else {
 		return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation))
 	}
@@ -205,6 +205,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			usedToken = token.AccessToken
 		} else if toa.Config.Provider.TokenValidation == "IdToken" {
 			usedToken = token.IdToken
+		} else if toa.Config.Provider.TokenValidation == "Introspection" {
+			usedToken = token.AccessToken
 		} else {
 			log(toa.Config.LogLevel, LogLevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -215,7 +217,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			redactedToken = redactedToken[0:16] + " *** REDACTED ***"
 		}
 
-		_, claims, err := validateToken(toa, usedToken)
+		var claims map[string]interface{}
+
+		if toa.Config.Provider.TokenValidation == "Introspection" {
+			_, claims, err = toa.introspectToken(usedToken)
+		} else {
+			_, claims, err = toa.validateToken(usedToken)
+		}
+
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelError, "Returned token is not valid: %s", err.Error())
 			http.Error(rw, err.Error(), http.StatusInternalServerError)

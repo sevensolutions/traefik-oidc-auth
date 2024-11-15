@@ -6,15 +6,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/spyzhov/ajson"
 )
 
-func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
+func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
 	authorization := toa.Config.Authorization
 
 	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
-		parsed, err := json.Marshal(*claims)
+		parsed, err := json.Marshal(claims)
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelWarn, "Error whilst marshalling claims object: %s", err.Error())
 			return false
@@ -128,9 +127,9 @@ func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
 	return true
 }
 
-func (toa *TraefikOidcAuth) logAvailableClaims(claims *jwt.MapClaims) {
+func (toa *TraefikOidcAuth) logAvailableClaims(claims map[string]interface{}) {
 	log(toa.Config.LogLevel, LogLevelDebug, "Available claims are:")
-	for key, val := range *claims {
+	for key, val := range claims {
 		log(toa.Config.LogLevel, LogLevelDebug, "  %v = %v", key, val)
 	}
 }

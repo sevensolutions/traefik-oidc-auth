@@ -66,7 +66,7 @@ type ProviderConfig struct {
 	ValidIssuer    string `json:"valid_issuer"`
 	ValidIssuerEnv string `json:"valid_issuer_env"`
 
-	// AccessToken or IdToken (maybe later "Introspection")
+	// AccessToken or IdToken or Introspection
 	TokenValidation string `json:"verification_token"`
 }
 
