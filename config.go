@@ -15,6 +15,13 @@ const (
 	LogLevelError string = "ERROR"
 )
 
+var LogLevels = map[string]int{
+	LogLevelError: 1,
+	LogLevelWarn:  2,
+	LogLevelInfo:  3,
+	LogLevelDebug: 4,
+}
+
 type Config struct {
 	LogLevel string `json:"log_level"`
 

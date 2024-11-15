@@ -16,17 +16,17 @@ import (
 	"time"
 )
 
-func log(minLevel string, level string, format string, a ...interface{}) {
-	minLevel = strings.ToUpper(minLevel)
-	level = strings.ToUpper(level)
+func shouldLog(minLevel, level string) bool {
+	return LogLevels[strings.ToUpper(minLevel)] >= LogLevels[strings.ToUpper(level)]
+}
 
-	if (level == LogLevelError && (minLevel == LogLevelError || minLevel == LogLevelWarn || minLevel == LogLevelInfo || minLevel == LogLevelDebug)) ||
-		(level == LogLevelWarn && (minLevel == LogLevelWarn || minLevel == LogLevelInfo || minLevel == LogLevelDebug)) ||
-		(level == LogLevelInfo && (minLevel == LogLevelInfo || minLevel == LogLevelDebug)) ||
-		(level == LogLevelDebug && minLevel == LogLevelDebug) {
-		currentTime := time.Now().Format("2006-01-02 15:04:05")
-		os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
+func log(minLevel string, level string, format string, a ...interface{}) {
+	if !shouldLog(minLevel, level) {
+		return
 	}
+
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
+	os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
 }
 
 func parseCookieSameSite(sameSite string) http.SameSite {
@@ -134,12 +134,12 @@ func ParseInt(s string) (int, error) {
 }
 
 func encrypt(plaintext string, secret string) (string, error) {
-	aes, err := aes.NewCipher([]byte(secret))
+	aesCipher, err := aes.NewCipher([]byte(secret))
 	if err != nil {
 		return "", err
 	}
 
-	gcm, err := cipher.NewGCM(aes)
+	gcm, err := cipher.NewGCM(aesCipher)
 	if err != nil {
 		return "", err
 	}
@@ -164,12 +164,12 @@ func decrypt(ciphertext string, secret string) (string, error) {
 	cipherbytes, err := base64.StdEncoding.DecodeString(ciphertext)
 	ciphertext = string(cipherbytes)
 
-	aes, err := aes.NewCipher([]byte(secret))
+	aesCipher, err := aes.NewCipher([]byte(secret))
 	if err != nil {
 		return "", err
 	}
 
-	gcm, err := cipher.NewGCM(aes)
+	gcm, err := cipher.NewGCM(aesCipher)
 	if err != nil {
 		return "", err
 	}

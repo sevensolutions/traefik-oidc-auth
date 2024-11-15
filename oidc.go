@@ -116,7 +116,7 @@ func GetOidcDiscovery(logLevel string, providerUrl *url.URL) (*OidcDiscovery, er
 
 	wellKnownUrl.Path = path.Join(wellKnownUrl.Path, ".well-known/openid-configuration")
 
-	// // create an http client with configurable options
+	// // create a http client with configurable options
 	// // needed to skip certificate verification
 	// tr := &http.Transport{
 	// 	MaxIdleConns:    10,
@@ -163,7 +163,7 @@ func randomBytesInHex(count int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *OidcState) (string, error) {
+func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string) (string, error) {
 	host := getFullHost(req)
 
 	redirectUrl := host + oidcAuth.Config.CallbackUri
