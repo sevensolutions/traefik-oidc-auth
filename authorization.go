@@ -28,6 +28,7 @@ func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
 				return false
 			} else if len(value) == 0 {
 				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Unable to find claim %s in token claims.", assertion.Name)
+				toa.logAvailableClaims(claims)
 				return false
 			}
 
@@ -118,14 +119,18 @@ func (toa *TraefikOidcAuth) isAuthorized(claims *jwt.MapClaims) bool {
 				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected claim %s to contain any value of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "))
 			}
 
-			log(toa.Config.LogLevel, LogLevelDebug, "Available claims are:")
-			for key, val := range *claims {
-				log(toa.Config.LogLevel, LogLevelDebug, "  %v = %v", key, val)
-			}
+			toa.logAvailableClaims(claims)
 
 			return false
 		}
 	}
 
 	return true
+}
+
+func (toa *TraefikOidcAuth) logAvailableClaims(claims *jwt.MapClaims) {
+	log(toa.Config.LogLevel, LogLevelDebug, "Available claims are:")
+	for key, val := range *claims {
+		log(toa.Config.LogLevel, LogLevelDebug, "  %v = %v", key, val)
+	}
 }
