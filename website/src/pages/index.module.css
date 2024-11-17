@@ -1,0 +1,21 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+ .container {
+	width: 100dvw;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding-top: 10em;
+}
+
+.logo {
+  width: 20em;
+  content:url("~/img/logo.svg")
+}
+[data-theme='dark'] .logo {
+	content:url("~/img/logo-dark.svg")
+}
