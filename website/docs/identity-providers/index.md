@@ -3,3 +3,20 @@ sidebar_position: 1
 ---
 
 # Identity Providers
+
+This documentation section will give you an overview of the support-status of well known identity providers.
+Select a provider to see detailed setup instructions.
+
+:::info
+If you have tested a new Identity Provider, not mentioned here already, please open a PR and document it 🙏.
+:::
+
+| Provider | Status | Notes |
+|---|---|---|
+| [ZITADEL](./zitadel.md) | ✅ | |
+| [Kanidm](./kanidm.md) | ✅ | See [GH-12](https://github.com/sevensolutions/traefik-oidc-auth/issues/12) |
+| [Keycloak](./keycloak.md) | 🧐 | |
+| [Microsoft Entra ID](./entra-id.md) | 🧐 | See [GH-15](https://github.com/sevensolutions/traefik-oidc-auth/issues/15) |
+| [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
+
+✅ Supported | 🧐 Untested (See Notes) | ❌ Not Supported
