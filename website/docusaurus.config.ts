@@ -19,6 +19,7 @@ const config: Config = {
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'sevensolutions', // Usually your GitHub org/user name.
   projectName: 'traefik-oidc-auth', // Usually your repo name.
+  trailingSlash: false,
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
