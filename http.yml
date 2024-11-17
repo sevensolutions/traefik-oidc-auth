@@ -16,7 +16,6 @@ http:
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: true
             #ValidAudience: "280538749656466235"
-            TokenValidation: "Introspection"
           Scopes: ["openid", "profile", "email"]
           Headers:
             MapClaims:
