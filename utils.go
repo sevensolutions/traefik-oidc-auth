@@ -186,3 +186,17 @@ func decrypt(ciphertext string, secret string) (string, error) {
 
 	return string(plaintext), nil
 }
+
+func ChunkString(input string, chunkSize int) []string {
+	var chunks []string
+
+	for i := 0; i < len(input); i += chunkSize {
+		end := i + chunkSize
+		if end > len(input) {
+			end = len(input)
+		}
+		chunks = append(chunks, input[i:end])
+	}
+
+	return chunks
+}

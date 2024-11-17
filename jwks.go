@@ -57,7 +57,7 @@ func (h *JwksHandler) EnsureLoaded(oidcAuth *TraefikOidcAuth, forceReload bool) 
 	maxCacheTimeout := now.Add(-6 * time.Hour)
 	minCacheTimeout := now.Add(-5 * time.Minute)
 
-	reload := h.RsaKeys == nil || h.EcdsaKeys == nil
+	reload := h.RsaKeys == nil && h.EcdsaKeys == nil
 
 	if h.CacheDate.Compare(maxCacheTimeout) == -1 {
 		reload = true

@@ -65,6 +65,9 @@ type ProviderConfig struct {
 	ValidateIssuer bool   `json:"validate_issuer"`
 	ValidIssuer    string `json:"valid_issuer"`
 	ValidIssuerEnv string `json:"valid_issuer_env"`
+
+	// AccessToken or IdToken or Introspection
+	TokenValidation string `json:"verification_token"`
 }
 
 type StateCookieConfig struct {
@@ -163,12 +166,22 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, err
 	}
 
+	if config.Provider.TokenValidation == "" {
+		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
+		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
+			config.Provider.TokenValidation = "IdToken"
+		} else {
+			config.Provider.TokenValidation = "AccessToken"
+		}
+	}
+
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 
 	return &TraefikOidcAuth{
-		next:        next,
-		ProviderURL: parsedURL,
-		Config:      config,
+		next:           next,
+		ProviderURL:    parsedURL,
+		Config:         config,
+		SessionStorage: CreateCookieSessionStorage(),
 	}, nil
 }
