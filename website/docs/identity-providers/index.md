@@ -9,6 +9,8 @@ Select a provider to see detailed setup instructions.
 
 :::info
 If you have tested a new Identity Provider, not mentioned here already, please open a PR and document it 🙏.
+
+[![Open in Codeflow](https://developer.stackblitz.com/img/open_in_codeflow.svg)](https://pr.new/sevensolutions/traefik-oidc-auth)
 :::
 
 | Provider | Status | Notes |
