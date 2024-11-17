@@ -265,9 +265,17 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 		"token": {token},
 	}
 
+	//log(toa.Config.LogLevel, LogLevelDebug, "Token: %s", token)
+
+	endpoint := toa.DiscoveryDocument.IntrospectionEndpoint
+
+	//if endpoint == "" {
+	//	endpoint = toa.DiscoveryDocument.UserinfoEndpoint
+	//}
+
 	req, err := http.NewRequest(
 		http.MethodPost,
-		toa.DiscoveryDocument.IntrospectionEndpoint,
+		endpoint,
 		strings.NewReader(data.Encode()),
 	)
 
@@ -295,7 +303,7 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 	}
 
 	// TODO: Remove
-	toa.logAvailableClaims(introspectResponse)
+	//toa.logAvailableClaims(introspectResponse)
 
 	if introspectResponse["active"] != nil {
 		return introspectResponse["active"].(bool), introspectResponse, nil

@@ -188,7 +188,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
 			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing, redirect to Provider")
-			toa.redirectToProvider(rw, req)
+			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
 
