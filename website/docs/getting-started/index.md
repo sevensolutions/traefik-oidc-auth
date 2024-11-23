@@ -44,5 +44,6 @@ http:
       entryPoints: ["web"]
       rule: "HostRegexp(`.+`)"
       service: whoami
+      # highlight-next-line
       middlewares: ["oidc-auth"]
 ```
