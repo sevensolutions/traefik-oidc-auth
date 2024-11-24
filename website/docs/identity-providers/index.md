@@ -17,7 +17,7 @@ If you have tested a new Identity Provider, not mentioned here already, please o
 |---|---|---|
 | [ZITADEL](./zitadel.md) | ✅ | |
 | [Kanidm](./kanidm.md) | ✅ | See [GH-12](https://github.com/sevensolutions/traefik-oidc-auth/issues/12) |
-| [Keycloak](./keycloak.md) | 🧐 | |
+| [Keycloak](./keycloak.md) | ✅ | |
 | [Microsoft Entra ID](./entra-id.md) | 🧐 | See [GH-15](https://github.com/sevensolutions/traefik-oidc-auth/issues/15) |
 | [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
 
