@@ -282,13 +282,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		http.SetCookie(rw, &http.Cookie{
-			Name:    toa.Config.StateCookie.Name,
-			Value:   "",
-			Path:    toa.Config.StateCookie.Path,
-			Expires: time.Now().Add(-24 * time.Hour),
-			MaxAge:  -1,
-		})
+		toa.ClearChunkedCookie(rw, req, toa.Config.StateCookie.Name)
 	}
 
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
@@ -454,19 +448,18 @@ func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName
 	}
 }
 func (toa *TraefikOidcAuth) ReadChunkedCookie(req *http.Request, cookieName string) (string, error) {
-	chunksCookie, err := req.Cookie(fmt.Sprintf("%sChunks", cookieName))
+	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {
+		return "", err
+	}
+
+	if chunkCount == 0 {
 		cookie, err := req.Cookie(cookieName)
 		if err != nil {
 			return "", err
 		}
 
 		return cookie.Value, nil
-	}
-
-	chunkCount, err := strconv.Atoi(chunksCookie.Value)
-	if err != nil {
-		return "", err
 	}
 
 	value := ""
@@ -481,4 +474,53 @@ func (toa *TraefikOidcAuth) ReadChunkedCookie(req *http.Request, cookieName stri
 	}
 
 	return value, nil
+}
+func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
+	chunksCookie, err := req.Cookie(fmt.Sprintf("%sChunks", cookieName))
+	if err != nil {
+		return 0, nil
+	}
+
+	chunkCount, err := strconv.Atoi(chunksCookie.Value)
+	if err != nil {
+		return 0, err
+	}
+
+	return chunkCount, nil
+}
+func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http.Request, cookieName string) error {
+	chunkCount, err := getChunkedCookieCount(req, cookieName)
+	if err != nil {
+		return err
+	}
+
+	if chunkCount == 0 {
+		http.SetCookie(rw, &http.Cookie{
+			Name:    cookieName,
+			Value:   "",
+			Path:    toa.Config.StateCookie.Path,
+			Expires: time.Now().Add(-24 * time.Hour),
+			MaxAge:  -1,
+		})
+	} else {
+		http.SetCookie(rw, &http.Cookie{
+			Name:    fmt.Sprintf("%sChunks", cookieName),
+			Value:   "",
+			Path:    toa.Config.StateCookie.Path,
+			Expires: time.Now().Add(-24 * time.Hour),
+			MaxAge:  -1,
+		})
+
+		for i := 0; i < chunkCount; i++ {
+			http.SetCookie(rw, &http.Cookie{
+				Name:    fmt.Sprintf("%s%d", cookieName, i+1),
+				Value:   "",
+				Path:    toa.Config.StateCookie.Path,
+				Expires: time.Now().Add(-24 * time.Hour),
+				MaxAge:  -1,
+			})
+		}
+	}
+
+	return nil
 }
