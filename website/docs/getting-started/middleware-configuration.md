@@ -55,7 +55,12 @@ Additionaly, the `Name` field can be any [json path](https://jsonpath.com/). The
 | AnyOf | no | `string[]` | *none* | An array of allowed strings. The user is authorized if any value matching the name of the claim contains (or is) a value of this array. |
 | AllOf | no | `string[]` | *none* | An array of required strings. The user is only authorized if any value matching the name of the claim contains (or is) a value of this array and all values of this array are covered in the end. |
 
-It is possible to combine `AnyOf` and `AllOf` quantifiers for one assertion
+It is possible to combine `AnyOf` and `AllOf` quantifiers for one assertion.
+
+:::important
+Because the name is being interpreted as jsonpath, you may need to escape some names, if they contain special characters like a colon or minus.
+So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
+:::
 
 <details>
   <summary>
