@@ -94,7 +94,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		var ok = false
 
 		if sessionTicket != "" {
-			isValid, claims, err := validateSessionTicket(toa, sessionTicket)
+			isValid, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
 			if err != nil {
 				// TODO: Should we return InternalServerError here?
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
@@ -113,6 +113,10 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 						}
 					}
 				}
+			}
+
+			if updatedSession != nil {
+				toa.storeSessionAndAttachCookie(*updatedSession, rw)
 			}
 		}
 
@@ -139,27 +143,57 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	toa.handleUnauthorized(rw, req)
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, map[string]interface{}, error) {
+func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, map[string]interface{}, *SessionState, error) {
 	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
-		return false, nil, err
+		return false, nil, nil, err
 	}
 
 	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Reading session failed: %v", err.Error())
-		return false, nil, err
+		return false, nil, nil, err
 	}
 	if session == nil {
 		log(toa.Config.LogLevel, LogLevelDebug, "No session found")
-		return false, nil, nil
+		return false, nil, nil, nil
 	}
 
+	success, claims, err := toa.validateToken(session)
+
+	var updatedSession (*SessionState) = nil
+
+	if !success || err != nil {
+		return false, nil, nil, err
+	} else {
+		if session.RefreshToken != "" {
+			newTokens, err := toa.renewToken(session.RefreshToken)
+
+			if err != nil {
+				return false, nil, nil, err
+			}
+
+			session.AccessToken = newTokens.AccessToken
+			session.RefreshToken = newTokens.RefreshToken
+			updatedSession = session
+
+			success, claims, err = toa.validateToken(session)
+		}
+	}
+
+	if !success || err != nil {
+		return false, nil, updatedSession, err
+	}
+
+	return success, claims, updatedSession, err
+}
+
+func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[string]interface{}, error) {
 	if toa.Config.Provider.TokenValidation == "AccessToken" {
-		return toa.validateToken(session.AccessToken)
+		return toa.validateTokenLocally(session.AccessToken)
 	} else if toa.Config.Provider.TokenValidation == "IdToken" {
-		return toa.validateToken(session.IdToken)
+		return toa.validateTokenLocally(session.IdToken)
 	} else if toa.Config.Provider.TokenValidation == "Introspection" {
 		return toa.introspectToken(session.AccessToken)
 	} else {
@@ -222,7 +256,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		if toa.Config.Provider.TokenValidation == "Introspection" {
 			_, claims, err = toa.introspectToken(usedToken)
 		} else {
-			_, claims, err = toa.validateToken(usedToken)
+			_, claims, err = toa.validateTokenLocally(usedToken)
 		}
 
 		if err != nil {
@@ -239,29 +273,13 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		session := SessionState{
+			Id:           GenerateSessionId(),
 			AccessToken:  token.AccessToken,
 			IdToken:      token.IdToken,
 			RefreshToken: token.RefreshToken,
 		}
-		sessionId := GenerateSessionId()
 
-		sessionTicket, err := toa.SessionStorage.StoreSession(sessionId, session)
-		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Failed to store session: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		log(toa.Config.LogLevel, LogLevelDebug, "Session stored. Id %s", sessionId)
-
-		encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
-		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session ticket: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
+		toa.storeSessionAndAttachCookie(session, rw)
 
 		http.SetCookie(rw, &http.Cookie{
 			Name:     "CodeVerifier",
@@ -410,6 +428,26 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	redirectURL.RawQuery = urlValues.Encode()
 
 	http.Redirect(rw, req, redirectURL.String(), http.StatusFound)
+}
+
+func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session SessionState, rw http.ResponseWriter) {
+	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Failed to store session: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log(toa.Config.LogLevel, LogLevelDebug, "Session stored. Id %s", session.Id)
+
+	encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session ticket: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
 }
 
 func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
