@@ -162,31 +162,34 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, 
 
 	success, claims, err := toa.validateToken(session)
 
-	var updatedSession (*SessionState) = nil
-
 	if !success || err != nil {
-		return false, nil, nil, err
-	} else {
 		if session.RefreshToken != "" {
+			log(toa.Config.LogLevel, LogLevelInfo, "Trying to renew session...")
+
 			newTokens, err := toa.renewToken(session.RefreshToken)
 
 			if err != nil {
 				return false, nil, nil, err
 			}
 
+			log(toa.Config.LogLevel, LogLevelInfo, "Successfully renewed session")
+
 			session.AccessToken = newTokens.AccessToken
 			session.RefreshToken = newTokens.RefreshToken
-			updatedSession = session
 
 			success, claims, err = toa.validateToken(session)
+
+			if !success || err != nil {
+				return false, nil, session, err
+			}
+
+			return success, claims, session, err
+		} else {
+			return false, nil, nil, err
 		}
 	}
 
-	if !success || err != nil {
-		return false, nil, updatedSession, err
-	}
-
-	return success, claims, updatedSession, err
+	return success, claims, nil, nil
 }
 
 func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[string]interface{}, error) {
