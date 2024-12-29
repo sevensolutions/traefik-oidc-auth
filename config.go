@@ -73,6 +73,7 @@ type ProviderConfig struct {
 type StateCookieConfig struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`
+	Domain   string `json:"domain"`
 	Secure   bool   `json:"secure"`
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
@@ -115,6 +116,7 @@ func CreateConfig() *Config {
 		StateCookie: &StateCookieConfig{
 			Name:     "Authorization",
 			Path:     "/",
+			Domain:   "",
 			Secure:   true,
 			HttpOnly: true,
 			SameSite: "default",
@@ -177,6 +179,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
+	log(config.LogLevel, LogLevelDebug, "StateCookie: %v", config.StateCookie)
 
 	return &TraefikOidcAuth{
 		next:           next,

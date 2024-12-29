@@ -125,6 +125,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 				Name:    toa.Config.StateCookie.Name,
 				Value:   "",
 				Path:    toa.Config.StateCookie.Path,
+				Domain:  toa.Config.StateCookie.Domain,
 				Expires: time.Now().Add(-24 * time.Hour),
 				MaxAge:  -1,
 			})
@@ -418,6 +419,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 
 		// TODO: Make configurable
+		// TODO does this need domain tweaks?
 		http.SetCookie(rw, &http.Cookie{
 			Name:     "CodeVerifier",
 			Value:    encryptedCodeVerifier,
@@ -464,6 +466,7 @@ func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName
 			Secure:   toa.Config.StateCookie.Secure,
 			HttpOnly: toa.Config.StateCookie.HttpOnly,
 			Path:     toa.Config.StateCookie.Path,
+			Domain:   toa.Config.StateCookie.Domain,
 			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
 		})
 	} else {
@@ -473,6 +476,7 @@ func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName
 			Secure:   toa.Config.StateCookie.Secure,
 			HttpOnly: toa.Config.StateCookie.HttpOnly,
 			Path:     toa.Config.StateCookie.Path,
+			Domain:   toa.Config.StateCookie.Domain,
 			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
 		})
 
@@ -483,6 +487,7 @@ func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName
 				Secure:   toa.Config.StateCookie.Secure,
 				HttpOnly: toa.Config.StateCookie.HttpOnly,
 				Path:     toa.Config.StateCookie.Path,
+				Domain:   toa.Config.StateCookie.Domain,
 				SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
 			})
 		}
@@ -540,6 +545,7 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 			Name:    cookieName,
 			Value:   "",
 			Path:    toa.Config.StateCookie.Path,
+			Domain:  toa.Config.StateCookie.Domain,
 			Expires: time.Now().Add(-24 * time.Hour),
 			MaxAge:  -1,
 		})
@@ -548,6 +554,7 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 			Name:    fmt.Sprintf("%sChunks", cookieName),
 			Value:   "",
 			Path:    toa.Config.StateCookie.Path,
+			Domain:  toa.Config.StateCookie.Domain,
 			Expires: time.Now().Add(-24 * time.Hour),
 			MaxAge:  -1,
 		})
@@ -557,6 +564,7 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 				Name:    fmt.Sprintf("%s%d", cookieName, i+1),
 				Value:   "",
 				Path:    toa.Config.StateCookie.Path,
+				Domain:  toa.Config.StateCookie.Domain,
 				Expires: time.Now().Add(-24 * time.Hour),
 				MaxAge:  -1,
 			})
