@@ -212,14 +212,14 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	tokenResponse := &OidcTokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
 	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Decoding ProviderTokenResponse: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "Decoding OidcTokenResponse: %s", err.Error())
 		return nil, err
 	}
 
 	return tokenResponse, nil
 }
 
-func (toa *TraefikOidcAuth) validateToken(tokenString string) (bool, map[string]interface{}, error) {
+func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[string]interface{}, error) {
 	claims := jwt.MapClaims{}
 
 	err := toa.Jwks.EnsureLoaded(toa, false)
@@ -310,4 +310,40 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 	} else {
 		return false, nil, errors.New("received invalid introspection response")
 	}
+}
+
+func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*OidcTokenResponse, error) {
+	urlValues := url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {toa.Config.Provider.ClientId},
+		"scope":         {strings.Join(toa.Config.Scopes, " ")},
+		"refresh_token": {refreshToken},
+	}
+
+	if toa.Config.Provider.ClientSecret != "" {
+		urlValues.Add("client_secret", toa.Config.Provider.ClientSecret)
+	}
+
+	resp, err := http.PostForm(toa.DiscoveryDocument.TokenEndpoint, urlValues)
+
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Sending token renewal request in POST: %s", err.Error())
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log(toa.Config.LogLevel, LogLevelError, "Received bad HTTP response from Provider: %s", string(body))
+		return nil, err
+	}
+
+	tokenResponse := &OidcTokenResponse{}
+	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Decoding OidcTokenResponse: %s", err.Error())
+		return nil, err
+	}
+
+	return tokenResponse, nil
 }
