@@ -80,7 +80,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) && (toa.Config.CallbackDomain == "" || toa.CallbackUriAbsolute(req) == ensureAbsoluteUrl(req, req.RequestURI)) {
+	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) && (toa.Config.CallbackDomain == "" || strings.HasPrefix(ensureAbsoluteUrl(req, req.RequestURI), toa.CallbackUriAbsolute(req))) {
 		toa.handleCallback(rw, req)
 		return
 	}
