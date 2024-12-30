@@ -166,9 +166,7 @@ func randomBytesInHex(count int) (string, error) {
 }
 
 func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string) (*OidcTokenResponse, error) {
-	host := getFullHost(req)
-
-	redirectUrl := host + oidcAuth.Config.CallbackUri
+	redirectUrl := oidcAuth.CallbackUriAbsolute(req)
 
 	urlValues := url.Values{
 		"grant_type":   {"authorization_code"},

@@ -31,6 +31,10 @@ type Config struct {
 	Scopes   []string        `json:"scopes"`
 
 	CallbackUri string `json:"callback_uri"`
+	// If set, use a fixed callback domain to interface with the IDP.
+	// Particularly useful when combined with StateCookie.Domain.
+	CallbackDomain string `json:"callback_domain"`
+	CallbackScheme string `json:"callback_scheme"`
 
 	// The URL used to start authorization when needed.
 	// All other requests that are not already authorized will return a 401 Unauthorized.
@@ -111,6 +115,8 @@ func CreateConfig() *Config {
 		// Maybe a traefik bug. So I've moved this to the New() method.
 		//Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
+		CallbackDomain:        "",
+		CallbackScheme:        "",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
 		StateCookie: &StateCookieConfig{

@@ -64,6 +64,13 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 	return nil
 }
 
+func (toa *TraefikOidcAuth) CallbackUriAbsolute(req *http.Request) string {
+	if toa.Config.CallbackDomain != "" && toa.Config.CallbackScheme != "" {
+		return fmt.Sprintf("%s://%s%s", toa.Config.CallbackScheme, toa.Config.CallbackDomain, toa.Config.CallbackUri)
+	}
+	return ensureAbsoluteUrl(req, toa.Config.CallbackUri)
+}
+
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	err := toa.EnsureOidcDiscovery()
 
@@ -73,7 +80,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) {
+	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) && (toa.Config.CallbackDomain == "" || toa.CallbackUriAbsolute(req) == ensureAbsoluteUrl(req, req.RequestURI)) {
 		toa.handleCallback(rw, req)
 		return
 	}
@@ -325,7 +332,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	callbackUri := ensureAbsoluteUrl(req, toa.Config.CallbackUri)
+	callbackUri := toa.CallbackUriAbsolute(req)
 	redirectUri := ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
 	if req.URL.Query().Get("redirect_uri") != "" {
@@ -367,9 +374,9 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to OIDC provider...")
 
 	host := getFullHost(req)
-
 	originalUrl := fmt.Sprintf("%s%s", host, req.RequestURI)
-	redirectUrl := host + toa.Config.CallbackUri
+
+	redirectUrl := toa.CallbackUriAbsolute(req)
 
 	state := OidcState{
 		Action:      "Login",
@@ -420,7 +427,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 
 		// TODO: Make configurable
-		// TODO does this need domain tweaks?
+		// TODO does this need domain tweaks?  it is in the login flow
 		http.SetCookie(rw, &http.Cookie{
 			Name:     "CodeVerifier",
 			Value:    encryptedCodeVerifier,
