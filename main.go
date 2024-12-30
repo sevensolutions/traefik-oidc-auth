@@ -105,6 +105,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			ok = isValid
 
 			if ok && claims != nil {
+				log(toa.Config.LogLevel, LogLevelDebug, "Claims: %+v", claims)
 				for _, claimMap := range toa.Config.Headers.MapClaims {
 					for claimName, claimValue := range claims {
 						if claimName == claimMap.Claim {
