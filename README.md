@@ -25,6 +25,7 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 | [Keycloak](https://github.com/kanidm/keycloak) | ✅ | |
 | [Microsoft EntraID](https://learn.microsoft.com/de-de/entra/identity/) | ⚠️ | See [GH-15](https://github.com/sevensolutions/traefik-oidc-auth/issues/15) |
 | [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
+| [Pocket ID](https://github.com/stonith404/pocket-id) | ✅ | |
 
 ## 📚 Documentation
 
