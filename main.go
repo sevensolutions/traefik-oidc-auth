@@ -301,6 +301,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			Secure:   true,
 			HttpOnly: true,
 			Path:     toa.Config.CallbackUri,
+			Domain:   toa.Config.CallbackDomain,
 			SameSite: http.SameSiteDefaultMode,
 		})
 
@@ -434,6 +435,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 			Secure:   true,
 			HttpOnly: true,
 			Path:     toa.Config.CallbackUri,
+			Domain:   toa.Config.CallbackDomain,
 			SameSite: http.SameSiteDefaultMode,
 		})
 	}
