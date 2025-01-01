@@ -66,13 +66,14 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 }
 
 func (toa *TraefikOidcAuth) CallbackURLAbsolute(req *http.Request) *url.URL {
-	if toa.CallbackURL.Host == "" || toa.CallbackURL.Scheme == "" {
+	if urlIsAbsolute(toa.CallbackURL) {
+		return toa.CallbackURL
+	} else {
 		abs := *toa.CallbackURL
 		abs.Scheme = req.URL.Scheme
 		abs.Host = req.URL.Host
 		return &abs
 	}
-	return toa.CallbackURL
 }
 
 func (toa *TraefikOidcAuth) CallbackUriAbsolute(req *http.Request) string {

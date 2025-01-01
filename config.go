@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -178,7 +179,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, err
 	}
 
-	parsedCallbackURL, err := parseUrl(config.CallbackUri)
+	parsedCallbackURL, err := url.Parse(config.CallbackUri)
 	if err != nil {
 		log(config.LogLevel, LogLevelError, "Error while parsing CallbackUri: %s", err.Error())
 		return nil, err
@@ -193,11 +194,17 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}
 	}
 
-	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelInfo, "Provider Url: %v", parsedURL)
 	log(config.LogLevel, LogLevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
+	if urlIsAbsolute(parsedCallbackURL) {
+		log(config.LogLevel, LogLevelInfo, "Callback URL is absolute, will not overlay wrapped services")
+	} else {
+		log(config.LogLevel, LogLevelInfo, "Callback URL is relative, will overlay any wrapped host")
+	}
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	log(config.LogLevel, LogLevelDebug, "StateCookie: %v", config.StateCookie)
 
+	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 	return &TraefikOidcAuth{
 		next:           next,
 		ProviderURL:    parsedURL,

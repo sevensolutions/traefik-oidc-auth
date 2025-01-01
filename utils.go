@@ -48,6 +48,10 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 	return cookie
 }
 
+func urlIsAbsolute(u *url.URL) bool {
+	return u.Scheme != "" && u.Host != ""
+}
+
 func parseUrl(rawUrl string) (*url.URL, error) {
 	if rawUrl == "" {
 		return nil, errors.New("invalid empty url")
