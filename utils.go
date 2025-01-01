@@ -69,10 +69,8 @@ func parseUrl(rawUrl string) (*url.URL, error) {
 	return u, nil
 }
 
-func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
+func getSchemeFromRequest(req *http.Request) string {
 	scheme := req.Header.Get("X-Forwarded-Proto")
-	host := req.Header.Get("X-Forwarded-Host")
-
 	if scheme == "" {
 		if req.TLS != nil {
 			scheme = "https"
@@ -80,6 +78,12 @@ func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
 			scheme = "http"
 		}
 	}
+	return scheme
+}
+
+func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
+	scheme := getSchemeFromRequest(req)
+	host := req.Header.Get("X-Forwarded-Host")
 	if host == "" {
 		host = req.Host
 	}
@@ -89,16 +93,8 @@ func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
 }
 
 func getFullHost(req *http.Request) string {
-	scheme := req.Header.Get("X-Forwarded-Proto")
+	scheme := getSchemeFromRequest(req)
 	host := req.Header.Get("X-Forwarded-Host")
-
-	if scheme == "" {
-		if req.TLS != nil {
-			scheme = "https"
-		} else {
-			scheme = "http"
-		}
-	}
 	if host == "" {
 		host = req.Host
 	}
