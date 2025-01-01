@@ -18,6 +18,7 @@ import (
 type TraefikOidcAuth struct {
 	next              http.Handler
 	ProviderURL       *url.URL
+	CallbackURL       *url.URL
 	Config            *Config
 	SessionStorage    SessionStorage
 	DiscoveryDocument *OidcDiscovery
@@ -64,6 +65,33 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 	return nil
 }
 
+func (toa *TraefikOidcAuth) CallbackURLAbsolute(req *http.Request) *url.URL {
+	if urlIsAbsolute(toa.CallbackURL) {
+		return toa.CallbackURL
+	} else {
+		abs := *toa.CallbackURL
+		fillHostSchemeFromRequest(req, &abs)
+		return &abs
+	}
+}
+
+func (toa *TraefikOidcAuth) isReqForCallback(req *http.Request) bool {
+	u := req.URL
+	fillHostSchemeFromRequest(req, u)
+
+	if u.Path != toa.CallbackURL.Path {
+		return false
+	}
+
+	if urlIsAbsolute(toa.CallbackURL) {
+		if u.Scheme != toa.CallbackURL.Scheme || u.Host != toa.CallbackURL.Host {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	err := toa.EnsureOidcDiscovery()
 
@@ -73,7 +101,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if strings.HasPrefix(req.RequestURI, toa.Config.CallbackUri) {
+	if toa.isReqForCallback(req) {
 		toa.handleCallback(rw, req)
 		return
 	}
@@ -105,6 +133,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			ok = isValid
 
 			if ok && claims != nil {
+				log(toa.Config.LogLevel, LogLevelDebug, "Claims: %+v", claims)
 				for _, claimMap := range toa.Config.Headers.MapClaims {
 					for claimName, claimValue := range claims {
 						if claimName == claimMap.Claim {
@@ -121,13 +150,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !ok {
-			http.SetCookie(rw, &http.Cookie{
-				Name:    toa.Config.StateCookie.Name,
-				Value:   "",
-				Path:    toa.Config.StateCookie.Path,
-				Expires: time.Now().Add(-24 * time.Hour),
-				MaxAge:  -1,
-			})
+			c := toa.stateCookieTemplate()
+			makeCookieExpireImmediately(c)
+			http.SetCookie(rw, c)
 
 			toa.handleUnauthorized(rw, req)
 			return
@@ -291,7 +316,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			MaxAge:   -1,
 			Secure:   true,
 			HttpOnly: true,
-			Path:     toa.Config.CallbackUri,
+			Path:     toa.CallbackURL.Path,
+			Domain:   toa.CallbackURL.Host,
 			SameSite: http.SameSiteDefaultMode,
 		})
 
@@ -323,7 +349,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	callbackUri := ensureAbsoluteUrl(req, toa.Config.CallbackUri)
+	callbackUri := toa.CallbackURLAbsolute(req).String()
 	redirectUri := ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
 	if req.URL.Query().Get("redirect_uri") != "" {
@@ -365,9 +391,9 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to OIDC provider...")
 
 	host := getFullHost(req)
-
 	originalUrl := fmt.Sprintf("%s%s", host, req.RequestURI)
-	redirectUrl := host + toa.Config.CallbackUri
+
+	redirectUrl := toa.CallbackURLAbsolute(req).String()
 
 	state := OidcState{
 		Action:      "Login",
@@ -418,12 +444,14 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 
 		// TODO: Make configurable
+		// TODO does this need domain tweaks?  it is in the login flow
 		http.SetCookie(rw, &http.Cookie{
 			Name:     "CodeVerifier",
 			Value:    encryptedCodeVerifier,
 			Secure:   true,
 			HttpOnly: true,
-			Path:     toa.Config.CallbackUri,
+			Path:     toa.CallbackURL.Path,
+			Domain:   toa.CallbackURL.Host,
 			SameSite: http.SameSiteDefaultMode,
 		})
 	}
@@ -453,38 +481,39 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session SessionState, rw
 	toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
 }
 
+func (toa *TraefikOidcAuth) stateCookieTemplate() *http.Cookie {
+	return &http.Cookie{
+		Name:     toa.Config.StateCookie.Name,
+		Value:    "",
+		Secure:   toa.Config.StateCookie.Secure,
+		HttpOnly: toa.Config.StateCookie.HttpOnly,
+		Path:     toa.Config.StateCookie.Path,
+		Domain:   toa.Config.StateCookie.Domain,
+		SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
+	}
+}
+
 func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
 	cookieChunks := ChunkString(cookieValue, 3072)
 
+	baseCookie := toa.stateCookieTemplate()
+	baseCookie.Name = cookieName
+
 	// Set the cookie
 	if len(cookieChunks) == 1 {
-		http.SetCookie(rw, &http.Cookie{
-			Name:     cookieName,
-			Value:    cookieValue,
-			Secure:   toa.Config.StateCookie.Secure,
-			HttpOnly: toa.Config.StateCookie.HttpOnly,
-			Path:     toa.Config.StateCookie.Path,
-			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-		})
+		c := baseCookie
+		c.Value = cookieValue
+		http.SetCookie(rw, c)
 	} else {
-		http.SetCookie(rw, &http.Cookie{
-			Name:     cookieName + "Chunks",
-			Value:    fmt.Sprintf("%d", len(cookieChunks)),
-			Secure:   toa.Config.StateCookie.Secure,
-			HttpOnly: toa.Config.StateCookie.HttpOnly,
-			Path:     toa.Config.StateCookie.Path,
-			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-		})
+		c := baseCookie
+		c.Name = cookieName + "Chunks"
+		c.Value = fmt.Sprintf("%d", len(cookieChunks))
+		http.SetCookie(rw, c)
 
 		for index, chunk := range cookieChunks {
-			http.SetCookie(rw, &http.Cookie{
-				Name:     fmt.Sprintf("%s%d", cookieName, index+1),
-				Value:    chunk,
-				Secure:   toa.Config.StateCookie.Secure,
-				HttpOnly: toa.Config.StateCookie.HttpOnly,
-				Path:     toa.Config.StateCookie.Path,
-				SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-			})
+			c.Name = fmt.Sprintf("%s%d", cookieName, index+1)
+			c.Value = chunk
+			http.SetCookie(rw, c)
 		}
 	}
 }
@@ -535,31 +564,21 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 		return err
 	}
 
+	baseCookie := toa.stateCookieTemplate()
+	baseCookie.Name = cookieName
+	baseCookie.Value = ""
+	makeCookieExpireImmediately(baseCookie)
+
 	if chunkCount == 0 {
-		http.SetCookie(rw, &http.Cookie{
-			Name:    cookieName,
-			Value:   "",
-			Path:    toa.Config.StateCookie.Path,
-			Expires: time.Now().Add(-24 * time.Hour),
-			MaxAge:  -1,
-		})
+		http.SetCookie(rw, baseCookie)
 	} else {
-		http.SetCookie(rw, &http.Cookie{
-			Name:    fmt.Sprintf("%sChunks", cookieName),
-			Value:   "",
-			Path:    toa.Config.StateCookie.Path,
-			Expires: time.Now().Add(-24 * time.Hour),
-			MaxAge:  -1,
-		})
+		c := baseCookie
+		c.Name = cookieName + "Chunks"
+		http.SetCookie(rw, c)
 
 		for i := 0; i < chunkCount; i++ {
-			http.SetCookie(rw, &http.Cookie{
-				Name:    fmt.Sprintf("%s%d", cookieName, i+1),
-				Value:   "",
-				Path:    toa.Config.StateCookie.Path,
-				Expires: time.Now().Add(-24 * time.Hour),
-				MaxAge:  -1,
-			})
+			c.Name = fmt.Sprintf("%s%d", cookieName, i+1)
+			http.SetCookie(rw, c)
 		}
 	}
 
