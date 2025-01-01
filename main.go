@@ -129,14 +129,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !ok {
-			http.SetCookie(rw, &http.Cookie{
-				Name:    toa.Config.StateCookie.Name,
-				Value:   "",
-				Path:    toa.Config.StateCookie.Path,
-				Domain:  toa.Config.StateCookie.Domain,
-				Expires: time.Now().Add(-24 * time.Hour),
-				MaxAge:  -1,
-			})
+			c := toa.stateCookieTemplate()
+			makeCookieExpireImmediately(c)
+			http.SetCookie(rw, c)
 
 			toa.handleUnauthorized(rw, req)
 			return
@@ -465,41 +460,39 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session SessionState, rw
 	toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
 }
 
+func (toa *TraefikOidcAuth) stateCookieTemplate() *http.Cookie {
+	return &http.Cookie{
+		Name:     toa.Config.StateCookie.Name,
+		Value:    "",
+		Secure:   toa.Config.StateCookie.Secure,
+		HttpOnly: toa.Config.StateCookie.HttpOnly,
+		Path:     toa.Config.StateCookie.Path,
+		Domain:   toa.Config.StateCookie.Domain,
+		SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
+	}
+}
+
 func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
 	cookieChunks := ChunkString(cookieValue, 3072)
 
+	baseCookie := toa.stateCookieTemplate()
+	baseCookie.Name = cookieName
+
 	// Set the cookie
 	if len(cookieChunks) == 1 {
-		http.SetCookie(rw, &http.Cookie{
-			Name:     cookieName,
-			Value:    cookieValue,
-			Secure:   toa.Config.StateCookie.Secure,
-			HttpOnly: toa.Config.StateCookie.HttpOnly,
-			Path:     toa.Config.StateCookie.Path,
-			Domain:   toa.Config.StateCookie.Domain,
-			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-		})
+		c := baseCookie
+		c.Value = cookieValue
+		http.SetCookie(rw, c)
 	} else {
-		http.SetCookie(rw, &http.Cookie{
-			Name:     cookieName + "Chunks",
-			Value:    fmt.Sprintf("%d", len(cookieChunks)),
-			Secure:   toa.Config.StateCookie.Secure,
-			HttpOnly: toa.Config.StateCookie.HttpOnly,
-			Path:     toa.Config.StateCookie.Path,
-			Domain:   toa.Config.StateCookie.Domain,
-			SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-		})
+		c := baseCookie
+		c.Name = cookieName + "Chunks"
+		c.Value = fmt.Sprintf("%d", len(cookieChunks))
+		http.SetCookie(rw, c)
 
 		for index, chunk := range cookieChunks {
-			http.SetCookie(rw, &http.Cookie{
-				Name:     fmt.Sprintf("%s%d", cookieName, index+1),
-				Value:    chunk,
-				Secure:   toa.Config.StateCookie.Secure,
-				HttpOnly: toa.Config.StateCookie.HttpOnly,
-				Path:     toa.Config.StateCookie.Path,
-				Domain:   toa.Config.StateCookie.Domain,
-				SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-			})
+			c.Name = fmt.Sprintf("%s%d", cookieName, index+1)
+			c.Value = chunk
+			http.SetCookie(rw, c)
 		}
 	}
 }
@@ -550,34 +543,21 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 		return err
 	}
 
+	baseCookie := toa.stateCookieTemplate()
+	baseCookie.Name = cookieName
+	baseCookie.Value = ""
+	makeCookieExpireImmediately(baseCookie)
+
 	if chunkCount == 0 {
-		http.SetCookie(rw, &http.Cookie{
-			Name:    cookieName,
-			Value:   "",
-			Path:    toa.Config.StateCookie.Path,
-			Domain:  toa.Config.StateCookie.Domain,
-			Expires: time.Now().Add(-24 * time.Hour),
-			MaxAge:  -1,
-		})
+		http.SetCookie(rw, baseCookie)
 	} else {
-		http.SetCookie(rw, &http.Cookie{
-			Name:    fmt.Sprintf("%sChunks", cookieName),
-			Value:   "",
-			Path:    toa.Config.StateCookie.Path,
-			Domain:  toa.Config.StateCookie.Domain,
-			Expires: time.Now().Add(-24 * time.Hour),
-			MaxAge:  -1,
-		})
+		c := baseCookie
+		c.Name = cookieName + "Chunks"
+		http.SetCookie(rw, c)
 
 		for i := 0; i < chunkCount; i++ {
-			http.SetCookie(rw, &http.Cookie{
-				Name:    fmt.Sprintf("%s%d", cookieName, i+1),
-				Value:   "",
-				Path:    toa.Config.StateCookie.Path,
-				Domain:  toa.Config.StateCookie.Domain,
-				Expires: time.Now().Add(-24 * time.Hour),
-				MaxAge:  -1,
-			})
+			c.Name = fmt.Sprintf("%s%d", cookieName, i+1)
+			http.SetCookie(rw, c)
 		}
 	}
 

@@ -42,6 +42,12 @@ func parseCookieSameSite(sameSite string) http.SameSite {
 	}
 }
 
+func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
+	cookie.Expires = time.Now().Add(-24 * time.Hour)
+	cookie.MaxAge = -1
+	return cookie
+}
+
 func parseUrl(rawUrl string) (*url.URL, error) {
 	if rawUrl == "" {
 		return nil, errors.New("invalid empty url")
