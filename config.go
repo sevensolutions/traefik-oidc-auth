@@ -33,15 +33,10 @@ type Config struct {
 
 	// Can be a relative path or a full URL.
 	// If a relative path is used, the scheme and domain will be taken from the incoming request.
-	// In this case, the callback path will overlay any wrapped services.
-	// If a full URL is used, the scheme and domain will be taken from the URL, and all callbacks
-	// routed there.  It is the user's responsibility to ensure that the callback URL is also routed
-	// to this plugin.
+	// In this case, the callback path will overlay all hostnames behind the middleware.
+	// If a full URL is used, all callbacks are sent there.  It is the user's responsibility to ensure
+	// that the callback URL is also routed to this middleware plugin.
 	CallbackUri string `json:"callback_uri"`
-	// If set, use a fixed callback domain to interface with the IDP.
-	// Particularly useful when combined with StateCookie.Domain.
-	CallbackDomain string `json:"callback_domain"`
-	CallbackScheme string `json:"callback_scheme"`
 
 	// The URL used to start authorization when needed.
 	// All other requests that are not already authorized will return a 401 Unauthorized.
