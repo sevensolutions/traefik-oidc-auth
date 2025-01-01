@@ -18,6 +18,7 @@ import (
 type TraefikOidcAuth struct {
 	next              http.Handler
 	ProviderURL       *url.URL
+	CallbackURL       *url.URL
 	Config            *Config
 	SessionStorage    SessionStorage
 	DiscoveryDocument *OidcDiscovery
@@ -62,6 +63,16 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 	}
 
 	return nil
+}
+
+func (toa *TraefikOidcAuth) CallbackURLAbsolute(req *http.Request) *url.URL {
+	if toa.CallbackURL.Host == "" || toa.CallbackURL.Scheme == "" {
+		abs := *toa.CallbackURL
+		abs.Scheme = req.URL.Scheme
+		abs.Host = req.URL.Host
+		return &abs
+	}
+	return toa.CallbackURL
 }
 
 func (toa *TraefikOidcAuth) CallbackUriAbsolute(req *http.Request) string {

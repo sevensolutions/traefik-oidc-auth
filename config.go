@@ -30,6 +30,12 @@ type Config struct {
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
 
+	// Can be a relative path or a full URL.
+	// If a relative path is used, the scheme and domain will be taken from the incoming request.
+	// In this case, the callback path will overlay any wrapped services.
+	// If a full URL is used, the scheme and domain will be taken from the URL, and all callbacks
+	// routed there.  It is the user's responsibility to ensure that the callback URL is also routed
+	// to this plugin.
 	CallbackUri string `json:"callback_uri"`
 	// If set, use a fixed callback domain to interface with the IDP.
 	// Particularly useful when combined with StateCookie.Domain.
@@ -115,8 +121,6 @@ func CreateConfig() *Config {
 		// Maybe a traefik bug. So I've moved this to the New() method.
 		//Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
-		CallbackDomain:        "",
-		CallbackScheme:        "",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
 		StateCookie: &StateCookieConfig{
@@ -174,6 +178,12 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, err
 	}
 
+	parsedCallbackURL, err := parseUrl(config.CallbackUri)
+	if err != nil {
+		log(config.LogLevel, LogLevelError, "Error while parsing CallbackUri: %s", err.Error())
+		return nil, err
+	}
+
 	if config.Provider.TokenValidation == "" {
 		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
 		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
@@ -184,12 +194,14 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	}
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	log(config.LogLevel, LogLevelDebug, "StateCookie: %v", config.StateCookie)
 
 	return &TraefikOidcAuth{
 		next:           next,
 		ProviderURL:    parsedURL,
+		CallbackURL:    parsedCallbackURL,
 		Config:         config,
 		SessionStorage: CreateCookieSessionStorage(),
 	}, nil
