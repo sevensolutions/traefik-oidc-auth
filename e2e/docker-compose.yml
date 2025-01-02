@@ -1,0 +1,8 @@
+services:
+  dex:
+    image: "ghcr.io/dexidp/dex:latest-alpine"
+    restart: unless-stopped
+    ports:
+      - "5556:5556"
+    volumes:
+      - "./dex.config.yml:/etc/dex/config.docker.yaml:ro"
