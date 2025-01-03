@@ -18,11 +18,12 @@ http:
             #ValidAudience: "280538749656466235"
           Scopes: ["openid", "profile", "email"]
           Headers:
-            MapClaims:
-              - Claim: "preferred_username"
-                Header: "X-Oidc-Username"
-              - Claim: "sub"
-                Header: "X-Oidc-Subject"
+            - Name: "X-Oidc-Username"
+              Value: "{{`{{ .claims.preferred_username }}`}}"
+            - Name: "X-Oidc-Subject"
+              Value: "sub"
+            - Name: "Authorization"
+              Value: "{{`Bearer {{ .accessToken }}`}}"
           # Authorization:
           #   AssertClaims:
           #     - Name: roles

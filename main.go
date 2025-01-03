@@ -1,6 +1,7 @@
 package traefik_oidc_auth
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 )
 
@@ -94,7 +96,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		var ok = false
 
 		if sessionTicket != "" {
-			isValid, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
+			session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
 			if err != nil {
 				// TODO: Should we return InternalServerError here?
 				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
@@ -102,14 +104,37 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 				return
 			}
 
-			ok = isValid
+			ok = session != nil
 
-			if ok && claims != nil {
-				for _, claimMap := range toa.Config.Headers.MapClaims {
-					for claimName, claimValue := range claims {
-						if claimName == claimMap.Claim {
-							req.Header.Set(claimMap.Header, fmt.Sprintf("%s", claimValue))
-							break
+			if ok && toa.Config.Headers != nil {
+				evalContext := make(map[string]interface{})
+
+				evalContext["claims"] = claims
+				evalContext["accessToken"] = session.AccessToken
+				evalContext["idToken"] = session.IdToken
+				evalContext["refreshToken"] = session.RefreshToken
+
+				for _, header := range toa.Config.Headers {
+					if header.Value != "" {
+						tpl := header.template
+
+						if tpl == nil {
+							tpl, err = template.New("").Parse(header.Value)
+
+							if err != nil {
+								log(toa.Config.LogLevel, LogLevelError, "Error parsing header template %s: %s", header.Value, err.Error())
+								http.Error(rw, err.Error(), http.StatusInternalServerError)
+								return
+							}
+						}
+
+						var renderedValue bytes.Buffer
+						err = tpl.Execute(&renderedValue, evalContext)
+
+						if err == nil {
+							req.Header.Set(header.Name, renderedValue.String())
+						} else {
+							req.Header.Set(header.Name, err.Error())
 						}
 					}
 				}
@@ -143,21 +168,21 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	toa.handleUnauthorized(rw, req)
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, map[string]interface{}, *SessionState, error) {
+func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*SessionState, map[string]interface{}, *SessionState, error) {
 	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
-		return false, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Reading session failed: %v", err.Error())
-		return false, nil, nil, err
+		return nil, nil, nil, err
 	}
 	if session == nil {
 		log(toa.Config.LogLevel, LogLevelDebug, "No session found")
-		return false, nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	success, claims, err := toa.validateToken(session)
@@ -169,7 +194,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, 
 			newTokens, err := toa.renewToken(session.RefreshToken)
 
 			if err != nil {
-				return false, nil, nil, err
+				return nil, nil, nil, err
 			}
 
 			log(toa.Config.LogLevel, LogLevelInfo, "Successfully renewed session")
@@ -180,16 +205,16 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (bool, 
 			success, claims, err = toa.validateToken(session)
 
 			if !success || err != nil {
-				return false, nil, session, err
+				return nil, nil, session, err
 			}
 
-			return success, claims, session, err
+			return session, claims, session, err
 		} else {
-			return false, nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
-	return success, claims, nil, nil
+	return session, claims, nil, nil
 }
 
 func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[string]interface{}, error) {

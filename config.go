@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"text/template"
 )
 
 const (
@@ -44,7 +45,7 @@ type Config struct {
 
 	Authorization *AuthorizationConfig `json:"authorization"`
 
-	Headers *HeadersConfig `json:"headers"`
+	Headers []HeaderConfig `json:"headers"`
 }
 
 type ProviderConfig struct {
@@ -88,13 +89,12 @@ type ClaimAssertion struct {
 	AllOf []string `json:"allOf"`
 }
 
-type HeadersConfig struct {
-	MapClaims []ClaimHeaderConfig `json:"map_claims"`
-}
+type HeaderConfig struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 
-type ClaimHeaderConfig struct {
-	Claim  string `json:"claim"`
-	Header string `json:"header"`
+	// A reference to the parsed Value-template
+	template *template.Template
 }
 
 // Will be called by traefik
@@ -120,7 +120,6 @@ func CreateConfig() *Config {
 			SameSite: "default",
 		},
 		Authorization: &AuthorizationConfig{},
-		Headers:       &HeadersConfig{},
 	}
 }
 
