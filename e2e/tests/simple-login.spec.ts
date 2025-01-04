@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.use({
   ignoreHTTPSErrors: true,
-  headless: false
+  //headless: false
 });
 
 test('login http', async ({ page }) => {
