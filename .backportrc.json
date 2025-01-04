@@ -1,0 +1,12 @@
+{
+    "repoOwner": "sevensolutions",
+    "repoName": "traefik-oidc-auth",
+
+    "targetBranchChoices": [
+        "production"
+    ],
+    
+    "branchLabelMapping": {
+        "^backport/(.+)$": "$1"
+    }
+}
