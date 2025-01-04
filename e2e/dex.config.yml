@@ -25,10 +25,11 @@ web:
 #   format: "text" # can also be "json"
 
 staticClients:
-- id: example-app
+- id: traefik
   redirectURIs:
     - "http://localhost:9080/oidc/callback"
-  name: 'Example App'
+    - "https://localhost:9443/oidc/callback"
+  name: 'Traefik App'
   secret: ZXhhbXBsZS1hcHAtc2VjcmV0
 #  - id: example-device-client
 #    redirectURIs:
@@ -39,17 +40,6 @@ connectors:
 - type: mockCallback
   id: mock
   name: Example
-# - type: google
-#   id: google
-#   name: Google
-#   config:
-#     issuer: https://accounts.google.com
-#     # Connector config values starting with a "$" will read from the environment.
-#     clientID: $GOOGLE_CLIENT_ID
-#     clientSecret: $GOOGLE_CLIENT_SECRET
-#     redirectURI: http://127.0.0.1:5556/dex/callback
-#     hostedDomains:
-#     - $GOOGLE_HOSTED_DOMAIN
 
 # Let dex keep a list of passwords which can be used to login to dex.
 enablePasswordDB: true

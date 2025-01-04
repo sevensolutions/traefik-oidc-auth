@@ -1,0 +1,31 @@
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+          Scopes: ["openid", "profile", "email"]
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(`.+`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    whoami-secure:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "HostRegexp(`.+`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
