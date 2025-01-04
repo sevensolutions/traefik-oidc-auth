@@ -9,17 +9,17 @@ sidebar_position: 3
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | Secret | no | `string` | `MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ`| A secret used for encryption. Must be a 32 character string. It is strongly suggested to change this. |
-| Provider | yes | `Provider` | *none* | Identity Provider Configuration. See *Provider* block. |
+| Provider | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
 | Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. |
 | LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. By default every url triggers a login-flow, if the user is not already logged in. If you set this to eg. `/login`, only this url will trigger a login-flow while all other requests return *Unauthorized*.  |
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
-| Authorization | no | `Authorization` | *none* | Authorization Configuration. See *Authorization* block. |
-| Headers | no | `Headers` | *none* | Header Configuration. See *Headers* block. |
+| Authorization | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
+| Headers | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 
-## Provider Block
+## Provider Block {#provider}
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
@@ -38,13 +38,13 @@ sidebar_position: 3
 | ValidAudienceEnv | no | `string` | *none* | The name of an environment variable, containing the valid audience. This is required, if *ValidAudience* is not used and ValidateAudience is enabled. |
 | TokenValidation | no | `string` | `AccessToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. When using Microsoft EntraID, this will automatically default to `IdToken`. `Introspection` may not work when using PKCE. |
 
-## Authorization Block
+## Authorization Block {#authorization}
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| AssertClaims | no | `ClaimAssertion[]` | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
+| AssertClaims | no | [`ClaimAssertion[]`](#claim-assertion) | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
 
-## ClaimAssertion Block
+## ClaimAssertion Block {#claim-assertion}
 
 If only the `Name` property is set and no additional assertions are defined it is only checked whether there exist any matches for the name of this claim without any verification on their values.
 Additionaly, the `Name` field can be any [json path](https://jsonpath.com/). The `Name` gets prefixed with `$.` to match from the root element. The usage of json paths allows for assertions on deeply nested json structures.
@@ -115,15 +115,31 @@ So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
   This assertion would succeed as the `store` object contains a `bicycle` object whose `color` is `red`
 </details>
 
-## Headers Block
+## Header Block {#header}
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| MapClaims | no | `ClaimHeader[]` | *none* | A list of claims which should be mapped as headers when the request will be sent to the upstream. See *ClaimHeader* block. |
+| Name | yes | `string` | *none* | The name of the header which should be added to the upstream request. |
+| Value | yes | `string` | *none* | The value of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Please see the info below. |
 
-## ClaimHeader Block
+By using Go-Templates you have access to the following attributes:
 
-| Name | Required | Type | Default | Description |
-|---|---|---|---|---|
-| Claim | yes | `string` | *none* | The name of the claim |
-| Header | yes | `string` | *none* | The name of the header which should receive the claim value. |
+| Template | Description |
+|---|---|
+| `{{ .accessToken }}` | The OAuth Access Token |
+| `{{ .idToken }}` | The OAuth Id Token |
+| `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim |
+
+:::info
+Because [traefik configuration files already support Go-templating](https://doc.traefik.io/traefik/providers/file/#go-templating), you need to *escape* your templates in a weird way. Here are some examples:
+
+```yml
+Headers:
+  - Name: "Authorization"
+    Value: "{{`Bearer {{ .accessToken }}`}}"
+  - Name: "X-Oidc-Username"
+    Value: "{{`{{ .claims.preferred_username }}`}}"
+```
+
+The outer curly braces and backticks are used to escape the inner curly braces.
+:::
