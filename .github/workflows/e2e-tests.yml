@@ -9,6 +9,10 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./e2e
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,14 +21,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./e2e
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
-        working-directory: ./e2e
 
       - name: Run Playwright tests
         run: npx playwright test
-        working-directory: ./e2e
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
@@ -32,4 +33,3 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
-        working-directory: ./e2e
