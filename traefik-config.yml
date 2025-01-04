@@ -5,6 +5,8 @@ global:
 entryPoints:
   web:
     address: :80
+  websecure:
+    address: :443
 
 # Enable API and dashboard
 api:

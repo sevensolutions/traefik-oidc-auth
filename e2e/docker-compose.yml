@@ -1,0 +1,29 @@
+services:
+  dex:
+    image: "ghcr.io/dexidp/dex:latest-alpine"
+    restart: unless-stopped
+    ports:
+      - "5556:5556"
+    volumes:
+      - "./dex.config.yml:/etc/dex/config.docker.yaml:ro"
+
+  traefik:
+    image: "traefik:v3.1.4"
+    ports:
+      - "9080:80"
+      - "9443:443"
+      - "8080:8080"
+    extra_hosts:
+      - "localhost:172.17.0.1" # To make OIDC discovery work correctly
+    volumes:
+      - "../traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "./http.yml:/etc/traefik/configs/http.yml:ro"
+      - "..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      PROVIDER_URL: http://dex:5556/dex
+      CLIENT_ID: traefik
+      CLIENT_SECRET: ZXhhbXBsZS1hcHAtc2VjcmV0
+
+  whoami:
+    image: "traefik/whoami:latest"
