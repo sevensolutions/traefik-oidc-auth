@@ -124,15 +124,28 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*Sessi
 }
 
 func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[string]interface{}, error) {
-	if toa.Config.Provider.TokenValidation == "AccessToken" {
-		return toa.validateTokenLocally(session.AccessToken)
-	} else if toa.Config.Provider.TokenValidation == "IdToken" {
-		return toa.validateTokenLocally(session.IdToken)
-	} else if toa.Config.Provider.TokenValidation == "Introspection" {
-		return toa.introspectToken(session.AccessToken)
+	var token string
+
+	// Little bit hacky. In case the request contains a custom AuthorizationHeader or Cookie, only AccessToken is used.
+	// See getSessionForRequest-function.
+	if session.Id == "AuthorizationHeader" || session.Id == "AuthorizationCookie" {
+		token = session.AccessToken
 	} else {
-		return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation))
+		switch toa.Config.Provider.TokenValidation {
+		case "AccessToken", "Introspection":
+			token = session.AccessToken
+		case "IdToken":
+			token = session.IdToken
+		default:
+			return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for TokenValidation", toa.Config.Provider.TokenValidation))
+		}
 	}
+
+	if toa.Config.Provider.TokenValidation == "Introspection" {
+		return toa.introspectToken(token)
+	}
+
+	return toa.validateTokenLocally(token)
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, rw http.ResponseWriter) {
