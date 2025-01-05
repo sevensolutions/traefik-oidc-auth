@@ -404,7 +404,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 }
 
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
-	if toa.Config.LoginUri == "" {
+	if toa.Config.UnauthorizedBehavior == "Challenge" {
 		toa.redirectToProvider(rw, req)
 	} else {
 		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)

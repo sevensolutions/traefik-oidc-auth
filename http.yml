@@ -14,8 +14,7 @@ http:
             UrlEnv: "PROVIDER_URL"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
-            UsePkce: true
-            #ValidAudience: "280538749656466235"
+            UsePkce: false
           Scopes: ["openid", "profile", "email"]
           Headers:
             - Name: "X-Oidc-Username"
@@ -24,6 +23,7 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
+          UnauthorizedBehavior: "Unauthorized"
           # Authorization:
           #   AssertClaims:
           #     - Name: roles
