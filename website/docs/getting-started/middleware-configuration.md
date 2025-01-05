@@ -16,6 +16,10 @@ sidebar_position: 3
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
+| SessionCookie | no | [`SessionCookieConfig`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
+| AuthorizationHeader | no | [`AuthorizationHeaderConfig`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeaderConfig* block. |
+| AuthorizationCookie | no | [`AuthorizationCookieConfig`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookieConfig* block. |
+| UnauthorizedBehavior | no | `string` | `Challenge` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, whereas `Unauthorized` will simply return a 401 status response. |
 | Authorization | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
 | Headers | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 
@@ -37,6 +41,34 @@ sidebar_position: 3
 | ValidAudience | no | `string` | *ClientId* | The audience which must be present in the JWT-token. Defaults to the configured client id. |
 | ValidAudienceEnv | no | `string` | *none* | The name of an environment variable, containing the valid audience. This is required, if *ValidAudience* is not used and ValidateAudience is enabled. |
 | TokenValidation | no | `string` | `AccessToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. When using Microsoft EntraID, this will automatically default to `IdToken`. `Introspection` may not work when using PKCE. |
+
+## SessionCookieConfig Block {#session-cookie}
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Name | no | `string` | `Authorization` | The name of the session-cookie. |
+| Path | no | `string` | `/` | The path to which the cookie should be assigned to. |
+| Domain | no | `string` | *none* | An optional domain to which the cookie should be assigned to. See [Callback URLs](./callback-uri.md) for examples. |
+| Secure | no | `bool` | `true` | Whether the cookie should be marked secure. |
+| HttpOnly | no | `bool` | `true` | Whether the cookie should be marked http-only. |
+| SameSite | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
+
+## AuthorizationHeaderConfig Block {#authorization-header}
+
+By specifying this configuration, a request can send an externally generated access token via this header to authenticate the request.
+In this case no session will be created by the middleware. You may also want to set `UnauthorizedBehavior` to `Unauthorized`.
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Name | no | `string` | *none* | The name of the header. |
+
+## AuthorizationCookieConfig Block {#authorization-cookie}
+
+This works exactly the same as [AuthorizationHeaderConfig](#authorization-header), but using a cookie instead of a header. You can also use both.
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| Name | no | `string` | *none* | The name of the cookie. |
 
 ## Authorization Block {#authorization}
 
