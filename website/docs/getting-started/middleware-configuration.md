@@ -12,7 +12,7 @@ sidebar_position: 3
 | Provider | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
 | Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
-| LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. By default every url triggers a login-flow, if the user is not already logged in. If you set this to eg. `/login`, only this url will trigger a login-flow while all other requests return *Unauthorized*.  |
+| LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthorizedBehavior`-configuration.  |
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
