@@ -47,8 +47,10 @@ type Config struct {
 	LogoutUri             string `json:"logout_uri"`
 	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
 
-	SessionCookie        *SessionCookieConfig `json:"session_cookie"`
-	UnauthorizedBehavior string               `json:"unauthorized_behavior"`
+	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
+	AuthorizationHeader  *AuthorizationHeaderConfig `json:"authorization_header"`
+	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
+	UnauthorizedBehavior string                     `json:"unauthorized_behavior"`
 
 	Authorization *AuthorizationConfig `json:"authorization"`
 
@@ -85,6 +87,13 @@ type SessionCookieConfig struct {
 	Secure   bool   `json:"secure"`
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
+}
+
+type AuthorizationHeaderConfig struct {
+	Name string `json:"name"`
+}
+type AuthorizationCookieConfig struct {
+	Name string `json:"name"`
 }
 
 type AuthorizationConfig struct {
@@ -128,6 +137,8 @@ func CreateConfig() *Config {
 			HttpOnly: true,
 			SameSite: "default",
 		},
+		AuthorizationHeader:  &AuthorizationHeaderConfig{},
+		AuthorizationCookie:  &AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Challenge",
 		Authorization:        &AuthorizationConfig{},
 	}

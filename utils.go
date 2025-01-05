@@ -29,25 +29,6 @@ func log(minLevel string, level string, format string, a ...interface{}) {
 	os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
 }
 
-func parseCookieSameSite(sameSite string) http.SameSite {
-	switch sameSite {
-	case "none":
-		return http.SameSiteNoneMode
-	case "lax":
-		return http.SameSiteLaxMode
-	case "strict":
-		return http.SameSiteStrictMode
-	default:
-		return http.SameSiteDefaultMode
-	}
-}
-
-func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
-	cookie.Expires = time.Now().Add(-24 * time.Hour)
-	cookie.MaxAge = -1
-	return cookie
-}
-
 func urlIsAbsolute(u *url.URL) bool {
 	return u.Scheme != "" && u.Host != ""
 }

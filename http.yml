@@ -23,7 +23,11 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
-          UnauthorizedBehavior: "Unauthorized"
+          AuthorizationHeader:
+            Name: "Blah"
+          AuthorizationCookie:
+            Name: "Blah2"
+          #UnauthorizedBehavior: "Unauthorized"
           # Authorization:
           #   AssertClaims:
           #     - Name: roles
