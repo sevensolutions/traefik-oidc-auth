@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"text/template"
@@ -31,6 +32,11 @@ type Config struct {
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
 
+	// Can be a relative path or a full URL.
+	// If a relative path is used, the scheme and domain will be taken from the incoming request.
+	// In this case, the callback path will overlay all hostnames behind the middleware.
+	// If a full URL is used, all callbacks are sent there.  It is the user's responsibility to ensure
+	// that the callback URL is also routed to this middleware plugin.
 	CallbackUri string `json:"callback_uri"`
 
 	// The URL used to start authorization when needed.
@@ -74,6 +80,7 @@ type ProviderConfig struct {
 type StateCookieConfig struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`
+	Domain   string `json:"domain"`
 	Secure   bool   `json:"secure"`
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
@@ -115,6 +122,7 @@ func CreateConfig() *Config {
 		StateCookie: &StateCookieConfig{
 			Name:     "Authorization",
 			Path:     "/",
+			Domain:   "",
 			Secure:   true,
 			HttpOnly: true,
 			SameSite: "default",
@@ -165,6 +173,12 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, err
 	}
 
+	parsedCallbackURL, err := url.Parse(config.CallbackUri)
+	if err != nil {
+		log(config.LogLevel, LogLevelError, "Error while parsing CallbackUri: %s", err.Error())
+		return nil, err
+	}
+
 	if config.Provider.TokenValidation == "" {
 		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
 		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
@@ -174,12 +188,21 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}
 	}
 
-	log(config.LogLevel, LogLevelInfo, "Configuration loaded. Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelInfo, "Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
+	if urlIsAbsolute(parsedCallbackURL) {
+		log(config.LogLevel, LogLevelInfo, "Callback URL is absolute, will not overlay wrapped services")
+	} else {
+		log(config.LogLevel, LogLevelInfo, "Callback URL is relative, will overlay any wrapped host")
+	}
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
+	log(config.LogLevel, LogLevelDebug, "StateCookie: %v", config.StateCookie)
 
+	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 	return &TraefikOidcAuth{
 		next:           next,
 		ProviderURL:    parsedURL,
+		CallbackURL:    parsedCallbackURL,
 		Config:         config,
 		SessionStorage: CreateCookieSessionStorage(),
 	}, nil
