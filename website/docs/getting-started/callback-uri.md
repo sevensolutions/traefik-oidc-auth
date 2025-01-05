@@ -24,7 +24,9 @@ This will likely greatly simplify your identity provider configuration.
 
 Of course you must pick an absolute URL where the plugin will receive the traffic.
 
-Warning: **absolute callback URLs are incompatible with PKCE**.  See [GH-42](https://github.com/sevensolutions/traefik-oidc-auth/issues/42).
+:::warning
+Absolute callback URLs are incompatible with PKCE.  See [GH-42](https://github.com/sevensolutions/traefik-oidc-auth/issues/42).
+:::
 
 For users familiar with [thomseddon/traefik-forward-auth](https://github.com/thomseddon/traefik-forward-auth), this is equivalent to its [Auth Host Mode](https://github.com/thomseddon/traefik-forward-auth?tab=readme-ov-file#auth-host-mode).
 
@@ -48,3 +50,48 @@ If you are protecting many different subdomains that share parent domain (for ex
 ```
 
 This is not required, but is a performance optimization.
+
+### Full working example for local development
+```yml
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+          Scopes: ["openid", "profile", "email"]
+          CallbackUri: "https://auth.127.0.0.1.sslip.io/oidc/callback"
+          StateCookie:
+            Domain: ".127.0.0.1.sslip.io"
+
+  routers:
+    service1:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "Host(`service1.127.0.0.1.sslip.io`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    service2:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "Host(`service2.127.0.0.1.sslip.io`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    auth:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "Host(`auth.127.0.0.1.sslip.io`)"
+      service: noop@internal
+      middlewares: ["oidc-auth@file"]
+```

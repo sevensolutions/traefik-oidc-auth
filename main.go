@@ -67,7 +67,7 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 	return nil
 }
 
-func (toa *TraefikOidcAuth) CallbackURLAbsolute(req *http.Request) *url.URL {
+func (toa *TraefikOidcAuth) GetAbsoluteCallbackURL(req *http.Request) *url.URL {
 	if urlIsAbsolute(toa.CallbackURL) {
 		return toa.CallbackURL
 	} else {
@@ -77,7 +77,7 @@ func (toa *TraefikOidcAuth) CallbackURLAbsolute(req *http.Request) *url.URL {
 	}
 }
 
-func (toa *TraefikOidcAuth) isReqForCallback(req *http.Request) bool {
+func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 	u := req.URL
 	fillHostSchemeFromRequest(req, u)
 
@@ -103,7 +103,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if toa.isReqForCallback(req) {
+	if toa.isCallbackRequest(req) {
 		toa.handleCallback(rw, req)
 		return
 	}
@@ -174,7 +174,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !ok {
-			c := toa.stateCookieTemplate()
+			c := toa.createStateCookie()
 			makeCookieExpireImmediately(c)
 			http.SetCookie(rw, c)
 
@@ -373,7 +373,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	callbackUri := toa.CallbackURLAbsolute(req).String()
+	callbackUri := toa.GetAbsoluteCallbackURL(req).String()
 	redirectUri := ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
 	if req.URL.Query().Get("redirect_uri") != "" {
@@ -417,7 +417,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	host := getFullHost(req)
 	originalUrl := fmt.Sprintf("%s%s", host, req.RequestURI)
 
-	redirectUrl := toa.CallbackURLAbsolute(req).String()
+	redirectUrl := toa.GetAbsoluteCallbackURL(req).String()
 
 	state := OidcState{
 		Action:      "Login",
@@ -505,7 +505,7 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session SessionState, rw
 	toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
 }
 
-func (toa *TraefikOidcAuth) stateCookieTemplate() *http.Cookie {
+func (toa *TraefikOidcAuth) createStateCookie() *http.Cookie {
 	return &http.Cookie{
 		Name:     toa.Config.StateCookie.Name,
 		Value:    "",
@@ -520,7 +520,7 @@ func (toa *TraefikOidcAuth) stateCookieTemplate() *http.Cookie {
 func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
 	cookieChunks := ChunkString(cookieValue, 3072)
 
-	baseCookie := toa.stateCookieTemplate()
+	baseCookie := toa.createStateCookie()
 	baseCookie.Name = cookieName
 
 	// Set the cookie
@@ -588,7 +588,7 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 		return err
 	}
 
-	baseCookie := toa.stateCookieTemplate()
+	baseCookie := toa.createStateCookie()
 	baseCookie.Name = cookieName
 	baseCookie.Value = ""
 	makeCookieExpireImmediately(baseCookie)
