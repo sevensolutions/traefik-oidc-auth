@@ -118,7 +118,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	sessionTicket, err := toa.ReadChunkedCookie(req, toa.Config.StateCookie.Name)
+	sessionTicket, err := toa.ReadChunkedCookie(req, toa.Config.SessionCookie.Name)
 
 	if err == nil {
 		var ok = false
@@ -174,7 +174,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !ok {
-			c := toa.createStateCookie()
+			c := toa.createSessionCookie()
 			makeCookieExpireImmediately(c)
 			http.SetCookie(rw, c)
 
@@ -353,7 +353,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		toa.ClearChunkedCookie(rw, req, toa.Config.StateCookie.Name)
+		toa.ClearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
 	}
 
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
@@ -502,25 +502,25 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session SessionState, rw
 		return
 	}
 
-	toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
+	toa.SetChunkedCookies(rw, toa.Config.SessionCookie.Name, encryptedSessionTicket)
 }
 
-func (toa *TraefikOidcAuth) createStateCookie() *http.Cookie {
+func (toa *TraefikOidcAuth) createSessionCookie() *http.Cookie {
 	return &http.Cookie{
-		Name:     toa.Config.StateCookie.Name,
+		Name:     toa.Config.SessionCookie.Name,
 		Value:    "",
-		Secure:   toa.Config.StateCookie.Secure,
-		HttpOnly: toa.Config.StateCookie.HttpOnly,
-		Path:     toa.Config.StateCookie.Path,
-		Domain:   toa.Config.StateCookie.Domain,
-		SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
+		Secure:   toa.Config.SessionCookie.Secure,
+		HttpOnly: toa.Config.SessionCookie.HttpOnly,
+		Path:     toa.Config.SessionCookie.Path,
+		Domain:   toa.Config.SessionCookie.Domain,
+		SameSite: parseCookieSameSite(toa.Config.SessionCookie.SameSite),
 	}
 }
 
 func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
 	cookieChunks := ChunkString(cookieValue, 3072)
 
-	baseCookie := toa.createStateCookie()
+	baseCookie := toa.createSessionCookie()
 	baseCookie.Name = cookieName
 
 	// Set the cookie
@@ -588,7 +588,7 @@ func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http
 		return err
 	}
 
-	baseCookie := toa.createStateCookie()
+	baseCookie := toa.createSessionCookie()
 	baseCookie.Name = cookieName
 	baseCookie.Value = ""
 	makeCookieExpireImmediately(baseCookie)

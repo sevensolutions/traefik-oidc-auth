@@ -47,7 +47,7 @@ type Config struct {
 	LogoutUri             string `json:"logout_uri"`
 	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
 
-	StateCookie *StateCookieConfig `json:"state_cookie"`
+	SessionCookie *SessionCookieConfig `json:"session_cookie"`
 
 	Authorization *AuthorizationConfig `json:"authorization"`
 
@@ -77,7 +77,7 @@ type ProviderConfig struct {
 	TokenValidation string `json:"verification_token"`
 }
 
-type StateCookieConfig struct {
+type SessionCookieConfig struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`
 	Domain   string `json:"domain"`
@@ -119,7 +119,7 @@ func CreateConfig() *Config {
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
-		StateCookie: &StateCookieConfig{
+		SessionCookie: &SessionCookieConfig{
 			Name:     "Authorization",
 			Path:     "/",
 			Domain:   "",
@@ -196,7 +196,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		log(config.LogLevel, LogLevelInfo, "Callback URL is relative, will overlay any wrapped host")
 	}
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
-	log(config.LogLevel, LogLevelDebug, "StateCookie: %v", config.StateCookie)
+	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 	return &TraefikOidcAuth{
