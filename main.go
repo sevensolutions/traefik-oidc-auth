@@ -5,12 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -118,139 +116,71 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	sessionTicket, err := toa.ReadChunkedCookie(req, toa.Config.StateCookie.Name)
+	session, updateSession, claims, err := toa.getSessionForRequest(req)
 
-	if err == nil {
-		var ok = false
-
-		if sessionTicket != "" {
-			session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
-			if err != nil {
-				// TODO: Should we return InternalServerError here?
-				log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
-				toa.handleUnauthorized(rw, req)
-				return
-			}
-
-			ok = session != nil
-
-			if ok && toa.Config.Headers != nil {
-				evalContext := make(map[string]interface{})
-
-				evalContext["claims"] = claims
-				evalContext["accessToken"] = session.AccessToken
-				evalContext["idToken"] = session.IdToken
-				evalContext["refreshToken"] = session.RefreshToken
-
-				for _, header := range toa.Config.Headers {
-					if header.Value != "" {
-						tpl := header.template
-
-						if tpl == nil {
-							tpl, err = template.New("").Parse(header.Value)
-
-							if err != nil {
-								log(toa.Config.LogLevel, LogLevelError, "Error parsing header template %s: %s", header.Value, err.Error())
-								http.Error(rw, err.Error(), http.StatusInternalServerError)
-								return
-							}
-						}
-
-						var renderedValue bytes.Buffer
-						err = tpl.Execute(&renderedValue, evalContext)
-
-						if err == nil {
-							req.Header.Set(header.Name, renderedValue.String())
-						} else {
-							req.Header.Set(header.Name, err.Error())
-						}
-					}
-				}
-			}
-
-			if updatedSession != nil {
-				toa.storeSessionAndAttachCookie(*updatedSession, rw)
-			}
+	if err == nil && session != nil {
+		// Attach upstream headers
+		err = toa.attachHeaders(req, session, claims)
+		if err != nil {
+			log(toa.Config.LogLevel, LogLevelError, "Error while attaching headers: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
-		if !ok {
-			c := toa.createStateCookie()
-			makeCookieExpireImmediately(c)
-			http.SetCookie(rw, c)
-
-			toa.handleUnauthorized(rw, req)
-			return
+		if updateSession {
+			toa.storeSessionAndAttachCookie(session, rw)
 		}
 
 		// Forward the request
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		log(toa.Config.LogLevel, LogLevelError, "Failed reading state cookie: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
 	}
+
+	c := toa.createSessionCookie()
+	makeCookieExpireImmediately(c)
+	http.SetCookie(rw, c)
 
 	toa.handleUnauthorized(rw, req)
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*SessionState, map[string]interface{}, *SessionState, error) {
-	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
-	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
-		return nil, nil, nil, err
-	}
+func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionState, claims map[string]interface{}) error {
+	if toa.Config.Headers != nil {
+		evalContext := make(map[string]interface{})
 
-	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
-	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Reading session failed: %v", err.Error())
-		return nil, nil, nil, err
-	}
-	if session == nil {
-		log(toa.Config.LogLevel, LogLevelDebug, "No session found")
-		return nil, nil, nil, nil
-	}
+		evalContext["claims"] = claims
+		evalContext["accessToken"] = session.AccessToken
+		evalContext["idToken"] = session.IdToken
+		evalContext["refreshToken"] = session.RefreshToken
 
-	success, claims, err := toa.validateToken(session)
+		for _, header := range toa.Config.Headers {
+			if header.Value != "" {
+				if header.template == nil {
+					tpl, err := template.New("").Parse(header.Value)
 
-	if !success || err != nil {
-		if session.RefreshToken != "" {
-			log(toa.Config.LogLevel, LogLevelInfo, "Trying to renew session...")
+					if err != nil {
+						return err
+					}
 
-			newTokens, err := toa.renewToken(session.RefreshToken)
+					header.template = tpl
+				}
 
-			if err != nil {
-				return nil, nil, nil, err
+				var renderedValue bytes.Buffer
+				err := header.template.Execute(&renderedValue, evalContext)
+
+				if err == nil {
+					req.Header.Set(header.Name, renderedValue.String())
+				} else {
+					req.Header.Set(header.Name, err.Error())
+				}
+			} else {
+				req.Header.Set(header.Name, "")
 			}
-
-			log(toa.Config.LogLevel, LogLevelInfo, "Successfully renewed session")
-
-			session.AccessToken = newTokens.AccessToken
-			session.RefreshToken = newTokens.RefreshToken
-
-			success, claims, err = toa.validateToken(session)
-
-			if !success || err != nil {
-				return nil, nil, session, err
-			}
-
-			return session, claims, session, err
-		} else {
-			return nil, nil, nil, err
 		}
 	}
 
-	return session, claims, nil, nil
-}
-
-func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[string]interface{}, error) {
-	if toa.Config.Provider.TokenValidation == "AccessToken" {
-		return toa.validateTokenLocally(session.AccessToken)
-	} else if toa.Config.Provider.TokenValidation == "IdToken" {
-		return toa.validateTokenLocally(session.IdToken)
-	} else if toa.Config.Provider.TokenValidation == "Introspection" {
-		return toa.introspectToken(session.AccessToken)
-	} else {
-		return false, nil, errors.New(fmt.Sprintf("Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation))
-	}
+	return nil
 }
 
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
@@ -324,7 +254,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
-		session := SessionState{
+		session := &SessionState{
 			Id:           GenerateSessionId(),
 			AccessToken:  token.AccessToken,
 			IdToken:      token.IdToken,
@@ -353,7 +283,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		toa.ClearChunkedCookie(rw, req, toa.Config.StateCookie.Name)
+		toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
 	}
 
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
@@ -404,7 +334,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 }
 
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
-	if toa.Config.LoginUri == "" {
+	if toa.Config.UnauthorizedBehavior == "Challenge" {
 		toa.redirectToProvider(rw, req)
 	} else {
 		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -483,128 +413,4 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	redirectURL.RawQuery = urlValues.Encode()
 
 	http.Redirect(rw, req, redirectURL.String(), http.StatusFound)
-}
-
-func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session SessionState, rw http.ResponseWriter) {
-	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
-	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to store session: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	log(toa.Config.LogLevel, LogLevelDebug, "Session stored. Id %s", session.Id)
-
-	encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
-	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session ticket: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	toa.SetChunkedCookies(rw, toa.Config.StateCookie.Name, encryptedSessionTicket)
-}
-
-func (toa *TraefikOidcAuth) createStateCookie() *http.Cookie {
-	return &http.Cookie{
-		Name:     toa.Config.StateCookie.Name,
-		Value:    "",
-		Secure:   toa.Config.StateCookie.Secure,
-		HttpOnly: toa.Config.StateCookie.HttpOnly,
-		Path:     toa.Config.StateCookie.Path,
-		Domain:   toa.Config.StateCookie.Domain,
-		SameSite: parseCookieSameSite(toa.Config.StateCookie.SameSite),
-	}
-}
-
-func (toa *TraefikOidcAuth) SetChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
-	cookieChunks := ChunkString(cookieValue, 3072)
-
-	baseCookie := toa.createStateCookie()
-	baseCookie.Name = cookieName
-
-	// Set the cookie
-	if len(cookieChunks) == 1 {
-		c := baseCookie
-		c.Value = cookieValue
-		http.SetCookie(rw, c)
-	} else {
-		c := baseCookie
-		c.Name = cookieName + "Chunks"
-		c.Value = fmt.Sprintf("%d", len(cookieChunks))
-		http.SetCookie(rw, c)
-
-		for index, chunk := range cookieChunks {
-			c.Name = fmt.Sprintf("%s%d", cookieName, index+1)
-			c.Value = chunk
-			http.SetCookie(rw, c)
-		}
-	}
-}
-func (toa *TraefikOidcAuth) ReadChunkedCookie(req *http.Request, cookieName string) (string, error) {
-	chunkCount, err := getChunkedCookieCount(req, cookieName)
-	if err != nil {
-		return "", err
-	}
-
-	if chunkCount == 0 {
-		cookie, err := req.Cookie(cookieName)
-		if err != nil {
-			return "", err
-		}
-
-		return cookie.Value, nil
-	}
-
-	value := ""
-
-	for i := 0; i < chunkCount; i++ {
-		cookie, err := req.Cookie(fmt.Sprintf("%s%d", cookieName, i+1))
-		if err != nil {
-			return "", err
-		}
-
-		value += cookie.Value
-	}
-
-	return value, nil
-}
-func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
-	chunksCookie, err := req.Cookie(fmt.Sprintf("%sChunks", cookieName))
-	if err != nil {
-		return 0, nil
-	}
-
-	chunkCount, err := strconv.Atoi(chunksCookie.Value)
-	if err != nil {
-		return 0, err
-	}
-
-	return chunkCount, nil
-}
-func (toa *TraefikOidcAuth) ClearChunkedCookie(rw http.ResponseWriter, req *http.Request, cookieName string) error {
-	chunkCount, err := getChunkedCookieCount(req, cookieName)
-	if err != nil {
-		return err
-	}
-
-	baseCookie := toa.createStateCookie()
-	baseCookie.Name = cookieName
-	baseCookie.Value = ""
-	makeCookieExpireImmediately(baseCookie)
-
-	if chunkCount == 0 {
-		http.SetCookie(rw, baseCookie)
-	} else {
-		c := baseCookie
-		c.Name = cookieName + "Chunks"
-		http.SetCookie(rw, c)
-
-		for i := 0; i < chunkCount; i++ {
-			c.Name = fmt.Sprintf("%s%d", cookieName, i+1)
-			http.SetCookie(rw, c)
-		}
-	}
-
-	return nil
 }

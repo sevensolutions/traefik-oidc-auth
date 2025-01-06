@@ -10,8 +10,8 @@ func CreateCookieSessionStorage() *CookieSessionStorage {
 	return storage
 }
 
-func (storage *CookieSessionStorage) StoreSession(sessionId string, state SessionState) (string, error) {
-	stateJson, _ := json.Marshal(state)
+func (storage *CookieSessionStorage) StoreSession(sessionId string, state *SessionState) (string, error) {
+	stateJson, _ := json.Marshal(*state)
 
 	return string(stateJson), nil
 }

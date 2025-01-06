@@ -39,7 +39,7 @@ If you are protecting many different subdomains that share parent domain (for ex
         traefik-oidc-auth:
         # highlight-start
           CallbackUri: "https://login.example.com/oidc/callback"
-          StateCookie:
+          SessionCookie:
             Domain: ".example.com"
         # highlight-end
           Provider:
@@ -72,7 +72,7 @@ http:
             UsePkce: false
           Scopes: ["openid", "profile", "email"]
           CallbackUri: "https://auth.127.0.0.1.sslip.io/oidc/callback"
-          StateCookie:
+          SessionCookie:
             Domain: ".127.0.0.1.sslip.io"
 
   routers:
