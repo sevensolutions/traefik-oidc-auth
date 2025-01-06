@@ -5,7 +5,7 @@ import (
 )
 
 type SessionStorage interface {
-	StoreSession(sessionId string, state SessionState) (string, error)
+	StoreSession(sessionId string, state *SessionState) (string, error)
 	TryGetSession(sessionTicket string) (*SessionState, error)
 }
 
