@@ -37,7 +37,12 @@ func getTestClaims() map[string]interface{} {
 				"Joe",
 				"Sam"
 			]
-		}
+		},
+		"my:zitadel:grants": [
+			"abc",
+			"def",
+			"ghi"
+		]
 	}`)
 
 	claims := jwt.MapClaims{}
@@ -99,6 +104,15 @@ func TestSimpleAssertions(t *testing.T) {
 
 	if toa.isAuthorized(claims) {
 		t.Fatal("Should not authorize since the single value match cannot contain all values of array")
+	}
+
+	// We need to use ['my:zitadel:grants'] here to escape the colons in the jsonpath.
+	toa = createAuthInstance([]ClaimAssertion{
+		{Name: "['my:zitadel:grants']", AllOf: []string{"abc", "def", "ghi"}},
+	})
+
+	if !toa.isAuthorized(claims) {
+		t.Fatal("Should authorize since all values are contained in the array")
 	}
 }
 

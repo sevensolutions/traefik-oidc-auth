@@ -42,6 +42,16 @@ func parseCookieSameSite(sameSite string) http.SameSite {
 	}
 }
 
+func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
+	cookie.Expires = time.Now().Add(-24 * time.Hour)
+	cookie.MaxAge = -1
+	return cookie
+}
+
+func urlIsAbsolute(u *url.URL) bool {
+	return u.Scheme != "" && u.Host != ""
+}
+
 func parseUrl(rawUrl string) (*url.URL, error) {
 	if rawUrl == "" {
 		return nil, errors.New("invalid empty url")
@@ -59,10 +69,8 @@ func parseUrl(rawUrl string) (*url.URL, error) {
 	return u, nil
 }
 
-func getFullHost(req *http.Request) string {
+func getSchemeFromRequest(req *http.Request) string {
 	scheme := req.Header.Get("X-Forwarded-Proto")
-	host := req.Header.Get("X-Forwarded-Host")
-
 	if scheme == "" {
 		if req.TLS != nil {
 			scheme = "https"
@@ -70,6 +78,23 @@ func getFullHost(req *http.Request) string {
 			scheme = "http"
 		}
 	}
+	return scheme
+}
+
+func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
+	scheme := getSchemeFromRequest(req)
+	host := req.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = req.Host
+	}
+	u.Scheme = scheme
+	u.Host = host
+	return u
+}
+
+func getFullHost(req *http.Request) string {
+	scheme := getSchemeFromRequest(req)
+	host := req.Header.Get("X-Forwarded-Host")
 	if host == "" {
 		host = req.Host
 	}

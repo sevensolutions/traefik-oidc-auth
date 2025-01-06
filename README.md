@@ -31,6 +31,10 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 
 Please see the full documentation [HERE](https://traefik-oidc-auth.sevensolutions.cc/).
 
+> [!NOTE]
+> The documentation is being built from the *production* branch, representing the latest released version.
+> If you want to check the documentation of the main branch to see whats comming in the next version, [see here](https://main.traefik-oidc-auth.pages.dev/).
+
 ## 🧪 Local Development and Testing
 
 Create the following `.env` file:
