@@ -14,7 +14,7 @@ http:
             UrlEnv: "PROVIDER_URL"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
-            UsePkce: false
+            UsePkce: true
           Scopes: ["openid", "profile", "email"]
           Headers:
             - Name: "X-Oidc-Username"
@@ -24,9 +24,9 @@ http:
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
           AuthorizationHeader:
-            Name: "Blah"
+            Name: "CustomAuth"
           AuthorizationCookie:
-            Name: "Blah2"
+            Name: "CustomAuth"
           #UnauthorizedBehavior: "Unauthorized"
           # Authorization:
           #   AssertClaims:
