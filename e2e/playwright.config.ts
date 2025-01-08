@@ -68,12 +68,5 @@ export default defineConfig({
     //   name: 'Google Chrome',
     //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     // },
-  ],
-
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'docker compose up',
-    url: 'http://localhost:9080',
-    reuseExistingServer: !process.env.CI,
-  },
+  ]
 });
