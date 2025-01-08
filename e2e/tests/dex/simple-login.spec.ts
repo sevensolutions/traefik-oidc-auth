@@ -7,8 +7,7 @@ import { configureTraefik } from "../../utils";
 //-----------------------------------------------------------------------------
 
 test.use({
-  ignoreHTTPSErrors: true,
-  //headless: false
+  ignoreHTTPSErrors: true
 });
 
 test.beforeAll("Starting traefik", async () => {
@@ -78,6 +77,19 @@ test("login https", async ({ page }) => {
   expect(response.status()).toBe(200);
 });
 
+// Seems like logout is not supported by dey yet :(
+// https://github.com/dexidp/dex/issues/1697
+// test("logout", async ({ page }) => {
+//   await page.goto("http://localhost:9080");
+
+//   const response = await login(page, "admin@example.com", "password", "http://localhost:9080");
+
+//   expect(response.status()).toBe(200);
+
+//   await page.goto("http://localhost:9080/logout");
+
+// });
+
 test("test headers", async ({ page }) => {
   await configureTraefik(`
 http:
@@ -122,6 +134,84 @@ http:
 
   const staticHeaderExists = await page.locator(`text=X-Static-Header: 42`).isVisible();
   expect(staticHeaderExists).toBeTruthy();
+});
+
+test("test authorization", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["admin@example.com", "alice@example.com"]
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await page.goto("http://localhost:9080");
+
+  const response = await login(page, "alice@example.com", "password", "http://localhost:9080");
+
+  expect(response.status()).toBe(200);
+});
+
+test("test authorization failing", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["admin@example.com", "alice@example.com"]
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await page.goto("http://localhost:9080");
+
+  const response = await login(page, "bob@example.com", "password", "http://localhost:9080/oidc/callback**");
+
+  expect(response.status()).toBe(401);
 });
 
 //-----------------------------------------------------------------------------

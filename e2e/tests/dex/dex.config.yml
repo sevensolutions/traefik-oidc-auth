@@ -54,6 +54,14 @@ staticPasswords:
   hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
   username: "admin"
   userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"
+- email: "alice@example.com"
+  hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+  username: "alice"
+  userID: "7134d97d-58b0-417d-936f-762661122b00"
+- email: "bob@example.com"
+  hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+  username: "bob"
+  userID: "4cbac28e-39f8-4d88-8408-079a97d60c9c"
 
 # Allow password grants with local users
 oauth2:
