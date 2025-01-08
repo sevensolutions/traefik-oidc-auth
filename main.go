@@ -138,9 +138,8 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
 	}
 
-	c := toa.createSessionCookie()
-	makeCookieExpireImmediately(c)
-	http.SetCookie(rw, c)
+	// Clear the session cookie
+	toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
 
 	toa.handleUnauthorized(rw, req)
 }
