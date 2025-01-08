@@ -47,7 +47,10 @@ type Config struct {
 	LogoutUri             string `json:"logout_uri"`
 	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
 
-	StateCookie *StateCookieConfig `json:"state_cookie"`
+	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
+	AuthorizationHeader  *AuthorizationHeaderConfig `json:"authorization_header"`
+	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
+	UnauthorizedBehavior string                     `json:"unauthorized_behavior"`
 
 	Authorization *AuthorizationConfig `json:"authorization"`
 
@@ -77,13 +80,20 @@ type ProviderConfig struct {
 	TokenValidation string `json:"verification_token"`
 }
 
-type StateCookieConfig struct {
+type SessionCookieConfig struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`
 	Domain   string `json:"domain"`
 	Secure   bool   `json:"secure"`
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
+}
+
+type AuthorizationHeaderConfig struct {
+	Name string `json:"name"`
+}
+type AuthorizationCookieConfig struct {
+	Name string `json:"name"`
 }
 
 type AuthorizationConfig struct {
@@ -119,7 +129,7 @@ func CreateConfig() *Config {
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
-		StateCookie: &StateCookieConfig{
+		SessionCookie: &SessionCookieConfig{
 			Name:     "Authorization",
 			Path:     "/",
 			Domain:   "",
@@ -127,7 +137,10 @@ func CreateConfig() *Config {
 			HttpOnly: true,
 			SameSite: "default",
 		},
-		Authorization: &AuthorizationConfig{},
+		AuthorizationHeader:  &AuthorizationHeaderConfig{},
+		AuthorizationCookie:  &AuthorizationCookieConfig{},
+		UnauthorizedBehavior: "Challenge",
+		Authorization:        &AuthorizationConfig{},
 	}
 }
 
@@ -196,7 +209,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		log(config.LogLevel, LogLevelInfo, "Callback URL is relative, will overlay any wrapped host")
 	}
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
-	log(config.LogLevel, LogLevelDebug, "StateCookie: %v", config.StateCookie)
+	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 	return &TraefikOidcAuth{
