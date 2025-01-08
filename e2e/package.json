@@ -11,6 +11,7 @@
   "description": "",
   "devDependencies": {
     "@playwright/test": "^1.49.1",
-    "@types/node": "^22.10.3"
+    "@types/node": "^22.10.3",
+    "docker-compose": "^1.1.0"
   }
 }
