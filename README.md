@@ -15,6 +15,7 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 
 > [!WARNING]
 > This middleware is under active development and breaking changes may occur.
+> It is only tested against traefik v3+.
 
 ## Tested Providers
 
