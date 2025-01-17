@@ -132,6 +132,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		// Forward the request
+		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
@@ -142,6 +143,20 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
 
 	toa.handleUnauthorized(rw, req)
+}
+
+func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
+	// Remove the session cookie from the request before forwarding
+	keepCookies := make([]*http.Cookie, 0)
+	for _, c := range req.Cookies() {
+		if c.Name != toa.Config.SessionCookie.Name {
+			keepCookies = append(keepCookies, c)
+		}
+	}
+	req.Header.Del("Cookie")
+	for _, c := range keepCookies {
+		req.AddCookie(c)
+	}
 }
 
 func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionState, claims map[string]interface{}) error {
