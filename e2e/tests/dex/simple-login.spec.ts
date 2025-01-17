@@ -136,8 +136,6 @@ http:
   expect(staticHeaderExists).toBeTruthy();
 
   // Authorization cookie should not be present in the rendered contents
-  // Cookie: (?:^|\s|;)\s*Authorization\s*=\s*[^;]+
-  // should not occur in the text of the page
   const pageText = await page.innerText("html");
   expect(pageText).not.toMatch(/Cookie:\s*(?:^|\s|;)\s*Authorization\s*=\s*[^;\r\n]+/);
 });
