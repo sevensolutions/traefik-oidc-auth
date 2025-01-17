@@ -77,7 +77,7 @@ test("login https", async ({ page }) => {
   expect(response.status()).toBe(200);
 });
 
-// Seems like logout is not supported by dey yet :(
+// Seems like logout is not supported by dex yet :(
 // https://github.com/dexidp/dex/issues/1697
 // test("logout", async ({ page }) => {
 //   await page.goto("http://localhost:9080");
