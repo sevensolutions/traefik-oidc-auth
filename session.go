@@ -177,5 +177,6 @@ func (toa *TraefikOidcAuth) createSessionCookie() *http.Cookie {
 		Path:     toa.Config.SessionCookie.Path,
 		Domain:   toa.Config.SessionCookie.Domain,
 		SameSite: parseCookieSameSite(toa.Config.SessionCookie.SameSite),
+		MaxAge:   toa.Config.SessionCookie.MaxAge,
 	}
 }
