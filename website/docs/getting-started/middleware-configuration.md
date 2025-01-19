@@ -52,6 +52,7 @@ sidebar_position: 3
 | Secure | no | `bool` | `true` | Whether the cookie should be marked secure. |
 | HttpOnly | no | `bool` | `true` | Whether the cookie should be marked http-only. |
 | SameSite | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
+| MaxAge | no | `int` | `0` | Cookie time-to-live in seconds.  0 (default) is a ephemeral session cookie. |
 
 ## AuthorizationHeaderConfig Block {#authorization-header}
 
@@ -174,4 +175,12 @@ Headers:
 ```
 
 The outer curly braces and backticks are used to escape the inner curly braces.
+
+Note that this *only* applies for configuring Traefik from a YAML file, where it performs its own template expansion.  If you are using the Kubernetes CRDs, you should *not* escape, just template as usual:
+
+```yml
+Headers:
+  - Name: X-Oidc-Groups-Json-Array
+    Value: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js $g}}"{{end}}{{end}}]'
+```
 :::
