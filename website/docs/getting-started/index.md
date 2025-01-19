@@ -4,6 +4,9 @@ sidebar_position: 1
 
 # Getting Started
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Configure the Plugin
 
 Enable the plugin in your traefik configuration.
@@ -18,7 +21,11 @@ experimental:
 
 ## Configure Middleware
 
-### Example [YAML file](https://doc.traefik.io/traefik/providers/file/) config
+<Tabs>
+  <TabItem value="yaml" label="YAML" default>
+
+This is an example using [YAML file](https://doc.traefik.io/traefik/providers/file/) config
+
 ```yml
 http:
   services:
@@ -49,7 +56,10 @@ http:
       middlewares: ["oidc-auth"]
 ```
 
-### Example [Kubernetes IngressRoute CRD](https://doc.traefik.io/traefik/providers/kubernetes-crd/) config
+  </TabItem>
+  <TabItem value="k8s" label="Kubernetes">
+
+This is an example using [Kubernetes IngressRoute CRD](https://doc.traefik.io/traefik/providers/kubernetes-crd/) config
 
 ```yml
 apiVersion: traefik.io/v1alpha1
@@ -85,3 +95,6 @@ spec:
           name: whoami
           port: 80
 ```
+
+  </TabItem>
+</Tabs>
