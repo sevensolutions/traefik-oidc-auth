@@ -87,6 +87,7 @@ type SessionCookieConfig struct {
 	Secure   bool   `json:"secure"`
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
+	MaxAge   int    `json:"max_age"`
 }
 
 type AuthorizationHeaderConfig struct {
@@ -136,6 +137,7 @@ func CreateConfig() *Config {
 			Secure:   true,
 			HttpOnly: true,
 			SameSite: "default",
+			MaxAge:   0,
 		},
 		AuthorizationHeader:  &AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &AuthorizationCookieConfig{},

@@ -52,6 +52,7 @@ sidebar_position: 3
 | Secure | no | `bool` | `true` | Whether the cookie should be marked secure. |
 | HttpOnly | no | `bool` | `true` | Whether the cookie should be marked http-only. |
 | SameSite | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
+| MaxAge | no | `int` | `0` | Cookie time-to-live in seconds.  0 (default) is a ephemeral session cookie. |
 
 ## AuthorizationHeaderConfig Block {#authorization-header}
 
