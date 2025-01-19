@@ -10,7 +10,7 @@ sidebar_position: 3
 
 ```bash
 kanidm system oauth2 create <client_id> "Client Readable Name" https://login.example.com
-kanidm system oauth2 update-scope-map <client_id> <group_name> openid email profile
+kanidm system oauth2 update-scope-map <client_id> <group_name> openid email profile groups
 kanidm system oauth2 add-redirect-url <client_id> https://whoami.example.com/oidc/callback # and every other domain, if you want to use Relative URL
 kanidm system oauth2 add-redirect-url <client_id> https://login.example.com/oidc/callback # if you want to use Absolute URL
 kanidm system oauth2 warning-insecure-client-disable-pkce <client_id> # required if you want to use Absolute URL
@@ -38,7 +38,8 @@ http:
             ClientId: "<client_id>"
             ClientSecret: "<client_secret>"
             UsePkce: true
-          Scopes: ["openid", "profile", "email"]
+            TokenValidation: "IdToken"
+          Scopes: ["openid", "profile"]
           Headers:
             - Name: "X-Oidc-Subject"
               Value: "{{`{{ .claims.sub }}`}}"
@@ -63,12 +64,17 @@ http:
             ClientId: "<client_id>"
             ClientSecret: "<client_secret>"
             UsePkce: false
-          Scopes: ["openid", "profile", "email"]
+            TokenValidation: "IdToken"
+          Scopes: ["openid", "profile", "email", "groups"]
           Headers:
-            - Name: "X-Oidc-Subject"
-              Value: "{{`{{ .claims.sub }}`}}"
-            - Name: "X-Oidc-Username"
+            - Name: "Remote-User"
               Value: "{{`{{ .claims.preferred_username }}`}}"
+            - Name: "Remote-Email"
+              Value: "{{`{{ .claims.email }}`}}"
+            - Name: "Remote-Groups"
+              Value: "{{`{{ .claims.groups }}`}}"
+            - Name: "Remote-Name"
+              Value: "{{`{{ .claims.name }}`}}"
 
   routers:
     auth:
