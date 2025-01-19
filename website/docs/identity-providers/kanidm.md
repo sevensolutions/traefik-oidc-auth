@@ -31,7 +31,7 @@ To create or manage OAuth2 clients, you should use [kanidm client](https://kanid
    kanidm system oauth2 add-redirect-url <client_id> https://login.example.com/oidc/callback
    ```
    You might need to add all your subdomains where you plan to use this middleware or use [Absolute URL](../getting-started/callback-uri.md#absolute-url) configuration.
-5. Let's verify what we have now
+4. Let's verify what we have now
    ```shell
    kanidm system oauth2 get <client_id>
    ```
@@ -57,10 +57,6 @@ To create or manage OAuth2 clients, you should use [kanidm client](https://kanid
     spn: traefik-oauth2@example.com
     uuid: f1f4e707-832e-4beb-ba12-9410b883dddf
    ```
-7. Print the client's secret using
-   ```shell
-   kanidm system oauth2 show-basic-secret <client_id>
-   ```
 
 You will find all Kanidm configuration options in [the documentation](https://kanidm.github.io/kanidm/stable/integrations/oauth2.html).
 
@@ -69,6 +65,10 @@ Before you start, make sure your Kanidm has a valid (and not self-signed) TLS ce
 :::
 
 ## Middleware Configuration
+
+:::tip
+To display the client's secret, use `kanidm system oauth2 show-basic-secret <client_id>`
+:::
 
 <Tabs groupId="type">
   <TabItem value="relative-secure" label="Relative URL with PKCE">
@@ -102,11 +102,6 @@ http:
             ClientSecret: "<client_secret>"
             TokenValidation: "IdToken"
           Scopes: ["openid", "profile"]
-```
-
-Make sure you have allowed connection without PKCE for your client:
-```shell
-kanidm system oauth2 warning-insecure-client-disable-pkce <client_id>
 ```
 
   </TabItem>
@@ -146,10 +141,13 @@ http:
       middlewares: ["oidc-auth@file"]
 ```
 
-Make sure you have allowed connection without PKCE for your client:
-```shell
-kanidm system oauth2 warning-insecure-client-disable-pkce <client_id>
-```
-
   </TabItem>
 </Tabs>
+
+:::note
+You need to set `TokenValidation` to `IdToken` to populate claims. Otherwise, they do not include any scopes.
+:::
+
+:::note
+Kanidm enforces PKCE by default. To disable this behaviour use `kanidm system oauth2 warning-insecure-client-disable-pkce <client_id>`
+:::
