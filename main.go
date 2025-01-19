@@ -148,8 +148,9 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
 	// Remove the session cookie from the request before forwarding
 	keepCookies := make([]*http.Cookie, 0)
+	dontSendUpstreamCookieNames, _ := getChunkedCookieNames(req, toa.Config.SessionCookie.Name)
 	for _, c := range req.Cookies() {
-		if c.Name != toa.Config.SessionCookie.Name {
+		if _, ok := dontSendUpstreamCookieNames[c.Name]; !ok {
 			keepCookies = append(keepCookies, c)
 		}
 	}
