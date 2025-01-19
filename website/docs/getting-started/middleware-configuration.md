@@ -174,4 +174,12 @@ Headers:
 ```
 
 The outer curly braces and backticks are used to escape the inner curly braces.
+
+Note that this *only* applies for configuring Traefik from a YAML file, where it performs its own template expansion.  If you are using the Kubernetes CRDs, you should *not* escape, just template as usual:
+
+```yml
+Headers:
+  - Name: X-Oidc-Groups-Json-Array
+    Value: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js $g}}"{{end}}{{end}}]'
+```
 :::
