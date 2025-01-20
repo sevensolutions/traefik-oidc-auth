@@ -77,7 +77,7 @@ test("login https", async ({ page }) => {
   expect(response.status()).toBe(200);
 });
 
-// Seems like logout is not supported by dey yet :(
+// Seems like logout is not supported by dex yet :(
 // https://github.com/dexidp/dex/issues/1697
 // test("logout", async ({ page }) => {
 //   await page.goto("http://localhost:9080");
@@ -134,6 +134,10 @@ http:
 
   const staticHeaderExists = await page.locator(`text=X-Static-Header: 42`).isVisible();
   expect(staticHeaderExists).toBeTruthy();
+
+  // Authorization cookie should not be present in the rendered contents
+  const pageText = await page.innerText("html");
+  expect(pageText).not.toMatch(/Cookie:\s*(?:^|\s|;)\s*Authorization\s*=\s*[^;\r\n]+/);
 });
 
 test("test authorization", async ({ page }) => {
