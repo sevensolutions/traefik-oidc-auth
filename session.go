@@ -29,7 +29,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 			if ok {
 				return session, false, claims, err
 			} else {
-				return nil, false, nil, err
+				return nil, false, nil, fmt.Errorf("failed to validate token from AuthorizationHeader: %s", err.Error())
 			}
 		}
 	}
@@ -51,7 +51,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 			if ok {
 				return session, false, claims, err
 			} else {
-				return nil, false, nil, err
+				return nil, false, nil, fmt.Errorf("failed to validate token from AuthorizationCookie: %s", err.Error())
 			}
 		}
 	}
@@ -60,7 +60,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 	sessionTicket, err := toa.readChunkedCookie(req, toa.Config.SessionCookie.Name)
 
 	if err != nil {
-		return nil, false, nil, err
+		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
 	}
 
 	log(toa.Config.LogLevel, LogLevelDebug, "A session is present for the request and will be used.")
@@ -68,7 +68,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
 
 	if err != nil {
-		return nil, false, claims, err
+		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
 
 	return session, updatedSession != nil, claims, nil
