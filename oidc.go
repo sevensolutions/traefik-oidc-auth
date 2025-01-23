@@ -196,21 +196,21 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	resp, err := http.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint, urlValues)
 
 	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Sending AuthorizationCode in POST: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: couldn't POST to Provider: %s", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Received bad HTTP response from Provider: %s", string(body))
+		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: received bad HTTP response from Provider: %s", string(body))
 		return nil, err
 	}
 
 	tokenResponse := &OidcTokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
 	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "Decoding OidcTokenResponse: %s", err.Error())
+		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: couldn't decode OidcTokenResponse: %s", err.Error())
 		return nil, err
 	}
 
@@ -249,6 +249,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 		if err != nil {
+			log(toa.Config.LogLevel, LogLevelError, "Failed to parse token: %v", err)
 			return false, nil, err
 		}
 	}
@@ -325,21 +326,21 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*OidcTokenResponse,
 	resp, err := http.PostForm(toa.DiscoveryDocument.TokenEndpoint, urlValues)
 
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Sending token renewal request in POST: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelError, "renewToken: couldn't POST to Provider: %s", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log(toa.Config.LogLevel, LogLevelError, "Received bad HTTP response from Provider: %s", string(body))
+		log(toa.Config.LogLevel, LogLevelError, "renewToken: received bad HTTP response from Provider: %s", string(body))
 		return nil, err
 	}
 
 	tokenResponse := &OidcTokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Decoding OidcTokenResponse: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelError, "renewToken: couldn't decode OidcTokenResponse: %s", err.Error())
 		return nil, err
 	}
 
