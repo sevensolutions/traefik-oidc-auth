@@ -2,6 +2,8 @@ package traefik_oidc_auth
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net/http"
 	"net/url"
@@ -60,6 +62,9 @@ type Config struct {
 type ProviderConfig struct {
 	Url    string `json:"url"`
 	UrlEnv string `json:"url_env"`
+
+	InsecureSkipVerify    bool   `json:"insecure_skip_verify"`
+	CACertificateFilePath string `json:"ca_certificate_file_path"`
 
 	ClientId        string `json:"client_id"`
 	ClientIdEnv     string `json:"client_id_env"`
@@ -213,9 +218,41 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
 
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	if config.Provider.CACertificateFilePath != "" {
+		certs, err := os.ReadFile(config.Provider.CACertificateFilePath)
+		if err != nil {
+			log(config.LogLevel, LogLevelInfo, "Failed to load CA certificate from %v: %v", config.Provider.CACertificateFilePath, err)
+			return nil, err
+		}
+
+		// Append our cert to the system pool
+		if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
+			log(config.LogLevel, LogLevelWarn, "Failed to append CA certificate. Using system certificates only.")
+		}
+	}
+
+	httpTransport := &http.Transport{
+		// MaxIdleConns:    10,
+		// IdleConnTimeout: 30 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: config.Provider.InsecureSkipVerify,
+			RootCAs:            rootCAs,
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: httpTransport,
+	}
+
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 	return &TraefikOidcAuth{
 		next:           next,
+		httpClient:     httpClient,
 		ProviderURL:    parsedURL,
 		CallbackURL:    parsedCallbackURL,
 		Config:         config,
