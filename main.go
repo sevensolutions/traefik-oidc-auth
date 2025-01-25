@@ -136,7 +136,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelWarn, "Verifying token: %s", err.Error())
 	}
 
 	// Clear the session cookie
