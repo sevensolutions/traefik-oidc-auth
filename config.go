@@ -63,8 +63,9 @@ type ProviderConfig struct {
 	Url    string `json:"url"`
 	UrlEnv string `json:"url_env"`
 
-	InsecureSkipVerify    bool   `json:"insecure_skip_verify"`
-	CACertificateFilePath string `json:"ca_certificate_file_path"`
+	InsecureSkipVerify bool   `json:"insecure_skip_verify"`
+	CABundleFile       string `json:"ca_bundle_file"`
+	CABundleFileEnv    string `json:"ca_bundle_file_env"`
 
 	ClientId        string `json:"client_id"`
 	ClientIdEnv     string `json:"client_id_env"`
@@ -181,6 +182,9 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if config.Provider.ValidAudience == "" && config.Provider.ValidAudienceEnv != "" {
 		config.Provider.ValidAudience = os.Getenv(config.Provider.ValidAudienceEnv)
 	}
+	if config.Provider.CABundleFile == "" && config.Provider.CABundleFileEnv != "" {
+		config.Provider.CABundleFile = os.Getenv(config.Provider.CABundleFileEnv)
+	}
 
 	// Specify default scopes if not provided
 	if config.Scopes == nil || len(config.Scopes) == 0 {
@@ -223,17 +227,19 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		rootCAs = x509.NewCertPool()
 	}
 
-	if config.Provider.CACertificateFilePath != "" {
-		certs, err := os.ReadFile(config.Provider.CACertificateFilePath)
+	if config.Provider.CABundleFile != "" {
+		certs, err := os.ReadFile(config.Provider.CABundleFile)
 		if err != nil {
-			log(config.LogLevel, LogLevelInfo, "Failed to load CA certificate from %v: %v", config.Provider.CACertificateFilePath, err)
+			log(config.LogLevel, LogLevelInfo, "Failed to load CA bundle from %v: %v", config.Provider.CABundleFile, err)
 			return nil, err
 		}
 
 		// Append our cert to the system pool
 		if ok := rootCAs.AppendCertsFromPEM(certs); !ok {
-			log(config.LogLevel, LogLevelWarn, "Failed to append CA certificate. Using system certificates only.")
+			log(config.LogLevel, LogLevelWarn, "Failed to append CA bundle. Using system certificates only.")
 		}
+
+		log(config.LogLevel, LogLevelDebug, "Loaded CA bundle from %v", config.Provider.CABundleFile)
 	}
 
 	httpTransport := &http.Transport{
@@ -250,6 +256,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	}
 
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
+
 	return &TraefikOidcAuth{
 		next:           next,
 		httpClient:     httpClient,

@@ -234,7 +234,7 @@ http:
           LogLevel: DEBUG
           Provider:
             UrlEnv: "PROVIDER_URL_HTTPS"
-            CACertificateFilePath: "/certificates/bundle/ca_bundle.pem"
+            CABundleFile: "/certificates/bundle/ca_bundle.pem"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: false
