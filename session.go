@@ -111,6 +111,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*Sessi
 			success, claims, err = toa.validateToken(session)
 
 			if !success || err != nil {
+				log(toa.Config.LogLevel, LogLevelError, "Failed to validate renewed session: %v", err)
 				return nil, nil, session, err
 			}
 
