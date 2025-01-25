@@ -29,6 +29,9 @@ sidebar_position: 3
 |---|---|---|---|---|
 | Url | no | `string` | *none* | The full URL of the Identity Provider. This is required, if *UrlEnv* is not used. |
 | UrlEnv | no | `string` | *none* | The name of an environment variable, containing the full URL of the Identity Provider. This is required, if *Url* is not used. |
+| InsecureSkipVerify | no | `bool` | `false` | Disables SSL certificate verification of your provider. It's highly reccomended to provide the real CA bundle via `CABundleFile` instead. So this option should only be used for quick testing. |
+| CABundleFile | no | `string` | *none* | Specifies the path to an optional CA certificate bundle in case you're using self-signed certificates for the provider. If you're using Docker, make sure the file is mounted into the traefik container. |
+| CABundleFileEnv | no | `string` | *none* | The name of an environment variable, containing the CA bundle file. |
 | ClientId | no | `string` | *none* | The client id of the application. This is required, if *ClientIdEnv* is not used. |
 | ClientIdEnv | no | `string` | *none* | The name of an environment variable, containing the client id. This is required, if *ClientId* is not used. |
 | ClientSecret | no | `string` | *none* | The client secret of the application. This is required, if *ClientSecretEnv* is not used and *UsePkce* is false. |
