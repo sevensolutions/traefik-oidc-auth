@@ -25,7 +25,7 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL"
+            UrlEnv: "PROVIDER_URL_HTTP"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: false
@@ -105,7 +105,7 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL"
+            UrlEnv: "PROVIDER_URL_HTTP"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: false
@@ -155,7 +155,7 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL"
+            UrlEnv: "PROVIDER_URL_HTTP"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: false
@@ -194,7 +194,7 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL"
+            UrlEnv: "PROVIDER_URL_HTTP"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: false
@@ -218,13 +218,53 @@ http:
   expect(response.status()).toBe(401);
 });
 
+test("login at provider via self signed certificate", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL_HTTPS"
+            CACertificateFilePath: "/certificates/bundle/ca_bundle.pem"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    whoami-secure:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await page.goto("https://localhost:9443");
+
+  const response = await login(page, "admin@example.com", "password", "https://localhost:9443");
+
+  expect(response.status()).toBe(200);
+});
+
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------
 
 async function login(page: Page, username: string, password: string, waitForUrl: string): Promise<Response> {
-  await page.waitForURL("http://localhost:5556/dex/auth**");
-
   await page.locator(':text("Log in with Email")').click();
 
   await page.locator("#login").fill(username);

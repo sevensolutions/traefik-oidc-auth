@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "prepare": "cd tests/dex && ./gencerts.sh",
     "test": "playwright test"
   },
   "keywords": [],
