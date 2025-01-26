@@ -20,7 +20,11 @@ body:
       label: "Pitch"
       description: "Please explain why this feature should be implemented and how it would be used. Add examples, if applicable."
       placeholder: "In my use-case, ..."
-  - type: markdown
+  - type: checkboxes
+    id: homework
     attributes:
-      value: |
-        Before submitting, please check if the feature hasn't been proposed before.
+      label: 
+      description: 
+      options:
+        - label: I have searched for similar feature requests and not found a similar one.
+          required: true
