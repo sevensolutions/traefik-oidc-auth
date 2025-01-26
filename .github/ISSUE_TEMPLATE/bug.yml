@@ -1,0 +1,55 @@
+name: "🐛 Bug Report"
+description: "Report something that is not working as expected"
+title: "🐛 Bug Report: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out our bug report form 🙏
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: "Reproduction steps"
+      description: "How do you trigger this bug? Please walk us through it step by step."
+      placeholder: "When I ..."
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: "Expected behavior"
+      description: "What did you think would happen?"
+      placeholder: "It should ..."
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: "Actual Behavior"
+      description: "What did actually happen? Add error messages or screenshots, if applicable."
+      placeholder: "It actually ..."
+  - type: markdown
+    attributes:
+      value: |
+        ### Additional Information
+  - type: textarea
+    id: environment
+    validations:
+      required: true
+    attributes:
+      label: "Environment and Version Numbers"
+      description: |-
+        Please tell us about your installation.
+
+        * What versions of Traefik and of the plugin?
+        * What identity provider are you integrating with, and which version?
+        * Are you running Traefik on Docker, or Kubernetes, or on something else?
+      placeholder: "Traefik v3.3.2, plugin version v0.6.0, IDP Dex v2.41.0, all on Docker"
+  - type: textarea
+    id: log-files
+    validations:
+      required: false
+    attributes:
+      label: "Log Output"
+      description: "Relevant output of log files when the issue occured to help us diagnose the issue."
+  - type: markdown
+    attributes:
+      value: |
+        **Before submitting, please check if the issue hasn't been raised before.**
