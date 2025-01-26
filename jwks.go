@@ -70,7 +70,7 @@ func (h *JwksHandler) EnsureLoaded(oidcAuth *TraefikOidcAuth, forceReload bool) 
 	if reload {
 		log(oidcAuth.Config.LogLevel, LogLevelInfo, "Reloading JWKS...")
 
-		err := h.loadKeys()
+		err := h.loadKeys(oidcAuth.httpClient)
 		if err != nil {
 			log(oidcAuth.Config.LogLevel, LogLevelError, "Error loading JWKS: %v", err)
 		} else {
@@ -83,8 +83,8 @@ func (h *JwksHandler) EnsureLoaded(oidcAuth *TraefikOidcAuth, forceReload bool) 
 	return nil
 }
 
-func (h *JwksHandler) loadKeys() error {
-	resp, err := http.Get(h.Url)
+func (h *JwksHandler) loadKeys(httpClient *http.Client) error {
+	resp, err := httpClient.Get(h.Url)
 
 	if err != nil {
 		return err

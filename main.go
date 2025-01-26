@@ -17,6 +17,7 @@ import (
 
 type TraefikOidcAuth struct {
 	next              http.Handler
+	httpClient        *http.Client
 	ProviderURL       *url.URL
 	CallbackURL       *url.URL
 	Config            *Config
@@ -40,7 +41,7 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 			toa.Jwks = jwks
 			log(config.LogLevel, LogLevelInfo, "Getting OIDC discovery document...")
 
-			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, parsedURL)
+			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, toa.httpClient, parsedURL)
 			if err != nil {
 				log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
 				return err
