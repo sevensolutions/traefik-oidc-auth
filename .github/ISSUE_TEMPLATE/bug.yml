@@ -31,7 +31,7 @@ body:
         * What versions of Traefik and of the plugin?
         * What identity provider are you integrating with, and which version?
         * Are you running Traefik on Docker, or Kubernetes, or on something else?
-        * Any special circumstances, like about TLS certificates?
+        * Any special circumstances, like self-signed TLS certificates, or similar?
       placeholder: |-
         * Traefik v3.3.2
         * plugin version v0.6.0
