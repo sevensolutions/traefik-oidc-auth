@@ -51,5 +51,5 @@ body:
       label: Doing your homework
       description: 
       options:
-        - label: I have searched for similar issues and not found a similar one.
+        - label: I have searched for similar bug reports and not found a similar one.
           required: true
