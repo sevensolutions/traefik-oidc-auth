@@ -14,21 +14,11 @@ body:
       description: "How do you trigger this bug? Please walk us through it step by step."
       placeholder: "When I ..."
   - type: textarea
-    id: expected-behavior
+    id: behavior
     attributes:
-      label: "Expected behavior"
-      description: "What did you think would happen?"
-      placeholder: "It should ..."
-  - type: textarea
-    id: actual-behavior
-    attributes:
-      label: "Actual Behavior"
-      description: "What did actually happen? Add error messages or screenshots, if applicable."
-      placeholder: "It actually ..."
-  - type: markdown
-    attributes:
-      value: |
-        ### Additional Information
+      label: "Expected vs actual behavior"
+      description: "What did you think would happen? And also, what happened instead? Add any error messages or screenshots, if applicable."
+      placeholder: "It should have ... but actually it ... "
   - type: textarea
     id: environment
     validations:
