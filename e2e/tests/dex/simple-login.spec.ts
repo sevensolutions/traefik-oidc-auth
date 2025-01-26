@@ -1,6 +1,8 @@
 import { test, expect, Page, Response } from "@playwright/test";
 import * as dockerCompose from "docker-compose";
 import { configureTraefik } from "../../utils";
+import fs from "fs";
+import path from "path";
 
 //-----------------------------------------------------------------------------
 // Test Setup
@@ -218,7 +220,7 @@ http:
   expect(response.status()).toBe(401);
 });
 
-test("login at provider via self signed certificate", async ({ page }) => {
+test("login at provider via self signed certificate from file", async ({ page }) => {
   await configureTraefik(`
 http:
   services:
@@ -235,6 +237,51 @@ http:
           Provider:
             UrlEnv: "PROVIDER_URL_HTTPS"
             CABundleFile: "/certificates/bundle/ca_bundle.pem"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    whoami-secure:
+      entryPoints: ["websecure"]
+      tls: {}
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await page.goto("https://localhost:9443");
+
+  const response = await login(page, "admin@example.com", "password", "https://localhost:9443");
+
+  expect(response.status()).toBe(200);
+});
+
+test("login at provider via self signed inline certificate", async ({ page }) => {
+  const certBundle = fs.readFileSync(path.join(__dirname, "./certificates/bundle/ca_bundle.pem"));
+  const base64CertBundle = certBundle.toString("base64");
+
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL_HTTPS"
+            CABundle: "base64:${base64CertBundle}"
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: false
