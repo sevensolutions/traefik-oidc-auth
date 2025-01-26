@@ -204,7 +204,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: received bad HTTP response from Provider: %s", string(body))
-		return nil, err
+		return nil, errors.New("invalid status code")
 	}
 
 	tokenResponse := &OidcTokenResponse{}
@@ -332,7 +332,7 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*OidcTokenResponse,
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		log(toa.Config.LogLevel, LogLevelError, "renewToken: received bad HTTP response from Provider: %s", string(body))
-		return nil, err
+		return nil, errors.New("invalid status code")
 	}
 
 	tokenResponse := &OidcTokenResponse{}
