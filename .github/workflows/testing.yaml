@@ -1,5 +1,7 @@
 name: Run Go tests
 on:
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
     paths-ignore:

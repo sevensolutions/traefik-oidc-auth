@@ -17,6 +17,7 @@ import (
 
 type TraefikOidcAuth struct {
 	next              http.Handler
+	httpClient        *http.Client
 	ProviderURL       *url.URL
 	CallbackURL       *url.URL
 	Config            *Config
@@ -40,7 +41,7 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 			toa.Jwks = jwks
 			log(config.LogLevel, LogLevelInfo, "Getting OIDC discovery document...")
 
-			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, parsedURL)
+			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, toa.httpClient, parsedURL)
 			if err != nil {
 				log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
 				return err
@@ -132,17 +133,32 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		// Forward the request
+		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		log(toa.Config.LogLevel, LogLevelError, "Verifying token: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelWarn, "Verifying token: %s", err.Error())
 	}
 
-	c := toa.createSessionCookie()
-	makeCookieExpireImmediately(c)
-	http.SetCookie(rw, c)
+	// Clear the session cookie
+	toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
 
 	toa.handleUnauthorized(rw, req)
+}
+
+func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
+	// Remove the session cookie from the request before forwarding
+	keepCookies := make([]*http.Cookie, 0)
+	dontSendUpstreamCookieNames, _ := getChunkedCookieNames(req, toa.Config.SessionCookie.Name)
+	for _, c := range req.Cookies() {
+		if _, ok := dontSendUpstreamCookieNames[c.Name]; !ok {
+			keepCookies = append(keepCookies, c)
+		}
+	}
+	req.Header.Del("Cookie")
+	for _, c := range keepCookies {
+		req.AddCookie(c)
+	}
 }
 
 func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionState, claims map[string]interface{}) error {

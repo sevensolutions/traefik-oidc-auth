@@ -16,7 +16,7 @@ experimental:
   plugins:
     traefik-oidc-auth:
       moduleName: "github.com/sevensolutions/traefik-oidc-auth"
-      version: "v0.5.0"
+      version: "v0.6.0"
 ```
 
 ## Configure Middleware
@@ -63,11 +63,13 @@ This is an example using [Kubernetes IngressRoute CRD](https://doc.traefik.io/tr
 
 ```yml
 apiVersion: traefik.io/v1alpha1
+# highlight-next-line
 kind: Middleware
 metadata:
   name: oidc
   namespace: traefik
 spec:
+  # highlight-start
   plugin:
     traefik-oidc-plugin:  # same key as in the static configuration
       Provider:
@@ -78,6 +80,7 @@ spec:
         # in the secret named oidc-secret.
         ClientSecret: "urn:k8s:secret:oidc-secret:providerClientSecret"
       Secret: "urn:k8s:secret:oidc-secret:pluginSecret"
+  # highlight-end
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -88,8 +91,10 @@ spec:
   routes:
     - kind: Rule
       match: Host(`whoami.mycluster.com`)
+      # highlight-start
       middlewares:
         - name: oidc
+      # highlight-end
       services:
         - kind: Service
           name: whoami

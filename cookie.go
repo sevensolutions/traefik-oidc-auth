@@ -72,6 +72,22 @@ func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
 
 	return chunkCount, nil
 }
+func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]struct{}, error) {
+	cookieNames := make(map[string]struct{})
+	chunkCount, err := getChunkedCookieCount(req, cookieName)
+	if err != nil {
+		return nil, err
+	}
+	if chunkCount == 0 {
+		cookieNames[cookieName] = struct{}{}
+	} else {
+		cookieNames[cookieName+"Chunks"] = struct{}{}
+		for i := 0; i < chunkCount; i++ {
+			cookieNames[fmt.Sprintf("%s%d", cookieName, i+1)] = struct{}{}
+		}
+	}
+	return cookieNames, nil
+}
 func (toa *TraefikOidcAuth) clearChunkedCookie(rw http.ResponseWriter, req *http.Request, cookieName string) error {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {

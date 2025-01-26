@@ -2,6 +2,9 @@ package traefik_oidc_auth
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/url"
@@ -61,6 +64,11 @@ type ProviderConfig struct {
 	Url    string `json:"url"`
 	UrlEnv string `json:"url_env"`
 
+	InsecureSkipVerify bool   `json:"insecure_skip_verify"`
+	CABundle           string `json:"ca_bundle"`
+	CABundleFile       string `json:"ca_bundle_file"`
+	CABundleFileEnv    string `json:"ca_bundle_file_env"`
+
 	ClientId        string `json:"client_id"`
 	ClientIdEnv     string `json:"client_id_env"`
 	ClientSecret    string `json:"client_secret"`
@@ -87,6 +95,7 @@ type SessionCookieConfig struct {
 	Secure   bool   `json:"secure"`
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
+	MaxAge   int    `json:"max_age"`
 }
 
 type AuthorizationHeaderConfig struct {
@@ -136,6 +145,7 @@ func CreateConfig() *Config {
 			Secure:   true,
 			HttpOnly: true,
 			SameSite: "default",
+			MaxAge:   0,
 		},
 		AuthorizationHeader:  &AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
@@ -174,6 +184,14 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if config.Provider.ValidAudience == "" && config.Provider.ValidAudienceEnv != "" {
 		config.Provider.ValidAudience = os.Getenv(config.Provider.ValidAudienceEnv)
 	}
+	if config.Provider.CABundleFile == "" && config.Provider.CABundleFileEnv != "" {
+		config.Provider.CABundleFile = os.Getenv(config.Provider.CABundleFileEnv)
+	}
+
+	if config.Provider.CABundle != "" && config.Provider.CABundleFile != "" {
+		log(config.LogLevel, LogLevelError, "You can only use an inline CABundle OR CABundleFile, not both.")
+		return nil, errors.New("you can only use an inline CABundle OR CABundleFile, not both.")
+	}
 
 	// Specify default scopes if not provided
 	if config.Scopes == nil || len(config.Scopes) == 0 {
@@ -211,9 +229,61 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
 
+	rootCAs, _ := x509.SystemCertPool()
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	var caBundleData []byte
+
+	if config.Provider.CABundle != "" {
+		if strings.HasPrefix(config.Provider.CABundle, "base64:") {
+			caBundleData, err = base64.StdEncoding.DecodeString(strings.TrimPrefix(config.Provider.CABundle, "base64:"))
+			if err != nil {
+				log(config.LogLevel, LogLevelInfo, "Failed to base64-decode the inline CA bundle")
+				return nil, err
+			}
+		} else {
+			caBundleData = []byte(config.Provider.CABundle)
+		}
+
+		log(config.LogLevel, LogLevelDebug, "Loaded CA bundle provided inline")
+	} else if config.Provider.CABundleFile != "" {
+		caBundleData, err = os.ReadFile(config.Provider.CABundleFile)
+		if err != nil {
+			log(config.LogLevel, LogLevelInfo, "Failed to load CA bundle from %v: %v", config.Provider.CABundleFile, err)
+			return nil, err
+		}
+
+		log(config.LogLevel, LogLevelDebug, "Loaded CA bundle from %v", config.Provider.CABundleFile)
+	}
+
+	if caBundleData != nil {
+		// Append our cert to the system pool
+		if ok := rootCAs.AppendCertsFromPEM(caBundleData); !ok {
+			log(config.LogLevel, LogLevelWarn, "Failed to append CA bundle. Using system certificates only.")
+		}
+
+	}
+
+	httpTransport := &http.Transport{
+		// MaxIdleConns:    10,
+		// IdleConnTimeout: 30 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: config.Provider.InsecureSkipVerify,
+			RootCAs:            rootCAs,
+		},
+	}
+
+	httpClient := &http.Client{
+		Transport: httpTransport,
+	}
+
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
+
 	return &TraefikOidcAuth{
 		next:           next,
+		httpClient:     httpClient,
 		ProviderURL:    parsedURL,
 		CallbackURL:    parsedCallbackURL,
 		Config:         config,

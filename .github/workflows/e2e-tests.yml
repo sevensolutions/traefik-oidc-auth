@@ -1,5 +1,7 @@
 name: E2E Tests
 on:
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
     paths-ignore:
@@ -21,6 +23,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: Prepare tests
+        run: npm run prepare
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
