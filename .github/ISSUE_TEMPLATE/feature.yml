@@ -23,7 +23,7 @@ body:
   - type: checkboxes
     id: homework
     attributes:
-      label: 
+      label: Doing your homework
       description: 
       options:
         - label: I have searched for similar feature requests and not found a similar one.
