@@ -1,6 +1,6 @@
 name: "🐛 Bug Report"
 description: "Report something that is not working as expected"
-title: "🐛 Bug Report: "
+title: "🐛 Bug: "
 labels: [bug]
 body:
   - type: markdown
@@ -44,7 +44,7 @@ body:
       required: false
     attributes:
       label: "Log Output"
-      description: "Relevant output of log files when the issue occured to help us diagnose the issue."
+      description: "Any relevant output of log files when the issue occured, to help us diagnose the issue?"
   - type: checkboxes
     id: homework
     attributes:
