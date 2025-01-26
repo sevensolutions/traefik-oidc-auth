@@ -45,7 +45,11 @@ body:
     attributes:
       label: "Log Output"
       description: "Relevant output of log files when the issue occured to help us diagnose the issue."
-  - type: markdown
+  - type: checkboxes
+    id: homework
     attributes:
-      value: |
-        **Before submitting, please check if the issue hasn't been raised before.**
+      label: Doing your homework
+      description: 
+      options:
+        - label: I have searched for similar issues and not found a similar one.
+          required: true
