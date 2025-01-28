@@ -4,16 +4,20 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/hkdf"
 )
 
 func shouldLog(minLevel, level string) bool {
@@ -139,8 +143,24 @@ func ParseInt(s string) (int, error) {
 	return int(v.Int64()), nil
 }
 
-func encrypt(plaintext string, secret string) (string, error) {
-	aesCipher, err := aes.NewCipher([]byte(secret))
+func deriveKey(secret, salt string) ([]byte, error) {
+	// We expect the administrator to have used a CSPRNG to generate the secret,
+	// so we don't need to use something very expensive like PBKDF2 here.
+	// Instead we use HKDF with a fixed salt based on instance-specific parts of the configuration.
+	// This provides some independence between installations of the plugin
+	// (between different users, prod vs preprod environments, etc)
+
+	hkdf := hkdf.New(sha256.New, []byte(secret), []byte(salt), []byte("Traefik-OIDC-Authentication-Plugin-SessionCookie-Key"))
+	key := make([]byte, KeyLengthBytes) // AES-256 key size
+	_, err := io.ReadFull(hkdf, key)
+	if err != nil {
+		return nil, err
+	}
+	return key, nil
+}
+
+func encrypt(plaintext string, key []byte) (string, error) {
+	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
@@ -166,11 +186,11 @@ func encrypt(plaintext string, secret string) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-func decrypt(ciphertext string, secret string) (string, error) {
+func decrypt(ciphertext string, key []byte) (string, error) {
 	cipherbytes, err := base64.StdEncoding.DecodeString(ciphertext)
 	ciphertext = string(cipherbytes)
 
-	aesCipher, err := aes.NewCipher([]byte(secret))
+	aesCipher, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}

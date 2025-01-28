@@ -2,15 +2,21 @@ package traefik_oidc_auth
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"text/template"
+)
+
+const (
+	KeyLengthBytes = 32 // AES-256
 )
 
 const (
@@ -30,7 +36,8 @@ var LogLevels = map[string]int{
 type Config struct {
 	LogLevel string `json:"log_level"`
 
-	Secret string `json:"secret"`
+	Secret     string `json:"secret"`
+	DerivedKey []byte // internal, not in json
 
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
@@ -127,7 +134,7 @@ type HeaderConfig struct {
 func CreateConfig() *Config {
 	return &Config{
 		LogLevel: LogLevelError,
-		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
+		Secret:   "",
 		Provider: &ProviderConfig{
 			ValidateIssuer:   true,
 			ValidateAudience: true,
@@ -217,6 +224,24 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		} else {
 			config.Provider.TokenValidation = "AccessToken"
 		}
+	}
+
+	if config.Secret == "" {
+		log(config.LogLevel, LogLevelWarn, "No Secret provided, generating a random one. This means restarting or reconfiguring Traefik will log out all users. To avoid this, specify a Secret in your configuration.")
+		b := make([]byte, KeyLengthBytes)
+		_, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		config.DerivedKey = b
+	} else if len(config.Secret) < 32 {
+		return nil, fmt.Errorf("Secret must be at least 32 characters long, you gave %d", len(config.Secret))
+	} else {
+		k, err := deriveKey(config.Secret, config.Provider.Url)
+		if err != nil {
+			return nil, err
+		}
+		config.DerivedKey = k
 	}
 
 	log(config.LogLevel, LogLevelInfo, "Provider Url: %v", parsedURL)

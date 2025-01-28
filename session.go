@@ -75,7 +75,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 }
 
 func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*SessionState, map[string]interface{}, *SessionState, error) {
-	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
+	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.DerivedKey)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
 		return nil, nil, nil, err
@@ -159,7 +159,7 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, r
 
 	log(toa.Config.LogLevel, LogLevelDebug, "Session stored. Id %s", session.Id)
 
-	encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
+	encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.DerivedKey)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session ticket: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)

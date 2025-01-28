@@ -185,7 +185,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 			return nil, err
 		}
 
-		codeVerifier, err := decrypt(codeVerifierCookie.Value, oidcAuth.Config.Secret)
+		codeVerifier, err := decrypt(codeVerifierCookie.Value, oidcAuth.Config.DerivedKey)
 		if err != nil {
 			return nil, err
 		}

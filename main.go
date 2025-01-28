@@ -407,7 +407,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		urlValues.Add("code_challenge_method", "S256")
 		urlValues.Add("code_challenge", codeChallenge)
 
-		encryptedCodeVerifier, err := encrypt(codeVerifier, toa.Config.Secret)
+		encryptedCodeVerifier, err := encrypt(codeVerifier, toa.Config.DerivedKey)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
