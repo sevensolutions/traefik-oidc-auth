@@ -1,0 +1,28 @@
+name: 🚀 Feature Request
+description: "I have a suggestion (and may want to implement it 🙂)!"
+title: "🚀 FR: "
+labels: [enhancement]
+
+body:
+  - type: textarea
+    id: feature-description
+    validations:
+      required: true
+    attributes:
+      label: "Feature description"
+      description: "A clear and concise description of what the feature is."
+      placeholder: "You should add ..."
+  - type: textarea
+    id: pitch
+    attributes:
+      label: "Pitch"
+      description: "Please explain why this feature should be implemented and how it would be used. Add examples, if applicable."
+      placeholder: "In my use-case, ..."
+  - type: checkboxes
+    id: homework
+    attributes:
+      label: Doing your homework
+      description: 
+      options:
+        - label: I have searched for similar feature requests and not found a similar one.
+          required: true

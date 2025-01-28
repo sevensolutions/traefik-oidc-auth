@@ -1,0 +1,55 @@
+name: "🐛 Bug Report"
+description: "Report something that is not working as expected"
+title: "🐛 Bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out our bug report form 🙏
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: "Reproduction steps"
+      description: "How do you trigger this bug? Please walk us through it step by step."
+      placeholder: "When I ..."
+  - type: textarea
+    id: behavior
+    attributes:
+      label: "Expected vs actual behavior"
+      description: "What did you think would happen? And also, what happened instead? Add any error messages or screenshots, if applicable."
+      placeholder: "It should have ... but actually it ... "
+  - type: textarea
+    id: environment
+    validations:
+      required: true
+    attributes:
+      label: "Environment and Version Numbers"
+      description: |-
+        Please tell us about your installation.
+
+        * What versions of Traefik and of the plugin?
+        * What identity provider are you integrating with, and which version?
+        * Are you running Traefik on Docker, or Kubernetes, or on something else?
+        * Any special circumstances, like self-signed TLS certificates, or similar?
+      placeholder: |-
+        * Traefik v3.3.2
+        * plugin version v0.6.0
+        * IDP: Dex v2.41.0
+        All running on Docker.
+        Dex is fronted by Traefik on a dedicated subdomain, using a LetsEncrypt cert.
+  - type: textarea
+    id: log-files
+    validations:
+      required: false
+    attributes:
+      label: "Log Output"
+      description: "Any relevant output of log files when the issue occured, to help us diagnose the issue?"
+  - type: checkboxes
+    id: homework
+    attributes:
+      label: Doing your homework
+      description: 
+      options:
+        - label: I have searched for similar bug reports and not found a similar one.
+          required: true
