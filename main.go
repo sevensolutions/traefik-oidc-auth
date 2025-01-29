@@ -25,6 +25,7 @@ type TraefikOidcAuth struct {
 	DiscoveryDocument *OidcDiscovery
 	Jwks              *JwksHandler
 	Lock              sync.RWMutex
+	DerivedKey        []byte
 }
 
 // Make sure we fetch oidc discovery document during first request - avoid race condition
@@ -407,7 +408,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		urlValues.Add("code_challenge_method", "S256")
 		urlValues.Add("code_challenge", codeChallenge)
 
-		encryptedCodeVerifier, err := encrypt(codeVerifier, toa.Config.DerivedKey)
+		encryptedCodeVerifier, err := encrypt(codeVerifier, toa.DerivedKey)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return

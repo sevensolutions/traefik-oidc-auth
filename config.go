@@ -36,8 +36,7 @@ var LogLevels = map[string]int{
 type Config struct {
 	LogLevel string `json:"log_level"`
 
-	Secret     string `json:"secret"`
-	DerivedKey []byte // internal, not in json
+	Secret string `json:"secret"`
 
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
@@ -161,6 +160,33 @@ func CreateConfig() *Config {
 	}
 }
 
+func getDerivedKey(config *Config) ([]byte, error) {
+	var derivedKey []byte
+	if config.Secret == "" {
+		log(config.LogLevel, LogLevelWarn, "No Secret provided, generating a random one. This means restarting or reconfiguring Traefik will log out all users. To avoid this, specify a Secret in your configuration.")
+		b := make([]byte, KeyLengthBytes)
+		_, err := rand.Read(b)
+		if err != nil {
+			return nil, err
+		}
+		derivedKey = b
+	} else if len(config.Secret) < 32 {
+		return nil, fmt.Errorf("secret must be at least 32 characters long, you gave %d", len(config.Secret))
+	} else {
+		// We expect the administrator to have used a CSPRNG to generate the secret,
+		// so we don't need to use something very expensive like PBKDF2 here.
+		// Instead we use HKDF with a fixed salt based on instance-specific parts of the configuration.
+		// This provides some independence between installations of the plugin
+		// (between different users, prod vs test environments, etc)
+		k, err := deriveKey(config.Secret, config.Provider.Url)
+		if err != nil {
+			return nil, err
+		}
+		derivedKey = k
+	}
+	return derivedKey, nil
+}
+
 // Will be called by traefik
 func New(uctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	log(config.LogLevel, LogLevelInfo, "Loading Configuration...")
@@ -226,25 +252,13 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}
 	}
 
-	if config.Secret == "" {
-		log(config.LogLevel, LogLevelWarn, "No Secret provided, generating a random one. This means restarting or reconfiguring Traefik will log out all users. To avoid this, specify a Secret in your configuration.")
-		b := make([]byte, KeyLengthBytes)
-		_, err := rand.Read(b)
-		if err != nil {
-			return nil, err
-		}
-		config.DerivedKey = b
-	} else if len(config.Secret) < 32 {
-		return nil, fmt.Errorf("Secret must be at least 32 characters long, you gave %d", len(config.Secret))
-	} else {
-		k, err := deriveKey(config.Secret, config.Provider.Url)
-		if err != nil {
-			return nil, err
-		}
-		config.DerivedKey = k
+	// Check for this before logging the happy "valid config" messages
+	derivedKey, err := getDerivedKey(config)
+	if err != nil {
+		return nil, err
 	}
 
-	log(config.LogLevel, LogLevelInfo, "Provider Url: %v", parsedURL)
+	log(config.LogLevel, LogLevelInfo, "Provider URL: %v", parsedURL)
 	log(config.LogLevel, LogLevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
 	if urlIsAbsolute(parsedCallbackURL) {
 		log(config.LogLevel, LogLevelInfo, "Callback URL is absolute, will not overlay wrapped services")
@@ -313,5 +327,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		CallbackURL:    parsedCallbackURL,
 		Config:         config,
 		SessionStorage: CreateCookieSessionStorage(),
+		DerivedKey:     derivedKey,
 	}, nil
 }

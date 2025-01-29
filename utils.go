@@ -144,12 +144,6 @@ func ParseInt(s string) (int, error) {
 }
 
 func deriveKey(secret, salt string) ([]byte, error) {
-	// We expect the administrator to have used a CSPRNG to generate the secret,
-	// so we don't need to use something very expensive like PBKDF2 here.
-	// Instead we use HKDF with a fixed salt based on instance-specific parts of the configuration.
-	// This provides some independence between installations of the plugin
-	// (between different users, prod vs preprod environments, etc)
-
 	hkdf := hkdf.New(sha256.New, []byte(secret), []byte(salt), []byte("Traefik-OIDC-Authentication-Plugin-SessionCookie-Key"))
 	key := make([]byte, KeyLengthBytes) // AES-256 key size
 	_, err := io.ReadFull(hkdf, key)
