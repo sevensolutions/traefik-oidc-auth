@@ -22,7 +22,7 @@ experimental:
 ## Configure Middleware
 
 <Tabs>
-  <TabItem value="yaml" label="YAML" default>
+<TabItem value="yaml" label="YAML" default>
 
 This is an example using [YAML file](https://doc.traefik.io/traefik/providers/file/) config
 
@@ -39,6 +39,7 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
+          Secret: ""  # it's suggested to set this, but safe to not; see below
           Provider:
             Url: "https://<YourIdentityProviderUrl>"
             ClientId: "<YourClientId>"
@@ -56,8 +57,8 @@ http:
       middlewares: ["oidc-auth"]
 ```
 
-  </TabItem>
-  <TabItem value="k8s" label="Kubernetes">
+</TabItem>
+<TabItem value="k8s" label="Kubernetes">
 
 This is an example using [Kubernetes IngressRoute CRD](https://doc.traefik.io/traefik/providers/kubernetes-crd/) config
 
@@ -101,5 +102,20 @@ spec:
           port: 80
 ```
 
-  </TabItem>
+</TabItem>
 </Tabs>
+
+:::::tip[Configuring a secret is suggested but not required]
+The plugin needs a key to encrypt user authentication cookies with.
+If you do not provide one, it will generate a random key every time it starts up --
+which means every time you restart Traefik, or reconfigure the plugin, etc.
+This is safe and secure, but will invalidate all existing logins,
+meaning all your users will get redirected to the IDP on their next request.
+
+:::warning
+If you do provide your own secret, generate one from a good source
+of randomness.  For example by running `openssl rand -base64 64`.
+You must provide at least 32 characters.
+:::
+
+:::::
