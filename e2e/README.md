@@ -5,10 +5,14 @@ The test infrastructure is set up by [*docker compose*](https://docs.docker.com/
 
 Test files are located in the *./tests*-folder within subfolders for different configurations or IDPs.
 
-## How to run the tests
-
+## First-time setup
 ```
 npm install
+npx playwright install
+```
+
+## How to run the tests
+```
 npx playwright test
 ```
 

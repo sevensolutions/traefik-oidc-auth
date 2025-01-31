@@ -64,7 +64,7 @@ test.afterAll("Stopping traefik", async () => {
 //-----------------------------------------------------------------------------
 
 test("login http", async ({ page }) => {
-  await page.goto("http://localhost:9080");
+  await expectGotoOkay(page, "http://localhost:9080");
 
   const response = await login(page, "admin@example.com", "password", "http://localhost:9080");
 
@@ -72,7 +72,7 @@ test("login http", async ({ page }) => {
 });
 
 test("login https", async ({ page }) => {
-  await page.goto("https://localhost:9443");
+  await expectGotoOkay(page, "https://localhost:9443");
 
   const response = await login(page, "admin@example.com", "password", "https://localhost:9443");
 
@@ -82,7 +82,7 @@ test("login https", async ({ page }) => {
 // Seems like logout is not supported by dex yet :(
 // https://github.com/dexidp/dex/issues/1697
 // test("logout", async ({ page }) => {
-//   await page.goto("http://localhost:9080");
+//   await expectGotoOkay(page, "http://localhost:9080");
 
 //   const response = await login(page, "admin@example.com", "password", "http://localhost:9080");
 
@@ -125,7 +125,7 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await page.goto("http://localhost:9080");
+  await expectGotoOkay(page, "http://localhost:9080");
 
   const response = await login(page, "admin@example.com", "password", "http://localhost:9080");
 
@@ -174,7 +174,7 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await page.goto("http://localhost:9080");
+  await expectGotoOkay(page, "http://localhost:9080");
 
   const response = await login(page, "alice@example.com", "password", "http://localhost:9080");
 
@@ -213,7 +213,7 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await page.goto("http://localhost:9080");
+  await expectGotoOkay(page, "http://localhost:9080");
 
   const response = await login(page, "bob@example.com", "password", "http://localhost:9080/oidc/callback**");
 
@@ -255,7 +255,7 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await page.goto("https://localhost:9443");
+  await expectGotoOkay(page, "https://localhost:9443");
 
   const response = await login(page, "admin@example.com", "password", "https://localhost:9443");
 
@@ -300,7 +300,7 @@ http:
       middlewares: ["oidc-auth@file"]
 `);
 
-  await page.goto("https://localhost:9443");
+  await expectGotoOkay(page, "https://localhost:9443");
 
   const response = await login(page, "admin@example.com", "password", "https://localhost:9443");
 
@@ -324,4 +324,9 @@ async function login(page: Page, username: string, password: string, waitForUrl:
   const response = await responsePromise;
 
   return response;
+}
+
+async function expectGotoOkay(page: Page, url: string) {
+  const response = await page.goto(url); // follows redirects
+  expect(response?.status()).toBe(200);
 }
