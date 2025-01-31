@@ -57,7 +57,7 @@ http:
 ```
 
   </TabItem>
-  <TabItem value="secret" label="Without PKCE">
+  <TabItem value="no-pkce" label="Without PKCE">
   
 ```yml
 http:
