@@ -45,6 +45,10 @@ body:
     attributes:
       label: "Log Output"
       description: "Any relevant output of log files when the issue occured, to help us diagnose the issue?"
+      placeholder: |-
+        * Logs from the plugin
+        * Any relevant logs from your identity provider?
+        * Any error messages in your browser devtools console?
   - type: checkboxes
     id: homework
     attributes:
