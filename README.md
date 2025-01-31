@@ -1,5 +1,7 @@
 # Traefik OpenID Connect Middleware
 
+![E2E Tests](https://img.shields.io/github/actions/workflow/status/sevensolutions/traefik-oidc-auth/.github%2Fworkflows%2Fe2e-tests.yml?logo=github&label=E2E%20Tests&color=green)
+
 <p align="left" style="text-align:left;">
   <a href="https://github.com/sevensolutions/traefik-oidc-auth">
     <img alt="Logo" src=".assets/icon.png" width="150" />
