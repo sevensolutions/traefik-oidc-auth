@@ -8,6 +8,7 @@ sidebar_position: 3
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
+| LogLevel | no | `string` | `WARN` | Defines the logging level of the plugin. Can be one of `DEBUG`, `INFO`, `WARN`, `ERROR`. |
 | Secret | no | `string` | `MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ`| A secret used for encryption. Must be a 32 character string. It is strongly suggested to change this. |
 | Provider | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
 | Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |

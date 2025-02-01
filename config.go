@@ -126,7 +126,7 @@ type HeaderConfig struct {
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
-		LogLevel: LogLevelError,
+		LogLevel: LogLevelWarn,
 		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
 		Provider: &ProviderConfig{
 			ValidateIssuer:   true,
