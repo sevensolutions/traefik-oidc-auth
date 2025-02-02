@@ -26,8 +26,9 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 | [ZITADEL](https://zitadel.com/) | ✅ | |
 | [Kanidm](https://github.com/kanidm/kanidm) | ✅ | See [GH-12](https://github.com/sevensolutions/traefik-oidc-auth/issues/12) |
 | [Keycloak](https://github.com/kanidm/keycloak) | ✅ | |
-| [Microsoft EntraID](https://learn.microsoft.com/de-de/entra/identity/) | ⚠️ | See [GH-15](https://github.com/sevensolutions/traefik-oidc-auth/issues/15) |
+| [Microsoft EntraID](https://learn.microsoft.com/de-de/entra/identity/) | ✅ | |
 | [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
+| [Authentik](https://goauthentik.io/) | ✅ | |
 | [Pocket ID](https://github.com/stonith404/pocket-id) | ✅ | |
 
 ## 📚 Documentation
