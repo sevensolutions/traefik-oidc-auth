@@ -180,7 +180,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	}
 
 	if oidcAuth.Config.Provider.UsePkce {
-		codeVerifierCookie, err := req.Cookie("CodeVerifier")
+		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config))
 		if err != nil {
 			return nil, err
 		}

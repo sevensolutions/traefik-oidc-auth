@@ -50,6 +50,7 @@ type Config struct {
 	LogoutUri             string `json:"logout_uri"`
 	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
 
+	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
 	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
 	AuthorizationHeader  *AuthorizationHeaderConfig `json:"authorization_header"`
 	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
@@ -89,7 +90,6 @@ type ProviderConfig struct {
 }
 
 type SessionCookieConfig struct {
-	Name     string `json:"name"`
 	Path     string `json:"path"`
 	Domain   string `json:"domain"`
 	Secure   bool   `json:"secure"`
@@ -138,8 +138,8 @@ func CreateConfig() *Config {
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
+		CookieNamePrefix:      "TraefikOidcAuth",
 		SessionCookie: &SessionCookieConfig{
-			Name:     "Authorization",
 			Path:     "/",
 			Domain:   "",
 			Secure:   true,
