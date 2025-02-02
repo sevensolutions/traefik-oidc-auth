@@ -126,7 +126,7 @@ http:
     other:
       entryPoints: ["web"]
       rule: "Host(\`localhost\`) && Path(\`/other\`)"
-      service: noop@internal  # will serve 404
+      service: noop@internal  # serves 418 I'm A Teapot
       middlewares: ["oidc-auth@file"]
 
 `);
@@ -138,7 +138,7 @@ http:
   expect(response.status()).toBe(200);
 
   const otherSvcResp = await page.goto("http://localhost:9080/other");
-  expect(otherSvcResp!.status()).toBe(404);
+  expect(otherSvcResp!.status()).toBe(418);
   expect(otherSvcResp!.request().redirectedFrom()).toBeNull();
 });
 
