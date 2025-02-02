@@ -52,6 +52,14 @@ http:
   });
 });
 
+test.afterEach("Traefik logs on test failure", async ({}, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    console.log(`${testInfo.title} failed, here are Traefik logs:`);
+    console.log(await dockerCompose.logs("traefik", { cwd: __dirname }));
+    console.log(await dockerCompose.logs("dex-https", { cwd: __dirname }));
+  }
+});
+
 test.afterAll("Stopping traefik", async () => {
   await dockerCompose.downAll({
     cwd: __dirname,
