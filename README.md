@@ -31,6 +31,7 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 | [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
 | [Authentik](https://goauthentik.io/) | ✅ | |
 | [Pocket ID](https://github.com/stonith404/pocket-id) | ✅ | |
+| [GitHub](https://github.com) | ❌ | GitHub doesn't seem to support OIDC, only plain OAuth. |
 
 ## 📚 Documentation
 
