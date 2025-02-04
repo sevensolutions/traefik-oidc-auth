@@ -100,6 +100,57 @@ test("login https", async ({ page }) => {
 
 // });
 
+test("test two services is seamless", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL_HTTP"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+          Headers:
+            - Name: "Authorization"
+              Value: "{{\`Bearer: {{ .accessToken }}\`}}"
+            - Name: "X-Static-Header"
+              Value: "42"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "Host(\`localhost\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+    other:
+      entryPoints: ["web"]
+      rule: "Host(\`localhost\`) && Path(\`/other\`)"
+      service: noop@internal  # serves 418 I'm A Teapot
+      middlewares: ["oidc-auth@file"]
+
+`);
+
+  await expectGotoOkay(page, "http://localhost:9080/");
+
+  const response = await login(page, "admin@example.com", "password", "http://localhost:9080");
+
+  expect(response.status()).toBe(200);
+
+  const otherSvcResp = await page.goto("http://localhost:9080/other");
+  expect(otherSvcResp!.status()).toBe(418);
+  expect(otherSvcResp!.request().redirectedFrom()).toBeNull();
+});
+
+
 test("test headers", async ({ page }) => {
   await configureTraefik(`
 http:
