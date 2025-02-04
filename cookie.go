@@ -20,12 +20,12 @@ func (toa *TraefikOidcAuth) setChunkedCookies(rw http.ResponseWriter, cookieName
 		http.SetCookie(rw, c)
 	} else {
 		c := baseCookie
-		c.Name = cookieName + "Chunks"
+		c.Name = cookieName + ".Chunks"
 		c.Value = fmt.Sprintf("%d", len(cookieChunks))
 		http.SetCookie(rw, c)
 
 		for index, chunk := range cookieChunks {
-			c.Name = fmt.Sprintf("%s%d", cookieName, index+1)
+			c.Name = fmt.Sprintf("%s.%d", cookieName, index+1)
 			c.Value = chunk
 			http.SetCookie(rw, c)
 		}
@@ -49,7 +49,7 @@ func (toa *TraefikOidcAuth) readChunkedCookie(req *http.Request, cookieName stri
 	value := ""
 
 	for i := 0; i < chunkCount; i++ {
-		cookie, err := req.Cookie(fmt.Sprintf("%s%d", cookieName, i+1))
+		cookie, err := req.Cookie(fmt.Sprintf("%s.%d", cookieName, i+1))
 		if err != nil {
 			return "", err
 		}
@@ -60,7 +60,7 @@ func (toa *TraefikOidcAuth) readChunkedCookie(req *http.Request, cookieName stri
 	return value, nil
 }
 func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
-	chunksCookie, err := req.Cookie(fmt.Sprintf("%sChunks", cookieName))
+	chunksCookie, err := req.Cookie(fmt.Sprintf("%s.Chunks", cookieName))
 	if err != nil {
 		return 0, nil
 	}
@@ -81,9 +81,9 @@ func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]str
 	if chunkCount == 0 {
 		cookieNames[cookieName] = struct{}{}
 	} else {
-		cookieNames[cookieName+"Chunks"] = struct{}{}
+		cookieNames[cookieName+".Chunks"] = struct{}{}
 		for i := 0; i < chunkCount; i++ {
-			cookieNames[fmt.Sprintf("%s%d", cookieName, i+1)] = struct{}{}
+			cookieNames[fmt.Sprintf("%s.%d", cookieName, i+1)] = struct{}{}
 		}
 	}
 	return cookieNames, nil
@@ -103,11 +103,11 @@ func (toa *TraefikOidcAuth) clearChunkedCookie(rw http.ResponseWriter, req *http
 		http.SetCookie(rw, baseCookie)
 	} else {
 		c := baseCookie
-		c.Name = cookieName + "Chunks"
+		c.Name = cookieName + ".Chunks"
 		http.SetCookie(rw, c)
 
 		for i := 0; i < chunkCount; i++ {
-			c.Name = fmt.Sprintf("%s%d", cookieName, i+1)
+			c.Name = fmt.Sprintf("%s.%d", cookieName, i+1)
 			http.SetCookie(rw, c)
 		}
 	}
@@ -132,4 +132,14 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 	cookie.Expires = time.Now().Add(-24 * time.Hour)
 	cookie.MaxAge = -1
 	return cookie
+}
+
+func getCodeVerifierCookieName(config *Config) string {
+	return makeCookieName(config, "CodeVerifier")
+}
+func getSessionCookieName(config *Config) string {
+	return makeCookieName(config, "Session")
+}
+func makeCookieName(config *Config, name string) string {
+	return fmt.Sprintf("%s.%s", config.CookieNamePrefix, name)
 }

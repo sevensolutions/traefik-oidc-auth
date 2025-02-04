@@ -57,7 +57,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 	}
 
 	// Use SessionCookie, if present
-	sessionTicket, err := toa.readChunkedCookie(req, toa.Config.SessionCookie.Name)
+	sessionTicket, err := toa.readChunkedCookie(req, getSessionCookieName(toa.Config))
 
 	if err != nil {
 		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
@@ -166,12 +166,12 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, r
 		return
 	}
 
-	toa.setChunkedCookies(rw, toa.Config.SessionCookie.Name, encryptedSessionTicket)
+	toa.setChunkedCookies(rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
 }
 
 func (toa *TraefikOidcAuth) createSessionCookie() *http.Cookie {
 	return &http.Cookie{
-		Name:     toa.Config.SessionCookie.Name,
+		Name:     getSessionCookieName(toa.Config),
 		Value:    "",
 		Secure:   toa.Config.SessionCookie.Secure,
 		HttpOnly: toa.Config.SessionCookie.HttpOnly,

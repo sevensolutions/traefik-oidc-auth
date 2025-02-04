@@ -17,6 +17,7 @@ sidebar_position: 3
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
+| CookieNamePrefix | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookieConfig* where the name can be set individually. |
 | SessionCookie | no | [`SessionCookieConfig`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | AuthorizationHeader | no | [`AuthorizationHeaderConfig`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeaderConfig* block. |
 | AuthorizationCookie | no | [`AuthorizationCookieConfig`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookieConfig* block. |
@@ -51,7 +52,6 @@ sidebar_position: 3
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| Name | no | `string` | `Authorization` | The name of the session-cookie. |
 | Path | no | `string` | `/` | The path to which the cookie should be assigned to. |
 | Domain | no | `string` | *none* | An optional domain to which the cookie should be assigned to. See [Callback URLs](./callback-uri.md) for examples. |
 | Secure | no | `bool` | `true` | Whether the cookie should be marked secure. |

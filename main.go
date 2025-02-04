@@ -141,21 +141,23 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	}
 
 	// Clear the session cookie
-	toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
+	toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
 
 	toa.handleUnauthorized(rw, req)
 }
 
 func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
-	// Remove the session cookie from the request before forwarding
+	// Remove all internal cookies from the request before forwarding
 	keepCookies := make([]*http.Cookie, 0)
-	dontSendUpstreamCookieNames, _ := getChunkedCookieNames(req, toa.Config.SessionCookie.Name)
+
 	for _, c := range req.Cookies() {
-		if _, ok := dontSendUpstreamCookieNames[c.Name]; !ok {
+		if !strings.HasPrefix(c.Name, toa.Config.CookieNamePrefix) {
 			keepCookies = append(keepCookies, c)
 		}
 	}
+
 	req.Header.Del("Cookie")
+
 	for _, c := range keepCookies {
 		req.AddCookie(c)
 	}
@@ -280,7 +282,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		toa.storeSessionAndAttachCookie(session, rw)
 
 		http.SetCookie(rw, &http.Cookie{
-			Name:     "CodeVerifier",
+			Name:     getCodeVerifierCookieName(toa.Config),
 			Value:    "",
 			Expires:  time.Now().Add(-24 * time.Hour),
 			MaxAge:   -1,
@@ -301,7 +303,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
+		toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
 	}
 
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
@@ -434,7 +436,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		// TODO: Make configurable
 		// TODO does this need domain tweaks?  it is in the login flow
 		http.SetCookie(rw, &http.Cookie{
-			Name:     "CodeVerifier",
+			Name:     getCodeVerifierCookieName(toa.Config),
 			Value:    encryptedCodeVerifier,
 			Secure:   true,
 			HttpOnly: true,
