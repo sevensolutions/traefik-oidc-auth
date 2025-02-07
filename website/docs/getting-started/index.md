@@ -21,6 +21,11 @@ experimental:
 
 ## Configure Middleware
 
+:::caution
+It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+You can generate a random one here: https://it-tools.tech/token-generator?length=32
+:::
+
 <Tabs>
   <TabItem value="yaml" label="YAML" default>
 
@@ -39,6 +44,7 @@ http:
     oidc-auth:
       plugin:
         traefik-oidc-auth:
+          Secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
           Provider:
             Url: "https://<YourIdentityProviderUrl>"
             ClientId: "<YourClientId>"
@@ -72,6 +78,7 @@ spec:
   # highlight-start
   plugin:
     traefik-oidc-plugin:  # same key as in the static configuration
+      Secret: "urn:k8s:secret:oidc-secret:pluginSecret"
       Provider:
         # You could just write strings here for the values.
         ClientId: "abcd-12345"
@@ -79,7 +86,6 @@ spec:
         # This will resolve to the value of the providerClientSecret key
         # in the secret named oidc-secret.
         ClientSecret: "urn:k8s:secret:oidc-secret:providerClientSecret"
-      Secret: "urn:k8s:secret:oidc-secret:pluginSecret"
   # highlight-end
 ---
 apiVersion: traefik.io/v1alpha1

@@ -27,6 +27,8 @@ var LogLevels = map[string]int{
 	LogLevelDebug: 4,
 }
 
+const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+
 type Config struct {
 	LogLevel string `json:"log_level"`
 
@@ -127,7 +129,7 @@ type HeaderConfig struct {
 func CreateConfig() *Config {
 	return &Config{
 		LogLevel: LogLevelWarn,
-		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
+		Secret:   DefaultSecret,
 		Provider: &ProviderConfig{
 			ValidateIssuer:   true,
 			ValidateAudience: true,
@@ -160,6 +162,10 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	if config.Provider == nil {
 		return nil, errors.New("missing provider configuration")
+	}
+
+	if config.Secret == DefaultSecret {
+		log(config.LogLevel, LogLevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
 	}
 
 	// Hack: Trick to traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.

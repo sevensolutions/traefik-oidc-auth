@@ -6,6 +6,11 @@ sidebar_position: 3
 
 ## Plugin Config Block
 
+:::caution
+It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+You can generate a random one here: https://it-tools.tech/token-generator?length=32
+:::
+
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | LogLevel | no | `string` | `WARN` | Defines the logging level of the plugin. Can be one of `DEBUG`, `INFO`, `WARN`, `ERROR`. |
