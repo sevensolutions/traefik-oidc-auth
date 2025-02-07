@@ -34,7 +34,7 @@ body:
         * Any special circumstances, like self-signed TLS certificates, or similar?
       placeholder: |-
         * Traefik v3.3.2
-        * plugin version v0.6.1
+        * plugin version v0.7.0
         * IDP: Dex v2.41.0
         All running on Docker.
         Dex is fronted by Traefik on a dedicated subdomain, using a LetsEncrypt cert.

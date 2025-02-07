@@ -16,7 +16,7 @@ services:
       - "./certificates:/certificates:ro"
 
   traefik:
-    image: "traefik:v3.1.4"
+    image: "traefik:v3.3.2"
     ports:
       - "9080:80"
       - "9443:443"

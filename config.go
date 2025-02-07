@@ -27,6 +27,8 @@ var LogLevels = map[string]int{
 	LogLevelDebug: 4,
 }
 
+const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+
 type Config struct {
 	LogLevel string `json:"log_level"`
 
@@ -50,6 +52,7 @@ type Config struct {
 	LogoutUri             string `json:"logout_uri"`
 	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
 
+	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
 	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
 	AuthorizationHeader  *AuthorizationHeaderConfig `json:"authorization_header"`
 	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
@@ -89,7 +92,6 @@ type ProviderConfig struct {
 }
 
 type SessionCookieConfig struct {
-	Name     string `json:"name"`
 	Path     string `json:"path"`
 	Domain   string `json:"domain"`
 	Secure   bool   `json:"secure"`
@@ -126,8 +128,8 @@ type HeaderConfig struct {
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
-		LogLevel: LogLevelError,
-		Secret:   "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ",
+		LogLevel: LogLevelWarn,
+		Secret:   DefaultSecret,
 		Provider: &ProviderConfig{
 			ValidateIssuer:   true,
 			ValidateAudience: true,
@@ -138,8 +140,8 @@ func CreateConfig() *Config {
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
+		CookieNamePrefix:      "TraefikOidcAuth",
 		SessionCookie: &SessionCookieConfig{
-			Name:     "Authorization",
 			Path:     "/",
 			Domain:   "",
 			Secure:   true,
@@ -160,6 +162,10 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	if config.Provider == nil {
 		return nil, errors.New("missing provider configuration")
+	}
+
+	if config.Secret == DefaultSecret {
+		log(config.LogLevel, LogLevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
 	}
 
 	// Hack: Trick to traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.

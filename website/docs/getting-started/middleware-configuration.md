@@ -6,8 +6,14 @@ sidebar_position: 3
 
 ## Plugin Config Block
 
+:::caution
+It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+You can generate a random one here: https://it-tools.tech/token-generator?length=32
+:::
+
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
+| LogLevel | no | `string` | `WARN` | Defines the logging level of the plugin. Can be one of `DEBUG`, `INFO`, `WARN`, `ERROR`. |
 | Secret | no | `string` | `MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ`| A secret used for encryption. Must be a 32 character string. It is strongly suggested to change this. |
 | Provider | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
 | Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
@@ -16,6 +22,7 @@ sidebar_position: 3
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
+| CookieNamePrefix | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookieConfig* where the name can be set individually. |
 | SessionCookie | no | [`SessionCookieConfig`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | AuthorizationHeader | no | [`AuthorizationHeaderConfig`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeaderConfig* block. |
 | AuthorizationCookie | no | [`AuthorizationCookieConfig`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookieConfig* block. |
@@ -50,7 +57,6 @@ sidebar_position: 3
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| Name | no | `string` | `Authorization` | The name of the session-cookie. |
 | Path | no | `string` | `/` | The path to which the cookie should be assigned to. |
 | Domain | no | `string` | *none* | An optional domain to which the cookie should be assigned to. See [Callback URLs](./callback-uri.md) for examples. |
 | Secure | no | `bool` | `true` | Whether the cookie should be marked secure. |

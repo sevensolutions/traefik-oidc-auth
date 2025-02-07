@@ -141,21 +141,23 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	}
 
 	// Clear the session cookie
-	toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
+	toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
 
 	toa.handleUnauthorized(rw, req)
 }
 
 func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
-	// Remove the session cookie from the request before forwarding
+	// Remove all internal cookies from the request before forwarding
 	keepCookies := make([]*http.Cookie, 0)
-	dontSendUpstreamCookieNames, _ := getChunkedCookieNames(req, toa.Config.SessionCookie.Name)
+
 	for _, c := range req.Cookies() {
-		if _, ok := dontSendUpstreamCookieNames[c.Name]; !ok {
+		if !strings.HasPrefix(c.Name, toa.Config.CookieNamePrefix) {
 			keepCookies = append(keepCookies, c)
 		}
 	}
+
 	req.Header.Del("Cookie")
+
 	for _, c := range keepCookies {
 		req.AddCookie(c)
 	}
@@ -280,7 +282,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		toa.storeSessionAndAttachCookie(session, rw)
 
 		http.SetCookie(rw, &http.Cookie{
-			Name:     "CodeVerifier",
+			Name:     getCodeVerifierCookieName(toa.Config),
 			Value:    "",
 			Expires:  time.Now().Add(-24 * time.Hour),
 			MaxAge:   -1,
@@ -291,15 +293,17 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			SameSite: http.SameSiteDefaultMode,
 		})
 
-		// If we have a static redirect uri, use this one
-		if toa.Config.PostLoginRedirectUri != "" {
+		if redirectUrl != "" {
+			redirectUrl = ensureAbsoluteUrl(req, redirectUrl)
+		} else {
 			redirectUrl = ensureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 		}
+
 	} else if state.Action == "Logout" {
 		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		toa.clearChunkedCookie(rw, req, toa.Config.SessionCookie.Name)
+		toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
 	}
 
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
@@ -360,14 +364,30 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
 	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to OIDC provider...")
 
-	host := getFullHost(req)
-	originalUrl := fmt.Sprintf("%s%s", host, req.RequestURI)
+	var redirectUrl string
 
-	redirectUrl := toa.GetAbsoluteCallbackURL(req).String()
+	// If the user specified one on the /login request, use this one
+	if redirectUrlFromQuery := req.URL.Query().Get("redirect_uri"); toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUrlFromQuery != "" {
+		redirectUrl = redirectUrlFromQuery
+	} else if toa.Config.PostLoginRedirectUri != "" {
+		host := getFullHost(req)
+		postLoginUri, _ := strings.CutPrefix(toa.Config.PostLoginRedirectUri, "/")
+		redirectUrl = fmt.Sprintf("%s/%s", host, postLoginUri)
+	} else {
+		host := getFullHost(req)
+		redirectUrl = fmt.Sprintf("%s%s", host, req.RequestURI)
+
+		// Special case: If someone just calls /login but doesn't provide a redirect_uri, we go to / instead of /login again.
+		if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) {
+			redirectUrl = host
+		}
+	}
+
+	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
 
 	state := OidcState{
 		Action:      "Login",
-		RedirectUrl: originalUrl,
+		RedirectUrl: redirectUrl,
 	}
 
 	stateBytes, _ := json.Marshal(state)
@@ -375,7 +395,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 
 	log(toa.Config.LogLevel, LogLevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 
-	redirectURL, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
+	authorizationEndpointUrl, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -386,7 +406,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"response_type": {"code"},
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"client_id":     {toa.Config.Provider.ClientId},
-		"redirect_uri":  {redirectUrl},
+		"redirect_uri":  {callbackUrl},
 		"state":         {stateBase64},
 	}
 
@@ -416,7 +436,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		// TODO: Make configurable
 		// TODO does this need domain tweaks?  it is in the login flow
 		http.SetCookie(rw, &http.Cookie{
-			Name:     "CodeVerifier",
+			Name:     getCodeVerifierCookieName(toa.Config),
 			Value:    encryptedCodeVerifier,
 			Secure:   true,
 			HttpOnly: true,
@@ -426,7 +446,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		})
 	}
 
-	redirectURL.RawQuery = urlValues.Encode()
+	authorizationEndpointUrl.RawQuery = urlValues.Encode()
 
-	http.Redirect(rw, req, redirectURL.String(), http.StatusFound)
+	http.Redirect(rw, req, authorizationEndpointUrl.String(), http.StatusFound)
 }
