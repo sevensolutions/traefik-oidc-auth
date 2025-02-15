@@ -79,6 +79,12 @@ const config: Config = {
           label: 'Identity Providers',
         },
         {
+          type: 'docSidebar',
+          sidebarId: 'configSamplesSidebar',
+          position: 'left',
+          label: 'Config Samples',
+        },
+        {
           href: 'https://github.com/sevensolutions/traefik-oidc-auth',
           label: 'GitHub',
           position: 'right',
@@ -98,6 +104,10 @@ const config: Config = {
             {
               label: 'Identity Providers',
               to: '/docs/identity-providers',
+            },
+            {
+              label: 'Config Samples',
+              to: '/docs/config-samples',
             },
           ],
         },
