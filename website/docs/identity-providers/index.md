@@ -8,7 +8,7 @@ This documentation section will give you an overview of the support-status of we
 Select a provider to see detailed setup instructions.
 
 :::info
-If you have tested a new Identity Provider, not mentioned here already, please open a PR and document it 🙏.
+If you have tested a new Identity Provider, not mentioned here already, please submit a PR and document it 🙏.
 
 [![Open in Codeflow](https://developer.stackblitz.com/img/open_in_codeflow.svg)](https://pr.new/sevensolutions/traefik-oidc-auth)
 :::
