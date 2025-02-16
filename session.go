@@ -74,14 +74,8 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 	return session, updatedSession != nil, claims, nil
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*SessionState, map[string]interface{}, *SessionState, error) {
-	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
-	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
-		return nil, nil, nil, err
-	}
-
-	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
+func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*SessionState, map[string]interface{}, *SessionState, error) {
+	session, err := toa.SessionStorage.TryGetSession(toa, sessionTicket)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Reading session failed: %v", err.Error())
 		return nil, nil, nil, err
@@ -150,7 +144,7 @@ func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[stri
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, rw http.ResponseWriter) {
-	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
+	sessionTicket, err := toa.SessionStorage.StoreSession(toa, session.Id, session)
 	if err != nil {
 		log(toa.Config.LogLevel, LogLevelError, "Failed to store session: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -159,14 +153,7 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, r
 
 	log(toa.Config.LogLevel, LogLevelDebug, "Session stored. Id %s", session.Id)
 
-	encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
-	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session ticket: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	toa.setChunkedCookies(rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
+	toa.setChunkedCookies(rw, getSessionCookieName(toa.Config), sessionTicket)
 }
 
 func (toa *TraefikOidcAuth) createSessionCookie() *http.Cookie {

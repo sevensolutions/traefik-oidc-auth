@@ -10,16 +10,28 @@ func CreateCookieSessionStorage() *CookieSessionStorage {
 	return storage
 }
 
-func (storage *CookieSessionStorage) StoreSession(sessionId string, state *SessionState) (string, error) {
+func (storage *CookieSessionStorage) StoreSession(toa *TraefikOidcAuth, sessionId string, state *SessionState) (string, error) {
 	stateJson, _ := json.Marshal(*state)
 
-	return string(stateJson), nil
+	encryptedSessionTicket, err := encrypt(string(stateJson), toa.Config.Secret)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Failed to encrypt session state: %s", err.Error())
+		return "", err
+	}
+
+	return encryptedSessionTicket, nil
 }
 
-func (storage *CookieSessionStorage) TryGetSession(sessionTicket string) (*SessionState, error) {
+func (storage *CookieSessionStorage) TryGetSession(toa *TraefikOidcAuth, sessionTicket string) (*SessionState, error) {
+	plainSessionTicket, err := decrypt(sessionTicket, toa.Config.Secret)
+	if err != nil {
+		log(toa.Config.LogLevel, LogLevelError, "Failed to decrypt session ticket: %v", err.Error())
+		return nil, err
+	}
+
 	state := &SessionState{}
 
-	err := json.Unmarshal([]byte(sessionTicket), state)
+	err = json.Unmarshal([]byte(plainSessionTicket), state)
 	if err != nil {
 		return nil, err
 	}

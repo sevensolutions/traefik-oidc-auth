@@ -24,16 +24,17 @@ func CreateRedisSessionStorage(address string, password string) *RedisSessionSto
 	return storage
 }
 
-func (storage *RedisSessionStorage) StoreSession(sessionId string, state *SessionState) (string, error) {
+func (storage *RedisSessionStorage) StoreSession(toa *TraefikOidcAuth, sessionId string, state *SessionState) (string, error) {
 	stateJson, _ := json.Marshal(*state)
 
 	// TODO: Get expiration from token
+	// TODO: Generate a separate random session ticket
 	storage.client.Set(sessionId, string(stateJson), 0)
 
 	return sessionId, nil
 }
 
-func (storage *RedisSessionStorage) TryGetSession(sessionTicket string) (*SessionState, error) {
+func (storage *RedisSessionStorage) TryGetSession(toa *TraefikOidcAuth, sessionTicket string) (*SessionState, error) {
 	state := &SessionState{}
 
 	result := storage.client.Get(sessionTicket)

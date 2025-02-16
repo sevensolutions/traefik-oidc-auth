@@ -5,8 +5,8 @@ import (
 )
 
 type SessionStorage interface {
-	StoreSession(sessionId string, state *SessionState) (string, error)
-	TryGetSession(sessionTicket string) (*SessionState, error)
+	StoreSession(toa *TraefikOidcAuth, sessionId string, state *SessionState) (string, error)
+	TryGetSession(toa *TraefikOidcAuth, sessionTicket string) (*SessionState, error)
 }
 
 type SessionState struct {
