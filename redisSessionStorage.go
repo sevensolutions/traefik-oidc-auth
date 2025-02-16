@@ -1,4 +1,4 @@
-// yaegi:tags purego
+// yaegi:tags purego appengine
 
 package traefik_oidc_auth
 
