@@ -27,6 +27,11 @@ var LogLevels = map[string]int{
 	LogLevelDebug: 4,
 }
 
+const (
+	SessionStorageTypeCookie string = "Cookie"
+	SessionStorageTypeRedis  string = "Redis"
+)
+
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 
 type Config struct {
@@ -51,6 +56,9 @@ type Config struct {
 	PostLoginRedirectUri  string `json:"post_login_redirect_uri"`
 	LogoutUri             string `json:"logout_uri"`
 	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
+
+	SessionStorageType string      `json:"session_storage_type"`
+	Redis              RedisConfig `json:"redis"`
 
 	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
 	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
@@ -89,6 +97,11 @@ type ProviderConfig struct {
 
 	// AccessToken or IdToken or Introspection
 	TokenValidation string `json:"verification_token"`
+}
+
+type RedisConfig struct {
+	Address  string `json:"address"`
+	Password string `json:"password"`
 }
 
 type SessionCookieConfig struct {
@@ -141,6 +154,7 @@ func CreateConfig() *Config {
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
 		CookieNamePrefix:      "TraefikOidcAuth",
+		SessionStorageType:    SessionStorageTypeCookie,
 		SessionCookie: &SessionCookieConfig{
 			Path:     "/",
 			Domain:   "",
@@ -285,6 +299,20 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		Transport: httpTransport,
 	}
 
+	var sessionStorage SessionStorage
+
+	switch config.SessionStorageType {
+	case SessionStorageTypeCookie:
+		sessionStorage = CreateCookieSessionStorage()
+		break
+	case SessionStorageTypeRedis:
+		sessionStorage = CreateRedisSessionStorage(config.Redis.Address, config.Redis.Password)
+		break
+	default:
+		log(config.LogLevel, LogLevelError, "invalid SessionStorageType")
+		return nil, errors.New("invalid SessionStorageType")
+	}
+
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
@@ -293,6 +321,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		ProviderURL:    parsedURL,
 		CallbackURL:    parsedCallbackURL,
 		Config:         config,
-		SessionStorage: CreateCookieSessionStorage(),
+		SessionStorage: sessionStorage,
 	}, nil
 }

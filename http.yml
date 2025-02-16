@@ -16,7 +16,11 @@ http:
             ClientIdEnv: "CLIENT_ID"
             ClientSecretEnv: "CLIENT_SECRET"
             UsePkce: true
+            ValidateAudience: false
           Scopes: ["openid", "profile", "email"]
+          SessionStorageType: "Redis"
+          Redis:
+            Address: "host.docker.internal:6379"
           Headers:
             - Name: "X-Oidc-Username"
               Value: "{{`{{ .claims.preferred_username }}`}}"
