@@ -95,3 +95,10 @@ http:
       service: noop@internal
       middlewares: ["oidc-auth@file"]
 ```
+
+:::caution
+If you're sharing the session cookie (by providing `SessionCookie.Domain`) as shown above, authorization may not work as expected.
+Authorization is only checked when the session is being created.
+This means, if you have two different middlewares with different authorization rules but you're sharing the session cookie,
+you will also be logged in on the other application.
+:::
