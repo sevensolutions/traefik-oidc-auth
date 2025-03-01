@@ -112,14 +112,15 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if strings.HasPrefix(req.RequestURI, toa.Config.LogoutUri) {
-		toa.handleLogout(rw, req)
-		return
-	}
-
 	session, updateSession, claims, err := toa.getSessionForRequest(req)
 
 	if err == nil && session != nil {
+		// Handle logout
+		if strings.HasPrefix(req.RequestURI, toa.Config.LogoutUri) {
+			toa.handleLogout(rw, req, session)
+			return
+		}
+
 		// Attach upstream headers
 		err = toa.attachHeaders(req, session, claims)
 		if err != nil {
@@ -311,7 +312,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request) {
+func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *SessionState) {
 	log(toa.Config.LogLevel, LogLevelInfo, "Logging out...")
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
@@ -348,6 +349,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 		"client_id":                {toa.Config.Provider.ClientId},
 		"post_logout_redirect_uri": {callbackUri},
 		"state":                    {base64State},
+		"id_token_hint":            {session.IdToken},
 	}.Encode()
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
