@@ -85,6 +85,11 @@ const config: Config = {
           label: 'Config Samples',
         },
         {
+          href: 'https://github.com/sevensolutions/traefik-oidc-auth/discussions/categories/q-a',
+          label: 'I have a Question',
+          position: 'right'
+        },
+        {
           href: 'https://github.com/sevensolutions/traefik-oidc-auth',
           label: 'GitHub',
           position: 'right',
@@ -112,15 +117,24 @@ const config: Config = {
           ],
         },
         {
+          title: 'Support',
+          items: [
+            {
+              label: 'Github Discussions',
+              href: 'https://github.com/sevensolutions/traefik-oidc-auth/discussions'
+            }
+          ],
+        },
+        {
           title: 'More',
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/sevensolutions/traefik-oidc-auth',
+              href: 'https://github.com/sevensolutions/traefik-oidc-auth'
             },
             {
 							label: 'Sponsor',
-							href: "https://github.com/sponsors/sevensolutions"
+							href: 'https://github.com/sponsors/sevensolutions'
 						}
           ],
         },
