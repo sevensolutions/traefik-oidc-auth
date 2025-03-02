@@ -112,14 +112,15 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	if strings.HasPrefix(req.RequestURI, toa.Config.LogoutUri) {
-		toa.handleLogout(rw, req)
-		return
-	}
-
 	session, updateSession, claims, err := toa.getSessionForRequest(req)
 
 	if err == nil && session != nil {
+		// Handle logout
+		if strings.HasPrefix(req.RequestURI, toa.Config.LogoutUri) {
+			toa.handleLogout(rw, req, session)
+			return
+		}
+
 		// Attach upstream headers
 		err = toa.attachHeaders(req, session, claims)
 		if err != nil {
@@ -137,7 +138,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		log(toa.Config.LogLevel, LogLevelWarn, "Verifying token: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelInfo, "Verifying token: %s", err.Error())
 	}
 
 	// Clear the session cookie
@@ -204,15 +205,15 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionSta
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
 	base64State := req.URL.Query().Get("state")
 	if base64State == "" {
-		log(toa.Config.LogLevel, LogLevelWarn, "State is missing, redirect to Provider")
-		toa.redirectToProvider(rw, req)
+		log(toa.Config.LogLevel, LogLevelWarn, "State on callback request is missing.")
+		http.Error(rw, "State is missing", http.StatusInternalServerError)
 		return
 	}
 
 	state, err := base64DecodeState(base64State)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelWarn, "State is invalid, redirect to Provider")
-		toa.redirectToProvider(rw, req)
+		log(toa.Config.LogLevel, LogLevelWarn, "State on callback request is invalid.")
+		http.Error(rw, "State is invalid", http.StatusInternalServerError)
 		return
 	}
 
@@ -221,7 +222,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing, redirect to Provider")
+			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
@@ -229,7 +230,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		token, err := exchangeAuthCode(toa, req, authCode)
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelError, "Exchange Auth Code: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
 			return
 		}
 
@@ -261,7 +262,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelError, "Returned token is not valid: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Returned token is not valid", http.StatusInternalServerError)
 			return
 		}
 
@@ -311,7 +312,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request) {
+func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *SessionState) {
 	log(toa.Config.LogLevel, LogLevelInfo, "Logging out...")
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
@@ -348,6 +349,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 		"client_id":                {toa.Config.Provider.ClientId},
 		"post_logout_redirect_uri": {callbackUri},
 		"state":                    {base64State},
+		"id_token_hint":            {session.IdToken},
 	}.Encode()
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
