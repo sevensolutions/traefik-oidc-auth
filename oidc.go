@@ -94,6 +94,7 @@ type OidcDiscovery struct {
 	UserinfoEncryptionEncValuesSupported                      []string       `json:"userinfo_encryption_enc_values_supported"`
 	UserinfoEndpoint                                          string         `json:"userinfo_endpoint"`
 	UserinfoSigningAlgValuesSupported                         []string       `json:"userinfo_signing_alg_values_supported"`
+	ServiceDocumentation                                      string         `json:"service_documentation"`
 }
 
 type OidcTokenResponse struct {
@@ -102,6 +103,7 @@ type OidcTokenResponse struct {
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
+	Scope        string `json:"scope"`
 }
 
 type OidcIntrospectionResponse struct {
