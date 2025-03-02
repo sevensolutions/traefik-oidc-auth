@@ -5,16 +5,11 @@ import (
 	"net/http"
 )
 
-type ruleResult struct {
-	matcherName string
-	value       []string
-}
-
-type ConditionalAuth struct {
+type RequestCondition struct {
 	Match func(request *http.Request) bool
 }
 
-func ParseConditionalAuth(rule string) (*ConditionalAuth, error) {
+func ParseRequestCondition(rule string) (*RequestCondition, error) {
 	var matcherNames []string
 	for matcher := range httpFuncs {
 		matcherNames = append(matcherNames, matcher)
@@ -38,7 +33,7 @@ func ParseConditionalAuth(rule string) (*ConditionalAuth, error) {
 		return nil, fmt.Errorf("error while adding rule %s: %w", rule, err)
 	}
 
-	return &ConditionalAuth{
+	return &RequestCondition{
 		Match: func(request *http.Request) bool {
 			return matchers.match(request)
 		},

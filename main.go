@@ -18,16 +18,16 @@ import (
 )
 
 type TraefikOidcAuth struct {
-	next                   http.Handler
-	httpClient             *http.Client
-	ProviderURL            *url.URL
-	CallbackURL            *url.URL
-	Config                 *Config
-	SessionStorage         SessionStorage
-	DiscoveryDocument      *OidcDiscovery
-	Jwks                   *JwksHandler
-	Lock                   sync.RWMutex
-	SkipAuthenticationRule *rules.ConditionalAuth
+	next                     http.Handler
+	httpClient               *http.Client
+	ProviderURL              *url.URL
+	CallbackURL              *url.URL
+	Config                   *Config
+	SessionStorage           SessionStorage
+	DiscoveryDocument        *OidcDiscovery
+	Jwks                     *JwksHandler
+	Lock                     sync.RWMutex
+	BypassAuthenticationRule *rules.RequestCondition
 }
 
 // Make sure we fetch oidc discovery document during first request - avoid race condition
@@ -97,12 +97,19 @@ func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	matched := toa.SkipAuthenticationRule.Match(req)
+	if toa.BypassAuthenticationRule != nil {
+		matched := toa.BypassAuthenticationRule.Match(req)
 
-	if matched {
-		http.Error(rw, "Matched", http.StatusInternalServerError)
-	} else {
-		http.Error(rw, "Not Matched", http.StatusInternalServerError)
+		if matched {
+			log(toa.Config.LogLevel, LogLevelDebug, "BypassAuthenticationRule matched. Forwarding request without authentication.")
+
+			// Forward the request
+			toa.sanitizeForUpstream(req)
+			toa.next.ServeHTTP(rw, req)
+			return
+		} else {
+			log(toa.Config.LogLevel, LogLevelDebug, "BypassAuthenticationRule not matched. Requiring authentication.")
+		}
 	}
 
 	err := toa.EnsureOidcDiscovery()

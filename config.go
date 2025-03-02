@@ -64,7 +64,7 @@ type Config struct {
 
 	Headers []HeaderConfig `json:"headers"`
 
-	SkipAuthenticationRule string
+	BypassAuthenticationRule string
 }
 
 type ProviderConfig struct {
@@ -239,9 +239,9 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
 
-	var conditionalAuth *rules.ConditionalAuth
-	if config.SkipAuthenticationRule != "" {
-		ca, err := rules.ParseConditionalAuth(config.SkipAuthenticationRule)
+	var conditionalAuth *rules.RequestCondition
+	if config.BypassAuthenticationRule != "" {
+		ca, err := rules.ParseRequestCondition(config.BypassAuthenticationRule)
 
 		if err != nil {
 			return nil, err
@@ -303,12 +303,12 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
-		next:                   next,
-		httpClient:             httpClient,
-		ProviderURL:            parsedURL,
-		CallbackURL:            parsedCallbackURL,
-		Config:                 config,
-		SessionStorage:         CreateCookieSessionStorage(),
-		SkipAuthenticationRule: conditionalAuth,
+		next:                     next,
+		httpClient:               httpClient,
+		ProviderURL:              parsedURL,
+		CallbackURL:              parsedCallbackURL,
+		Config:                   config,
+		SessionStorage:           CreateCookieSessionStorage(),
+		BypassAuthenticationRule: conditionalAuth,
 	}, nil
 }

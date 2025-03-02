@@ -1,13 +1,12 @@
 package rules
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 )
 
-func TestConditionalAuth(t *testing.T) {
-	rule, _ := ParseConditionalAuth("Header(`abc`, `def`) && Header(`abc`, `def`)")
+func TestRequestCondition(t *testing.T) {
+	rule, _ := ParseRequestCondition("Header(`abc`) && HeaderRegexp(`abc`, `.*`)")
 
 	request, _ := http.NewRequest(http.MethodPost, "http://test", nil)
 
@@ -15,5 +14,7 @@ func TestConditionalAuth(t *testing.T) {
 
 	result := rule.Match(request)
 
-	fmt.Print(result)
+	if !result {
+		t.Fail()
+	}
 }
