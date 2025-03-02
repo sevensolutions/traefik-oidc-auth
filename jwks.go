@@ -30,6 +30,7 @@ type JwksKey struct {
 	Kid string `json:"kid"`
 	Kty string `json:"kty"`
 	N   string `json:"n,omitempty"`
+	Alg string `json:"alg,omitempty"`
 	Use string `json:"use,omitempty"`
 	X   string `json:"x,omitempty"`
 	Y   string `json:"y,omitempty"`
