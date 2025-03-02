@@ -168,6 +168,10 @@ func encrypt(plaintext string, secret string) (string, error) {
 
 func decrypt(ciphertext string, secret string) (string, error) {
 	cipherbytes, err := base64.StdEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return "", err
+	}
+
 	ciphertext = string(cipherbytes)
 
 	aesCipher, err := aes.NewCipher([]byte(secret))

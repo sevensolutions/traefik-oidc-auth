@@ -138,7 +138,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		log(toa.Config.LogLevel, LogLevelWarn, "Verifying token: %s", err.Error())
+		log(toa.Config.LogLevel, LogLevelInfo, "Verifying token: %s", err.Error())
 	}
 
 	// Clear the session cookie
@@ -205,15 +205,15 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionSta
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
 	base64State := req.URL.Query().Get("state")
 	if base64State == "" {
-		log(toa.Config.LogLevel, LogLevelWarn, "State is missing, redirect to Provider")
-		toa.redirectToProvider(rw, req)
+		log(toa.Config.LogLevel, LogLevelWarn, "State on callback request is missing.")
+		http.Error(rw, "State is missing", http.StatusInternalServerError)
 		return
 	}
 
 	state, err := base64DecodeState(base64State)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelWarn, "State is invalid, redirect to Provider")
-		toa.redirectToProvider(rw, req)
+		log(toa.Config.LogLevel, LogLevelWarn, "State on callback request is invalid.")
+		http.Error(rw, "State is invalid", http.StatusInternalServerError)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing, redirect to Provider")
+			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
@@ -230,7 +230,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		token, err := exchangeAuthCode(toa, req, authCode)
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelError, "Exchange Auth Code: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
 			return
 		}
 
@@ -262,7 +262,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		if err != nil {
 			log(toa.Config.LogLevel, LogLevelError, "Returned token is not valid: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			http.Error(rw, "Returned token is not valid", http.StatusInternalServerError)
 			return
 		}
 

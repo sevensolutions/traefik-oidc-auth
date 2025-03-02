@@ -249,7 +249,12 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Failed to parse token: %v", err)
+			if errors.Is(err, jwt.ErrTokenExpired) || err.Error() == "token has invalid claims: token is expired" {
+				log(toa.Config.LogLevel, LogLevelInfo, "The token is expired.")
+			} else {
+				log(toa.Config.LogLevel, LogLevelError, "Failed to parse token: %v", err)
+			}
+
 			return false, nil, err
 		}
 	}
