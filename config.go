@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/sevensolutions/traefik-oidc-auth/rules"
 )
 
 const (
@@ -61,6 +63,8 @@ type Config struct {
 	Authorization *AuthorizationConfig `json:"authorization"`
 
 	Headers []HeaderConfig `json:"headers"`
+
+	SkipAuthenticationRule string
 }
 
 type ProviderConfig struct {
@@ -235,6 +239,17 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
 
+	var conditionalAuth *rules.ConditionalAuth
+	if config.SkipAuthenticationRule != "" {
+		ca, err := rules.ParseConditionalAuth(config.SkipAuthenticationRule)
+
+		if err != nil {
+			return nil, err
+		}
+
+		conditionalAuth = ca
+	}
+
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
@@ -288,11 +303,12 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
-		next:           next,
-		httpClient:     httpClient,
-		ProviderURL:    parsedURL,
-		CallbackURL:    parsedCallbackURL,
-		Config:         config,
-		SessionStorage: CreateCookieSessionStorage(),
+		next:                   next,
+		httpClient:             httpClient,
+		ProviderURL:            parsedURL,
+		CallbackURL:            parsedCallbackURL,
+		Config:                 config,
+		SessionStorage:         CreateCookieSessionStorage(),
+		SkipAuthenticationRule: conditionalAuth,
 	}, nil
 }

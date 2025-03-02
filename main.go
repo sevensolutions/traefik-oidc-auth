@@ -13,18 +13,21 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/sevensolutions/traefik-oidc-auth/rules"
 )
 
 type TraefikOidcAuth struct {
-	next              http.Handler
-	httpClient        *http.Client
-	ProviderURL       *url.URL
-	CallbackURL       *url.URL
-	Config            *Config
-	SessionStorage    SessionStorage
-	DiscoveryDocument *OidcDiscovery
-	Jwks              *JwksHandler
-	Lock              sync.RWMutex
+	next                   http.Handler
+	httpClient             *http.Client
+	ProviderURL            *url.URL
+	CallbackURL            *url.URL
+	Config                 *Config
+	SessionStorage         SessionStorage
+	DiscoveryDocument      *OidcDiscovery
+	Jwks                   *JwksHandler
+	Lock                   sync.RWMutex
+	SkipAuthenticationRule *rules.ConditionalAuth
 }
 
 // Make sure we fetch oidc discovery document during first request - avoid race condition
@@ -94,6 +97,14 @@ func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	matched := toa.SkipAuthenticationRule.Match(req)
+
+	if matched {
+		http.Error(rw, "Matched", http.StatusInternalServerError)
+	} else {
+		http.Error(rw, "Not Matched", http.StatusInternalServerError)
+	}
+
 	err := toa.EnsureOidcDiscovery()
 
 	if err != nil {
