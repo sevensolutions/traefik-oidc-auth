@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package oidc
 
 import (
 	"crypto/ecdsa"
@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
 
 type JwksHandler struct {
@@ -49,7 +51,7 @@ type EcdsaKey struct {
 	key *ecdsa.PublicKey
 }
 
-func (h *JwksHandler) EnsureLoaded(oidcAuth *TraefikOidcAuth, forceReload bool) error {
+func (h *JwksHandler) EnsureLoaded(logger *logging.Logger, httpClient *http.Client, forceReload bool) error {
 	h.Lock.Lock()
 	defer h.Lock.Unlock()
 
@@ -68,13 +70,13 @@ func (h *JwksHandler) EnsureLoaded(oidcAuth *TraefikOidcAuth, forceReload bool) 
 	}
 
 	if reload {
-		log(oidcAuth.Config.LogLevel, LogLevelInfo, "Reloading JWKS...")
+		logger.Log(logging.LevelInfo, "Reloading JWKS...")
 
-		err := h.loadKeys(oidcAuth.httpClient)
+		err := h.loadKeys(httpClient)
 		if err != nil {
-			log(oidcAuth.Config.LogLevel, LogLevelError, "Error loading JWKS: %v", err)
+			logger.Log(logging.LevelError, "Error loading JWKS: %v", err)
 		} else {
-			log(oidcAuth.Config.LogLevel, LogLevelInfo, "...JWKS reloaded :)")
+			logger.Log(logging.LevelInfo, "...JWKS reloaded :)")
 		}
 
 		return err
@@ -205,13 +207,13 @@ func extractKeys(keys *JwksKeys) ([]*RsaKey, []*EcdsaKey, error) {
 	return rsaKeys, ecdsaKeys, nil
 }
 func extractRsaKey(key *JwksKey) (*RsaKey, error) {
-	decodedN, err := ParseBigInt(key.N)
+	decodedN, err := utils.ParseBigInt(key.N)
 
 	if err != nil {
 		return nil, err
 	}
 
-	decodedE, err := ParseInt(key.E)
+	decodedE, err := utils.ParseInt(key.E)
 
 	if err != nil {
 		return nil, err
@@ -225,13 +227,13 @@ func extractRsaKey(key *JwksKey) (*RsaKey, error) {
 	}, nil
 }
 func extractEcdsaKey(key *JwksKey) (*EcdsaKey, error) {
-	decodedX, err := ParseBigInt(key.X)
+	decodedX, err := utils.ParseBigInt(key.X)
 
 	if err != nil {
 		return nil, err
 	}
 
-	decodedY, err := ParseBigInt(key.Y)
+	decodedY, err := utils.ParseBigInt(key.Y)
 
 	if err != nil {
 		return nil, err

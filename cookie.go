@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
 
-func (toa *TraefikOidcAuth) setChunkedCookies(rw http.ResponseWriter, cookieName string, cookieValue string) {
-	cookieChunks := ChunkString(cookieValue, 3072)
+func setChunkedCookies(config *Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
+	cookieChunks := utils.ChunkString(cookieValue, 3072)
 
-	baseCookie := toa.createSessionCookie()
+	baseCookie := createSessionCookie(config)
 	baseCookie.Name = cookieName
 
 	// Set the cookie
@@ -31,7 +33,7 @@ func (toa *TraefikOidcAuth) setChunkedCookies(rw http.ResponseWriter, cookieName
 		}
 	}
 }
-func (toa *TraefikOidcAuth) readChunkedCookie(req *http.Request, cookieName string) (string, error) {
+func readChunkedCookie(req *http.Request, cookieName string) (string, error) {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {
 		return "", err
@@ -88,13 +90,13 @@ func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]str
 	}
 	return cookieNames, nil
 }
-func (toa *TraefikOidcAuth) clearChunkedCookie(rw http.ResponseWriter, req *http.Request, cookieName string) error {
+func clearChunkedCookie(config *Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {
 		return err
 	}
 
-	baseCookie := toa.createSessionCookie()
+	baseCookie := createSessionCookie(config)
 	baseCookie.Name = cookieName
 	baseCookie.Value = ""
 	makeCookieExpireImmediately(baseCookie)
