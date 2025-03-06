@@ -6,16 +6,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
 	"github.com/spyzhov/ajson"
 )
 
-func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
-	authorization := toa.Config.Authorization
-
+func isAuthorized(logger *logging.Logger, authorization *AuthorizationConfig, claims map[string]interface{}) bool {
 	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
 		parsed, err := json.Marshal(claims)
 		if err != nil {
-			log(toa.Config.LogLevel, LogLevelWarn, "Error whilst marshalling claims object: %s", err.Error())
+			logger.Log(logging.LevelWarn, "Error whilst marshalling claims object: %s", err.Error())
 			return false
 		}
 
@@ -23,16 +22,16 @@ func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
 		for _, assertion := range authorization.AssertClaims {
 			value, err := ajson.JSONPath(parsed, fmt.Sprintf("$.%s", assertion.Name))
 			if err != nil {
-				log(toa.Config.LogLevel, LogLevelWarn, "Error whilst parsing path for claim %s in token claims: %s", assertion.Name, err.Error())
+				logger.Log(logging.LevelWarn, "Error whilst parsing path for claim %s in token claims: %s", assertion.Name, err.Error())
 				return false
 			} else if len(value) == 0 {
-				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Unable to find claim %s in token claims.", assertion.Name)
-				toa.logAvailableClaims(claims)
+				logger.Log(logging.LevelWarn, "Unauthorized. Unable to find claim %s in token claims.", assertion.Name)
+				logAvailableClaims(logger, claims)
 				return false
 			}
 
 			if len(assertion.AllOf) == 0 && len(assertion.AnyOf) == 0 {
-				log(toa.Config.LogLevel, LogLevelDebug, "Authorized claim %s. No assertions were defined and claim exists", assertion.Name)
+				logger.Log(logging.LevelDebug, "Authorized claim %s. No assertions were defined and claim exists", assertion.Name)
 				continue assertions
 			}
 
@@ -47,7 +46,7 @@ func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
 			for _, val := range value {
 				unpacked, err := val.Unpack()
 				if err != nil {
-					log(toa.Config.LogLevel, LogLevelError, "Error whilst unpacking json node: %s", err.Error())
+					logger.Log(logging.LevelError, "Error whilst unpacking json node: %s", err.Error())
 					continue matches
 				}
 
@@ -71,13 +70,13 @@ func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
 					if len(assertion.AnyOf) > 0 {
 						for _, assert := range assertion.AnyOf {
 							if slices.Contains(mapped, assert) {
-								log(toa.Config.LogLevel, LogLevelDebug, "Authorized claim %s: Found value %s which is any of [%s]", assertion.Name, assert, strings.Join(assertion.AnyOf, ", "))
+								logger.Log(logging.LevelDebug, "Authorized claim %s: Found value %s which is any of [%s]", assertion.Name, assert, strings.Join(assertion.AnyOf, ", "))
 								continue assertions
 							}
 						}
 						continue matches
 					}
-					log(toa.Config.LogLevel, LogLevelDebug, "Authorized claim %s: Found all values of [%s]", assertion.Name, strings.Join(assertion.AllOf, ", "))
+					logger.Log(logging.LevelDebug, "Authorized claim %s: Found all values of [%s]", assertion.Name, strings.Join(assertion.AllOf, ", "))
 					continue assertions
 				// the value is any other json type
 				default:
@@ -100,25 +99,25 @@ func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
 			}
 
 			if len(assertion.AnyOf) > 0 && anyMatch && len(assertion.AllOf) > 0 && !slices.Contains(allMatches, false) {
-				log(toa.Config.LogLevel, LogLevelDebug, "Authorized claim %s: Found any value of [%s] and all values of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "), strings.Join(assertion.AllOf, ", "))
+				logger.Log(logging.LevelDebug, "Authorized claim %s: Found any value of [%s] and all values of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "), strings.Join(assertion.AllOf, ", "))
 				continue assertions
 			} else if len(assertion.AnyOf) > 0 && anyMatch && len(assertion.AllOf) == 0 {
-				log(toa.Config.LogLevel, LogLevelDebug, "Authorized claim %s: Found any value of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "))
+				logger.Log(logging.LevelDebug, "Authorized claim %s: Found any value of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "))
 				continue assertions
 			} else if len(assertion.AllOf) > 0 && !slices.Contains(allMatches, false) && len(assertion.AnyOf) == 0 {
-				log(toa.Config.LogLevel, LogLevelDebug, "Authorized claim %s: Found all values of [%s]", assertion.Name, strings.Join(assertion.AllOf, ", "))
+				logger.Log(logging.LevelDebug, "Authorized claim %s: Found all values of [%s]", assertion.Name, strings.Join(assertion.AllOf, ", "))
 				continue assertions
 			}
 
 			if len(assertion.AllOf) > 0 && len(assertion.AnyOf) > 0 {
-				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected claim %s to contain any value of [%s] and all values of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "), strings.Join(assertion.AllOf, ", "))
+				logger.Log(logging.LevelWarn, "Unauthorized. Expected claim %s to contain any value of [%s] and all values of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "), strings.Join(assertion.AllOf, ", "))
 			} else if len(assertion.AllOf) > 0 {
-				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected claim %s to contain all values of [%s]", assertion.Name, strings.Join(assertion.AllOf, ", "))
+				logger.Log(logging.LevelWarn, "Unauthorized. Expected claim %s to contain all values of [%s]", assertion.Name, strings.Join(assertion.AllOf, ", "))
 			} else if len(assertion.AnyOf) > 0 {
-				log(toa.Config.LogLevel, LogLevelWarn, "Unauthorized. Expected claim %s to contain any value of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "))
+				logger.Log(logging.LevelWarn, "Unauthorized. Expected claim %s to contain any value of [%s]", assertion.Name, strings.Join(assertion.AnyOf, ", "))
 			}
 
-			toa.logAvailableClaims(claims)
+			logAvailableClaims(logger, claims)
 
 			return false
 		}
@@ -127,9 +126,10 @@ func (toa *TraefikOidcAuth) isAuthorized(claims map[string]interface{}) bool {
 	return true
 }
 
-func (toa *TraefikOidcAuth) logAvailableClaims(claims map[string]interface{}) {
-	log(toa.Config.LogLevel, LogLevelDebug, "Available claims are:")
+func logAvailableClaims(logger *logging.Logger, claims map[string]interface{}) {
+	logger.Log(logging.LevelDebug, "Available claims are:")
+
 	for key, val := range claims {
-		log(toa.Config.LogLevel, LogLevelDebug, "  %v = %v", key, val)
+		logger.Log(logging.LevelDebug, "  %v = %v", key, val)
 	}
 }

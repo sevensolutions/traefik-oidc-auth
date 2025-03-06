@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package session
 
 import "encoding/json"
 

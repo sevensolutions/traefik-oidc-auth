@@ -11,21 +11,11 @@ import (
 	"os"
 	"strings"
 	"text/template"
-)
 
-const (
-	LogLevelDebug string = "DEBUG"
-	LogLevelInfo  string = "INFO"
-	LogLevelWarn  string = "WARN"
-	LogLevelError string = "ERROR"
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/session"
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
-
-var LogLevels = map[string]int{
-	LogLevelError: 1,
-	LogLevelWarn:  2,
-	LogLevelInfo:  3,
-	LogLevelDebug: 4,
-}
 
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 
@@ -128,7 +118,7 @@ type HeaderConfig struct {
 // Will be called by traefik
 func CreateConfig() *Config {
 	return &Config{
-		LogLevel: LogLevelWarn,
+		LogLevel: logging.LevelWarn,
 		Secret:   DefaultSecret,
 		Provider: &ProviderConfig{
 			ValidateIssuer:   true,
@@ -158,17 +148,19 @@ func CreateConfig() *Config {
 
 // Will be called by traefik
 func New(uctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	log(config.LogLevel, LogLevelInfo, "Loading Configuration...")
+	logger := logging.CreateLogger(config.LogLevel)
+
+	logger.Log(logging.LevelInfo, "Loading Configuration...")
 
 	if config.Provider == nil {
 		return nil, errors.New("missing provider configuration")
 	}
 
 	if config.Secret == DefaultSecret {
-		log(config.LogLevel, LogLevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
+		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
 	}
 
-	// Hack: Trick to traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
+	// Hack: Trick the traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
 	if config.Provider.Url == "https://..." {
 		return &TraefikOidcAuth{
 			next: next,
@@ -195,7 +187,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	}
 
 	if config.Provider.CABundle != "" && config.Provider.CABundleFile != "" {
-		log(config.LogLevel, LogLevelError, "You can only use an inline CABundle OR CABundleFile, not both.")
+		logger.Log(logging.LevelError, "You can only use an inline CABundle OR CABundleFile, not both.")
 		return nil, errors.New("you can only use an inline CABundle OR CABundleFile, not both.")
 	}
 
@@ -204,15 +196,15 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		config.Scopes = []string{"openid", "profile", "email"}
 	}
 
-	parsedURL, err := parseUrl(config.Provider.Url)
+	parsedURL, err := utils.ParseUrl(config.Provider.Url)
 	if err != nil {
-		log(config.LogLevel, LogLevelError, "Error while parsing Provider.Url: %s", err.Error())
+		logger.Log(logging.LevelError, "Error while parsing Provider.Url: %s", err.Error())
 		return nil, err
 	}
 
 	parsedCallbackURL, err := url.Parse(config.CallbackUri)
 	if err != nil {
-		log(config.LogLevel, LogLevelError, "Error while parsing CallbackUri: %s", err.Error())
+		logger.Log(logging.LevelError, "Error while parsing CallbackUri: %s", err.Error())
 		return nil, err
 	}
 
@@ -225,15 +217,15 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}
 	}
 
-	log(config.LogLevel, LogLevelInfo, "Provider Url: %v", parsedURL)
-	log(config.LogLevel, LogLevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
-	if urlIsAbsolute(parsedCallbackURL) {
-		log(config.LogLevel, LogLevelInfo, "Callback URL is absolute, will not overlay wrapped services")
+	logger.Log(logging.LevelInfo, "Provider Url: %v", parsedURL)
+	logger.Log(logging.LevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
+	if utils.UrlIsAbsolute(parsedCallbackURL) {
+		logger.Log(logging.LevelInfo, "Callback URL is absolute, will not overlay wrapped services")
 	} else {
-		log(config.LogLevel, LogLevelInfo, "Callback URL is relative, will overlay any wrapped host")
+		logger.Log(logging.LevelInfo, "Callback URL is relative, will overlay any wrapped host")
 	}
-	log(config.LogLevel, LogLevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
-	log(config.LogLevel, LogLevelDebug, "SessionCookie: %v", config.SessionCookie)
+	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
+	logger.Log(logging.LevelDebug, "SessionCookie: %v", config.SessionCookie)
 
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
@@ -246,28 +238,28 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		if strings.HasPrefix(config.Provider.CABundle, "base64:") {
 			caBundleData, err = base64.StdEncoding.DecodeString(strings.TrimPrefix(config.Provider.CABundle, "base64:"))
 			if err != nil {
-				log(config.LogLevel, LogLevelInfo, "Failed to base64-decode the inline CA bundle")
+				logger.Log(logging.LevelInfo, "Failed to base64-decode the inline CA bundle")
 				return nil, err
 			}
 		} else {
 			caBundleData = []byte(config.Provider.CABundle)
 		}
 
-		log(config.LogLevel, LogLevelDebug, "Loaded CA bundle provided inline")
+		logger.Log(logging.LevelDebug, "Loaded CA bundle provided inline")
 	} else if config.Provider.CABundleFile != "" {
 		caBundleData, err = os.ReadFile(config.Provider.CABundleFile)
 		if err != nil {
-			log(config.LogLevel, LogLevelInfo, "Failed to load CA bundle from %v: %v", config.Provider.CABundleFile, err)
+			logger.Log(logging.LevelInfo, "Failed to load CA bundle from %v: %v", config.Provider.CABundleFile, err)
 			return nil, err
 		}
 
-		log(config.LogLevel, LogLevelDebug, "Loaded CA bundle from %v", config.Provider.CABundleFile)
+		logger.Log(logging.LevelDebug, "Loaded CA bundle from %v", config.Provider.CABundleFile)
 	}
 
 	if caBundleData != nil {
 		// Append our cert to the system pool
 		if ok := rootCAs.AppendCertsFromPEM(caBundleData); !ok {
-			log(config.LogLevel, LogLevelWarn, "Failed to append CA bundle. Using system certificates only.")
+			logger.Log(logging.LevelWarn, "Failed to append CA bundle. Using system certificates only.")
 		}
 
 	}
@@ -285,14 +277,15 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		Transport: httpTransport,
 	}
 
-	log(config.LogLevel, LogLevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
+	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
+		logger:         logger,
 		next:           next,
 		httpClient:     httpClient,
 		ProviderURL:    parsedURL,
 		CallbackURL:    parsedCallbackURL,
 		Config:         config,
-		SessionStorage: CreateCookieSessionStorage(),
+		SessionStorage: session.CreateCookieSessionStorage(),
 	}, nil
 }
