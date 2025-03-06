@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
 )
 
 var httpFuncs = map[string]func(*matchersTree, ...string) error{
@@ -19,10 +21,14 @@ func headerFunc(tree *matchersTree, values ...string) error {
 	headerName := values[0]
 	headerValue := values[1]
 
-	tree.matcher = func(req *http.Request) bool {
-		h := req.Header.Get(headerName)
+	tree.matcher = func(logger *logging.Logger, request *http.Request) bool {
+		h := request.Header.Get(headerName)
 
-		return h == headerValue
+		matched := h == headerValue
+
+		logger.Log(logging.LevelDebug, "%s Eval rule Header(`%s`, `%s`). Actual value: %s %s", getMatchedText(matched), headerName, headerValue, h)
+
+		return matched
 	}
 
 	return nil
@@ -41,11 +47,23 @@ func headerRegexpFunc(tree *matchersTree, values ...string) error {
 		return err
 	}
 
-	tree.matcher = func(req *http.Request) bool {
-		h := req.Header.Get(headerName)
+	tree.matcher = func(logger *logging.Logger, request *http.Request) bool {
+		h := request.Header.Get(headerName)
 
-		return headerRegex.MatchString(h)
+		matched := headerRegex.MatchString(h)
+
+		logger.Log(logging.LevelDebug, "%s Eval rule HeaderRegexp(`%s`, `%s`). Actual value: %s", getMatchedText(matched), headerName, headerValueRegex, h)
+
+		return matched
 	}
 
 	return nil
+}
+
+func getMatchedText(matched bool) string {
+	if matched {
+		return "✅"
+	} else {
+		return "❌"
+	}
 }

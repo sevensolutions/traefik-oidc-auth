@@ -3,10 +3,12 @@ package rules
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
 )
 
 type RequestCondition struct {
-	Match func(request *http.Request) bool
+	Match func(logger *logging.Logger, request *http.Request) bool
 }
 
 func ParseRequestCondition(rule string) (*RequestCondition, error) {
@@ -34,8 +36,8 @@ func ParseRequestCondition(rule string) (*RequestCondition, error) {
 	}
 
 	return &RequestCondition{
-		Match: func(request *http.Request) bool {
-			return matchers.match(request)
+		Match: func(logger *logging.Logger, request *http.Request) bool {
+			return matchers.match(logger, request)
 		},
 	}, nil
 }
@@ -44,7 +46,7 @@ type matchersTree struct {
 	// matcher is a matcher func used to match HTTP request properties.
 	// If matcher is not nil, it means that this matcherTree is a leaf of the tree.
 	// It is therefore mutually exclusive with left and right.
-	matcher func(*http.Request) bool
+	matcher func(logger *logging.Logger, request *http.Request) bool
 	// operator to combine the evaluation of left and right leaves.
 	operator string
 	// Mutually exclusive with matcher.
@@ -52,7 +54,7 @@ type matchersTree struct {
 	right *matchersTree
 }
 
-func (m *matchersTree) match(req *http.Request) bool {
+func (m *matchersTree) match(logger *logging.Logger, request *http.Request) bool {
 	if m == nil {
 		// This should never happen as it should have been detected during parsing.
 		//log.Warn().Msg("Rule matcher is nil")
@@ -60,14 +62,14 @@ func (m *matchersTree) match(req *http.Request) bool {
 	}
 
 	if m.matcher != nil {
-		return m.matcher(req)
+		return m.matcher(logger, request)
 	}
 
 	switch m.operator {
 	case "or":
-		return m.left.match(req) || m.right.match(req)
+		return m.left.match(logger, request) || m.right.match(logger, request)
 	case "and":
-		return m.left.match(req) && m.right.match(req)
+		return m.left.match(logger, request) && m.right.match(logger, request)
 	default:
 		// This should never happen as it should have been detected during parsing.
 		//log.Warn().Str("operator", m.operator).Msg("Invalid rule operator")
@@ -102,8 +104,8 @@ func (m *matchersTree) addRule(rule *Tree, funcs matcherFuncs) error {
 
 		if rule.Not {
 			matcherFunc := m.matcher
-			m.matcher = func(req *http.Request) bool {
-				return !matcherFunc(req)
+			m.matcher = func(logger *logging.Logger, request *http.Request) bool {
+				return !matcherFunc(logger, request)
 			}
 		}
 	}

@@ -104,7 +104,7 @@ func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if toa.BypassAuthenticationRule != nil {
-		if toa.BypassAuthenticationRule.Match(req) {
+		if toa.BypassAuthenticationRule.Match(toa.logger, req) {
 			toa.logger.Log(logging.LevelDebug, "BypassAuthenticationRule matched. Forwarding request without authentication.")
 
 			// Forward the request
