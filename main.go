@@ -13,9 +13,12 @@ import (
 	"sync"
 	"text/template"
 	"time"
+
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
 )
 
 type TraefikOidcAuth struct {
+	logger            *logging.Logger
 	next              http.Handler
 	httpClient        *http.Client
 	ProviderURL       *url.URL
@@ -39,11 +42,11 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 		if toa.DiscoveryDocument == nil {
 			var jwks = &JwksHandler{}
 			toa.Jwks = jwks
-			log(config.LogLevel, LogLevelInfo, "Getting OIDC discovery document...")
+			toa.logger.Log(logging.LevelInfo, "Getting OIDC discovery document...")
 
-			oidcDiscoveryDocument, err := GetOidcDiscovery(config.LogLevel, toa.httpClient, parsedURL)
+			oidcDiscoveryDocument, err := GetOidcDiscovery(toa.logger, toa.httpClient, parsedURL)
 			if err != nil {
-				log(config.LogLevel, LogLevelError, "Error while retrieving discovery document: %s", err.Error())
+				toa.logger.Log(logging.LevelError, "Error while retrieving discovery document: %s", err.Error())
 				return err
 			}
 
@@ -55,7 +58,7 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 				config.Provider.ValidAudience = config.Provider.ClientId
 			}
 
-			log(config.LogLevel, LogLevelInfo, "OIDC Discovery successful. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
+			toa.logger.Log(logging.LevelInfo, "OIDC Discovery successful. AuthEndPoint: %s", oidcDiscoveryDocument.AuthorizationEndpoint)
 
 			toa.DiscoveryDocument = oidcDiscoveryDocument
 			toa.Jwks.Url = oidcDiscoveryDocument.JWKSURI
@@ -97,7 +100,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	err := toa.EnsureOidcDiscovery()
 
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Error getting oidc discovery: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "Error getting oidc discovery: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -124,7 +127,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		// Attach upstream headers
 		err = toa.attachHeaders(req, session, claims)
 		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Error while attaching headers: %s", err.Error())
+			toa.logger.Log(logging.LevelError, "Error while attaching headers: %s", err.Error())
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -138,7 +141,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		log(toa.Config.LogLevel, LogLevelInfo, "Verifying token: %s", err.Error())
+		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
 	}
 
 	// Clear the session cookie
@@ -205,14 +208,14 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionSta
 func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Request) {
 	base64State := req.URL.Query().Get("state")
 	if base64State == "" {
-		log(toa.Config.LogLevel, LogLevelWarn, "State on callback request is missing.")
+		toa.logger.Log(logging.LevelWarn, "State on callback request is missing.")
 		http.Error(rw, "State is missing", http.StatusInternalServerError)
 		return
 	}
 
 	state, err := base64DecodeState(base64State)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelWarn, "State on callback request is invalid.")
+		toa.logger.Log(logging.LevelWarn, "State on callback request is invalid.")
 		http.Error(rw, "State is invalid", http.StatusInternalServerError)
 		return
 	}
@@ -222,14 +225,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			log(toa.Config.LogLevel, LogLevelWarn, "Code is missing.")
+			toa.logger.Log(logging.LevelWarn, "Code is missing.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
 
 		token, err := exchangeAuthCode(toa, req, authCode)
 		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Exchange Auth Code: %s", err.Error())
+			toa.logger.Log(logging.LevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
 			return
 		}
@@ -243,7 +246,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		} else if toa.Config.Provider.TokenValidation == "Introspection" {
 			usedToken = token.AccessToken
 		} else {
-			log(toa.Config.LogLevel, LogLevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
+			toa.logger.Log(logging.LevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 		}
 
@@ -261,12 +264,12 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		if err != nil {
-			log(toa.Config.LogLevel, LogLevelError, "Returned token is not valid: %s", err.Error())
+			toa.logger.Log(logging.LevelError, "Returned token is not valid: %s", err.Error())
 			http.Error(rw, "Returned token is not valid", http.StatusInternalServerError)
 			return
 		}
 
-		log(toa.Config.LogLevel, LogLevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
+		toa.logger.Log(logging.LevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
 		if !toa.isAuthorized(claims) {
 			http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -301,25 +304,25 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 	} else if state.Action == "Logout" {
-		log(toa.Config.LogLevel, LogLevelDebug, "Post logout. Clearing cookie.")
+		toa.logger.Log(logging.LevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
 		toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
 	}
 
-	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to %s", redirectUrl)
+	toa.logger.Log(logging.LevelInfo, "Redirecting to %s", redirectUrl)
 
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
 
 func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *SessionState) {
-	log(toa.Config.LogLevel, LogLevelInfo, "Logging out...")
+	toa.logger.Log(logging.LevelInfo, "Logging out...")
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 
 	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -340,7 +343,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 
 	base64State, err := state.base64Encode()
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to serialize state: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -364,7 +367,7 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
-	log(toa.Config.LogLevel, LogLevelInfo, "Redirecting to OIDC provider...")
+	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
 
 	var redirectUrl string
 
@@ -395,11 +398,11 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	stateBytes, _ := json.Marshal(state)
 	stateBase64 := base64.StdEncoding.EncodeToString(stateBytes)
 
-	log(toa.Config.LogLevel, LogLevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
+	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 
 	authorizationEndpointUrl, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}

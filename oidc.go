@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sevensolutions/traefik-oidc-auth/logging"
 )
 
 type OidcEndpoints struct {
@@ -113,7 +114,7 @@ type OidcState struct {
 	RedirectUrl string `json:"redirect_url"`
 }
 
-func GetOidcDiscovery(logLevel string, httpClient *http.Client, providerUrl *url.URL) (*OidcDiscovery, error) {
+func GetOidcDiscovery(logger *logging.Logger, httpClient *http.Client, providerUrl *url.URL) (*OidcDiscovery, error) {
 	wellKnownUrl := *providerUrl
 
 	wellKnownUrl.Path = path.Join(wellKnownUrl.Path, ".well-known/openid-configuration")
@@ -131,7 +132,7 @@ func GetOidcDiscovery(logLevel string, httpClient *http.Client, providerUrl *url
 	resp, err := httpClient.Get(wellKnownUrl.String())
 
 	if err != nil {
-		log(logLevel, LogLevelError, "http-get discovery endpoints - Err: %s", err.Error())
+		logger.Log(logging.LevelError, "http-get discovery endpoints - Err: %s", err.Error())
 		return nil, errors.New("HTTP GET error")
 	}
 
@@ -139,7 +140,7 @@ func GetOidcDiscovery(logLevel string, httpClient *http.Client, providerUrl *url
 
 	// Check if the response status code is successful
 	if resp.StatusCode >= 300 {
-		log(logLevel, LogLevelError, "http-get OIDC discovery endpoints - http status code: %s", resp.Status)
+		logger.Log(logging.LevelError, "http-get OIDC discovery endpoints - http status code: %s", resp.Status)
 		return nil, errors.New("HTTP error - Status code: " + resp.Status)
 	}
 
@@ -148,7 +149,7 @@ func GetOidcDiscovery(logLevel string, httpClient *http.Client, providerUrl *url
 	err = json.NewDecoder(resp.Body).Decode(&document)
 
 	if err != nil {
-		log(logLevel, LogLevelError, "Failed to decode OIDC discovery document. Status code: %s", err.Error())
+		logger.Log(logging.LevelError, "Failed to decode OIDC discovery document. Status code: %s", err.Error())
 		return &document, errors.New("Failed to decode OIDC discovery document. Status code: " + err.Error())
 	}
 
@@ -196,21 +197,21 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	resp, err := oidcAuth.httpClient.PostForm(oidcAuth.DiscoveryDocument.TokenEndpoint, urlValues)
 
 	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: couldn't POST to Provider: %s", err.Error())
+		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: couldn't POST to Provider: %s", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: received bad HTTP response from Provider: %s", string(body))
+		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: received bad HTTP response from Provider: %s", string(body))
 		return nil, errors.New("invalid status code")
 	}
 
 	tokenResponse := &OidcTokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
 	if err != nil {
-		log(oidcAuth.Config.LogLevel, LogLevelError, "exchangeAuthCode: couldn't decode OidcTokenResponse: %s", err.Error())
+		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: couldn't decode OidcTokenResponse: %s", err.Error())
 		return nil, err
 	}
 
@@ -220,7 +221,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[string]interface{}, error) {
 	claims := jwt.MapClaims{}
 
-	err := toa.Jwks.EnsureLoaded(toa, false)
+	err := toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, false)
 	if err != nil {
 		return false, nil, err
 	}
@@ -241,7 +242,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 	_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 	if err != nil {
-		err := toa.Jwks.EnsureLoaded(toa, true)
+		err := toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, true)
 		if err != nil {
 			return false, nil, err
 		}
@@ -250,9 +251,9 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) || err.Error() == "token has invalid claims: token is expired" {
-				log(toa.Config.LogLevel, LogLevelInfo, "The token is expired.")
+				toa.logger.Log(logging.LevelInfo, "The token is expired.")
 			} else {
-				log(toa.Config.LogLevel, LogLevelError, "Failed to parse token: %v", err)
+				toa.logger.Log(logging.LevelError, "Failed to parse token: %v", err)
 			}
 
 			return false, nil, err
@@ -290,7 +291,7 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 
 	resp, err := toa.httpClient.Do(req)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Error on introspection request: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "Error on introspection request: %s", err.Error())
 		return false, nil, err
 	}
 
@@ -300,7 +301,7 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
 
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "Failed to decode introspection response: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "Failed to decode introspection response: %s", err.Error())
 		return false, nil, err
 	}
 
@@ -329,21 +330,21 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*OidcTokenResponse,
 	resp, err := toa.httpClient.PostForm(toa.DiscoveryDocument.TokenEndpoint, urlValues)
 
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "renewToken: couldn't POST to Provider: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "renewToken: couldn't POST to Provider: %s", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log(toa.Config.LogLevel, LogLevelError, "renewToken: received bad HTTP response from Provider: %s", string(body))
+		toa.logger.Log(logging.LevelError, "renewToken: received bad HTTP response from Provider: %s", string(body))
 		return nil, errors.New("invalid status code")
 	}
 
 	tokenResponse := &OidcTokenResponse{}
 	err = json.NewDecoder(resp.Body).Decode(tokenResponse)
 	if err != nil {
-		log(toa.Config.LogLevel, LogLevelError, "renewToken: couldn't decode OidcTokenResponse: %s", err.Error())
+		toa.logger.Log(logging.LevelError, "renewToken: couldn't decode OidcTokenResponse: %s", err.Error())
 		return nil, err
 	}
 

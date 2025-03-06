@@ -11,23 +11,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
-	"time"
 )
-
-func shouldLog(minLevel, level string) bool {
-	return LogLevels[strings.ToUpper(minLevel)] >= LogLevels[strings.ToUpper(level)]
-}
-
-func log(minLevel string, level string, format string, a ...interface{}) {
-	if !shouldLog(minLevel, level) {
-		return
-	}
-
-	currentTime := time.Now().Format("2006-01-02 15:04:05")
-	os.Stdout.WriteString(currentTime + " [" + level + "]" + " [traefik-oidc-auth] " + fmt.Sprintf(format, a...) + "\n")
-}
 
 func urlIsAbsolute(u *url.URL) bool {
 	return u.Scheme != "" && u.Host != ""
