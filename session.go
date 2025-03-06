@@ -7,9 +7,11 @@ import (
 	"strings"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/session"
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
 
-func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionState, bool, map[string]interface{}, error) {
+func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
 	// Use AuthorizationHeader, if present
 	if toa.Config.AuthorizationHeader != nil && toa.Config.AuthorizationHeader.Name != "" {
 		authHeader := req.Header.Get(toa.Config.AuthorizationHeader.Name)
@@ -21,7 +23,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 
 			toa.logger.Log(logging.LevelDebug, "Custom AuthorizationHeader is present on the request and will be used.")
 
-			session := &SessionState{
+			session := &session.SessionState{
 				Id:          "AuthorizationHeader",
 				AccessToken: authHeader,
 			}
@@ -43,7 +45,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 		if authCookie != nil && err == nil && authCookie.Value != "" {
 			toa.logger.Log(logging.LevelDebug, "Custom AuthorizationCookie is present on the request and will be used.")
 
-			session := &SessionState{
+			session := &session.SessionState{
 				Id:          "AuthorizationCookie",
 				AccessToken: authCookie.Value,
 			}
@@ -59,7 +61,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 	}
 
 	// Use SessionCookie, if present
-	sessionTicket, err := toa.readChunkedCookie(req, getSessionCookieName(toa.Config))
+	sessionTicket, err := readChunkedCookie(req, getSessionCookieName(toa.Config))
 
 	if err != nil {
 		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
@@ -76,8 +78,8 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*SessionSta
 	return session, updatedSession != nil, claims, nil
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*SessionState, map[string]interface{}, *SessionState, error) {
-	plainSessionTicket, err := decrypt(encryptedTicket, toa.Config.Secret)
+func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*session.SessionState, map[string]interface{}, *session.SessionState, error) {
+	plainSessionTicket, err := utils.Decrypt(encryptedTicket, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to decrypt session ticket: %v", err.Error())
 		return nil, nil, nil, err
@@ -126,7 +128,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*Sessi
 	return session, claims, nil, nil
 }
 
-func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[string]interface{}, error) {
+func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, map[string]interface{}, error) {
 	var token string
 
 	// Little bit hacky. In case the request contains a custom AuthorizationHeader or Cookie, only AccessToken is used.
@@ -151,7 +153,7 @@ func (toa *TraefikOidcAuth) validateToken(session *SessionState) (bool, map[stri
 	return toa.validateTokenLocally(token)
 }
 
-func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, rw http.ResponseWriter) {
+func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
 	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to store session: %s", err.Error())
@@ -161,25 +163,25 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *SessionState, r
 
 	toa.logger.Log(logging.LevelDebug, "Session stored. Id %s", session.Id)
 
-	encryptedSessionTicket, err := encrypt(sessionTicket, toa.Config.Secret)
+	encryptedSessionTicket, err := utils.Encrypt(sessionTicket, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to encrypt session ticket: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	toa.setChunkedCookies(rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
+	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
 }
 
-func (toa *TraefikOidcAuth) createSessionCookie() *http.Cookie {
+func createSessionCookie(config *Config) *http.Cookie {
 	return &http.Cookie{
-		Name:     getSessionCookieName(toa.Config),
+		Name:     getSessionCookieName(config),
 		Value:    "",
-		Secure:   toa.Config.SessionCookie.Secure,
-		HttpOnly: toa.Config.SessionCookie.HttpOnly,
-		Path:     toa.Config.SessionCookie.Path,
-		Domain:   toa.Config.SessionCookie.Domain,
-		SameSite: parseCookieSameSite(toa.Config.SessionCookie.SameSite),
-		MaxAge:   toa.Config.SessionCookie.MaxAge,
+		Secure:   config.SessionCookie.Secure,
+		HttpOnly: config.SessionCookie.HttpOnly,
+		Path:     config.SessionCookie.Path,
+		Domain:   config.SessionCookie.Domain,
+		SameSite: parseCookieSameSite(config.SessionCookie.SameSite),
+		MaxAge:   config.SessionCookie.MaxAge,
 	}
 }

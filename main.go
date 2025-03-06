@@ -15,6 +15,9 @@ import (
 	"time"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/oidc"
+	"github.com/sevensolutions/traefik-oidc-auth/session"
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
 
 type TraefikOidcAuth struct {
@@ -24,9 +27,9 @@ type TraefikOidcAuth struct {
 	ProviderURL       *url.URL
 	CallbackURL       *url.URL
 	Config            *Config
-	SessionStorage    SessionStorage
-	DiscoveryDocument *OidcDiscovery
-	Jwks              *JwksHandler
+	SessionStorage    session.SessionStorage
+	DiscoveryDocument *oidc.OidcDiscovery
+	Jwks              *oidc.JwksHandler
 	Lock              sync.RWMutex
 }
 
@@ -40,7 +43,7 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 		defer toa.Lock.Unlock()
 		// check again after lock
 		if toa.DiscoveryDocument == nil {
-			var jwks = &JwksHandler{}
+			var jwks = &oidc.JwksHandler{}
 			toa.Jwks = jwks
 			toa.logger.Log(logging.LevelInfo, "Getting OIDC discovery document...")
 
@@ -70,24 +73,24 @@ func (toa *TraefikOidcAuth) EnsureOidcDiscovery() error {
 }
 
 func (toa *TraefikOidcAuth) GetAbsoluteCallbackURL(req *http.Request) *url.URL {
-	if urlIsAbsolute(toa.CallbackURL) {
+	if utils.UrlIsAbsolute(toa.CallbackURL) {
 		return toa.CallbackURL
 	} else {
 		abs := *toa.CallbackURL
-		fillHostSchemeFromRequest(req, &abs)
+		utils.FillHostSchemeFromRequest(req, &abs)
 		return &abs
 	}
 }
 
 func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 	u := req.URL
-	fillHostSchemeFromRequest(req, u)
+	utils.FillHostSchemeFromRequest(req, u)
 
 	if u.Path != toa.CallbackURL.Path {
 		return false
 	}
 
-	if urlIsAbsolute(toa.CallbackURL) {
+	if utils.UrlIsAbsolute(toa.CallbackURL) {
 		if u.Scheme != toa.CallbackURL.Scheme || u.Host != toa.CallbackURL.Host {
 			return false
 		}
@@ -145,7 +148,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	}
 
 	// Clear the session cookie
-	toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
+	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
 	toa.handleUnauthorized(rw, req)
 }
@@ -167,7 +170,7 @@ func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
 	}
 }
 
-func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *SessionState, claims map[string]interface{}) error {
+func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.SessionState, claims map[string]interface{}) error {
 	if toa.Config.Headers != nil {
 		evalContext := make(map[string]interface{})
 
@@ -213,7 +216,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		return
 	}
 
-	state, err := base64DecodeState(base64State)
+	state, err := oidc.DecodeState(base64State)
 	if err != nil {
 		toa.logger.Log(logging.LevelWarn, "State on callback request is invalid.")
 		http.Error(rw, "State is invalid", http.StatusInternalServerError)
@@ -276,8 +279,8 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
-		session := &SessionState{
-			Id:           GenerateSessionId(),
+		session := &session.SessionState{
+			Id:           session.GenerateSessionId(),
 			AccessToken:  token.AccessToken,
 			IdToken:      token.IdToken,
 			RefreshToken: token.RefreshToken,
@@ -298,16 +301,16 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		})
 
 		if redirectUrl != "" {
-			redirectUrl = ensureAbsoluteUrl(req, redirectUrl)
+			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
 		} else {
-			redirectUrl = ensureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
+			redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 		}
 
 	} else if state.Action == "Logout" {
 		toa.logger.Log(logging.LevelDebug, "Post logout. Clearing cookie.")
 
 		// Clear the cookie
-		toa.clearChunkedCookie(rw, req, getSessionCookieName(toa.Config))
+		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 	}
 
 	toa.logger.Log(logging.LevelInfo, "Redirecting to %s", redirectUrl)
@@ -315,7 +318,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *SessionState) {
+func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *session.SessionState) {
 	toa.logger.Log(logging.LevelInfo, "Logging out...")
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
@@ -328,20 +331,20 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}
 
 	callbackUri := toa.GetAbsoluteCallbackURL(req).String()
-	redirectUri := ensureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
+	redirectUri := utils.EnsureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
 	if req.URL.Query().Get("redirect_uri") != "" {
-		redirectUri = ensureAbsoluteUrl(req, req.URL.Query().Get("redirect_uri"))
+		redirectUri = utils.EnsureAbsoluteUrl(req, req.URL.Query().Get("redirect_uri"))
 	} else if req.URL.Query().Get("post_logout_redirect_uri") != "" {
-		redirectUri = ensureAbsoluteUrl(req, req.URL.Query().Get("post_logout_redirect_uri"))
+		redirectUri = utils.EnsureAbsoluteUrl(req, req.URL.Query().Get("post_logout_redirect_uri"))
 	}
 
-	state := OidcState{
+	state := &oidc.OidcState{
 		Action:      "Logout",
 		RedirectUrl: redirectUri,
 	}
 
-	base64State, err := state.base64Encode()
+	base64State, err := oidc.EncodeState(state)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -375,11 +378,11 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	if redirectUrlFromQuery := req.URL.Query().Get("redirect_uri"); toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUrlFromQuery != "" {
 		redirectUrl = redirectUrlFromQuery
 	} else if toa.Config.PostLoginRedirectUri != "" {
-		host := getFullHost(req)
+		host := utils.GetFullHost(req)
 		postLoginUri, _ := strings.CutPrefix(toa.Config.PostLoginRedirectUri, "/")
 		redirectUrl = fmt.Sprintf("%s/%s", host, postLoginUri)
 	} else {
-		host := getFullHost(req)
+		host := utils.GetFullHost(req)
 		redirectUrl = fmt.Sprintf("%s%s", host, req.RequestURI)
 
 		// Special case: If someone just calls /login but doesn't provide a redirect_uri, we go to / instead of /login again.
@@ -390,7 +393,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 
 	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
 
-	state := OidcState{
+	state := oidc.OidcState{
 		Action:      "Login",
 		RedirectUrl: redirectUrl,
 	}
@@ -432,7 +435,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		urlValues.Add("code_challenge_method", "S256")
 		urlValues.Add("code_challenge", codeChallenge)
 
-		encryptedCodeVerifier, err := encrypt(codeVerifier, toa.Config.Secret)
+		encryptedCodeVerifier, err := utils.Encrypt(codeVerifier, toa.Config.Secret)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return

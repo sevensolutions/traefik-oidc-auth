@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package oidc
 
 import (
 	"crypto/ecdsa"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
 
 type JwksHandler struct {
@@ -206,13 +207,13 @@ func extractKeys(keys *JwksKeys) ([]*RsaKey, []*EcdsaKey, error) {
 	return rsaKeys, ecdsaKeys, nil
 }
 func extractRsaKey(key *JwksKey) (*RsaKey, error) {
-	decodedN, err := ParseBigInt(key.N)
+	decodedN, err := utils.ParseBigInt(key.N)
 
 	if err != nil {
 		return nil, err
 	}
 
-	decodedE, err := ParseInt(key.E)
+	decodedE, err := utils.ParseInt(key.E)
 
 	if err != nil {
 		return nil, err
@@ -226,13 +227,13 @@ func extractRsaKey(key *JwksKey) (*RsaKey, error) {
 	}, nil
 }
 func extractEcdsaKey(key *JwksKey) (*EcdsaKey, error) {
-	decodedX, err := ParseBigInt(key.X)
+	decodedX, err := utils.ParseBigInt(key.X)
 
 	if err != nil {
 		return nil, err
 	}
 
-	decodedY, err := ParseBigInt(key.Y)
+	decodedY, err := utils.ParseBigInt(key.Y)
 
 	if err != nil {
 		return nil, err

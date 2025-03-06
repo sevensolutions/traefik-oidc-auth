@@ -13,6 +13,8 @@ import (
 	"text/template"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/session"
+	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
 
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
@@ -158,7 +160,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
 	}
 
-	// Hack: Trick to traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
+	// Hack: Trick the traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
 	if config.Provider.Url == "https://..." {
 		return &TraefikOidcAuth{
 			next: next,
@@ -194,7 +196,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		config.Scopes = []string{"openid", "profile", "email"}
 	}
 
-	parsedURL, err := parseUrl(config.Provider.Url)
+	parsedURL, err := utils.ParseUrl(config.Provider.Url)
 	if err != nil {
 		logger.Log(logging.LevelError, "Error while parsing Provider.Url: %s", err.Error())
 		return nil, err
@@ -217,7 +219,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	logger.Log(logging.LevelInfo, "Provider Url: %v", parsedURL)
 	logger.Log(logging.LevelInfo, "I will use this URL for callbacks from the IDP: %v", parsedCallbackURL)
-	if urlIsAbsolute(parsedCallbackURL) {
+	if utils.UrlIsAbsolute(parsedCallbackURL) {
 		logger.Log(logging.LevelInfo, "Callback URL is absolute, will not overlay wrapped services")
 	} else {
 		logger.Log(logging.LevelInfo, "Callback URL is relative, will overlay any wrapped host")
@@ -284,6 +286,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		ProviderURL:    parsedURL,
 		CallbackURL:    parsedCallbackURL,
 		Config:         config,
-		SessionStorage: CreateCookieSessionStorage(),
+		SessionStorage: session.CreateCookieSessionStorage(),
 	}, nil
 }

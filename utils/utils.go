@@ -1,11 +1,10 @@
-package traefik_oidc_auth
+package utils
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -14,11 +13,11 @@ import (
 	"strings"
 )
 
-func urlIsAbsolute(u *url.URL) bool {
+func UrlIsAbsolute(u *url.URL) bool {
 	return u.Scheme != "" && u.Host != ""
 }
 
-func parseUrl(rawUrl string) (*url.URL, error) {
+func ParseUrl(rawUrl string) (*url.URL, error) {
 	if rawUrl == "" {
 		return nil, errors.New("invalid empty url")
 	}
@@ -47,7 +46,7 @@ func getSchemeFromRequest(req *http.Request) string {
 	return scheme
 }
 
-func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
+func FillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
 	scheme := getSchemeFromRequest(req)
 	host := req.Header.Get("X-Forwarded-Host")
 	if host == "" {
@@ -58,7 +57,7 @@ func fillHostSchemeFromRequest(req *http.Request, u *url.URL) *url.URL {
 	return u
 }
 
-func getFullHost(req *http.Request) string {
+func GetFullHost(req *http.Request) string {
 	scheme := getSchemeFromRequest(req)
 	host := req.Header.Get("X-Forwarded-Host")
 	if host == "" {
@@ -68,40 +67,13 @@ func getFullHost(req *http.Request) string {
 	return fmt.Sprintf("%s://%s", scheme, host)
 }
 
-func ensureAbsoluteUrl(req *http.Request, url string) string {
+func EnsureAbsoluteUrl(req *http.Request, url string) string {
 	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
 		return url
 	} else {
-		host := getFullHost(req)
+		host := GetFullHost(req)
 		return host + url
 	}
-}
-
-func (state *OidcState) base64Encode() (string, error) {
-	stateBytes, err := json.Marshal(state)
-
-	if err != nil {
-		return "", err
-	}
-
-	stateBase64 := base64.StdEncoding.EncodeToString(stateBytes)
-	return stateBase64, nil
-}
-
-func base64DecodeState(base64State string) (*OidcState, error) {
-	stateBytes, err := base64.StdEncoding.DecodeString(base64State)
-
-	if err != nil {
-		return nil, err
-	}
-
-	var state OidcState
-	err2 := json.Unmarshal(stateBytes, &state)
-	if err2 != nil {
-		return nil, err2
-	}
-
-	return &state, nil
 }
 
 func ParseBigInt(s string) (*big.Int, error) {
@@ -124,7 +96,7 @@ func ParseInt(s string) (int, error) {
 	return int(v.Int64()), nil
 }
 
-func encrypt(plaintext string, secret string) (string, error) {
+func Encrypt(plaintext string, secret string) (string, error) {
 	aesCipher, err := aes.NewCipher([]byte(secret))
 	if err != nil {
 		return "", err
@@ -151,7 +123,7 @@ func encrypt(plaintext string, secret string) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-func decrypt(ciphertext string, secret string) (string, error) {
+func Decrypt(ciphertext string, secret string) (string, error) {
 	cipherbytes, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return "", err
