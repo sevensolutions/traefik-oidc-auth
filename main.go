@@ -271,7 +271,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		toa.logger.Log(logging.LevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
-		if !toa.isAuthorized(claims) {
+		if !isAuthorized(toa.logger, toa.Config.Authorization, claims) {
 			http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
