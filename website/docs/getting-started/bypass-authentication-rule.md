@@ -39,3 +39,7 @@ The following rules are available:
 | <code>PathPrefix(&#96;/products&#96;)</code> | Match every request by a path prefix. Eg. `/products/123` would match, `/user` would not match. |
 | <code>PathRegexp(&#96;^/products/(shoes&#124;socks)/[0-9]+$&#96;)</code> | Match every request path against the given regex. |
 | <code>Method(&#96;POST&#96;)</code> | Match every POST request. |
+
+:::note
+When authentication is bypassed, no headers etc. will be forwarded to the upstream service, even if an existing session is present.
+:::
