@@ -29,6 +29,7 @@ You can generate a random one here: https://it-tools.tech/token-generator?length
 | UnauthorizedBehavior | no | `string` | `Challenge` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, whereas `Unauthorized` will simply return a 401 status response. |
 | Authorization | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
 | Headers | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
+| BypassAuthenticationRule | no | `string` | *none* | Specifies an optional rule to bypass authentication. See [Bypass Authentication Rule](./bypass-authentication-rule.md) for more details. |
 
 ## Provider Block {#provider}
 

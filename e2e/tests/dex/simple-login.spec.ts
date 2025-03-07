@@ -366,6 +366,60 @@ http:
   expect(response.status()).toBe(200);
 });
 
+test("access app with bypass rule", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            UrlEnv: "PROVIDER_URL_HTTP"
+            ClientIdEnv: "CLIENT_ID"
+            ClientSecretEnv: "CLIENT_SECRET"
+            UsePkce: false
+          BypassAuthenticationRule: "Header(\`MY-HEADER\`, \`123\`)"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  // The first test should bypass authentication and directly return the whoami page.
+  await page.route("http://localhost:9080/**/*", route => {
+    const headers = route.request().headers();
+    headers["MY-HEADER"] = "123";
+
+    route.continue({ headers });
+  });
+  
+  await page.goto("http://localhost:9080/test1");
+
+  await expect(page.getByText(/My-Header: 123/i)).toBeVisible();
+
+  // The second test should return a redirect to the IDP, because the header doesn't match.
+  await page.route("http://localhost:9080/**/*", route => {
+    const headers = route.request().headers();
+    headers["MY-HEADER"] = "456";
+
+    route.continue({ headers });
+  });
+
+  const response = await page.goto("http://localhost:9080/test2");
+
+  expect(response?.url()).toMatch(/http:\/\/localhost:5556\/dex\/auth.*/);
+});
+
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------

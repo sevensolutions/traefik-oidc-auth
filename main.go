@@ -14,6 +14,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/rules"
+
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/oidc"
 	"github.com/sevensolutions/traefik-oidc-auth/session"
@@ -21,16 +23,17 @@ import (
 )
 
 type TraefikOidcAuth struct {
-	logger            *logging.Logger
-	next              http.Handler
-	httpClient        *http.Client
-	ProviderURL       *url.URL
-	CallbackURL       *url.URL
-	Config            *Config
-	SessionStorage    session.SessionStorage
-	DiscoveryDocument *oidc.OidcDiscovery
-	Jwks              *oidc.JwksHandler
-	Lock              sync.RWMutex
+	logger                   *logging.Logger
+	next                     http.Handler
+	httpClient               *http.Client
+	ProviderURL              *url.URL
+	CallbackURL              *url.URL
+	Config                   *Config
+	SessionStorage           session.SessionStorage
+	DiscoveryDocument        *oidc.OidcDiscovery
+	Jwks                     *oidc.JwksHandler
+	Lock                     sync.RWMutex
+	BypassAuthenticationRule *rules.RequestCondition
 }
 
 // Make sure we fetch oidc discovery document during first request - avoid race condition
@@ -100,6 +103,19 @@ func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if toa.BypassAuthenticationRule != nil {
+		if toa.BypassAuthenticationRule.Match(toa.logger, req) {
+			toa.logger.Log(logging.LevelDebug, "BypassAuthenticationRule matched. Forwarding request without authentication.")
+
+			// Forward the request
+			toa.sanitizeForUpstream(req)
+			toa.next.ServeHTTP(rw, req)
+			return
+		} else {
+			toa.logger.Log(logging.LevelDebug, "BypassAuthenticationRule not matched. Requiring authentication.")
+		}
+	}
+
 	err := toa.EnsureOidcDiscovery()
 
 	if err != nil {
