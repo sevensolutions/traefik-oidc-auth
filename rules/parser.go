@@ -32,6 +32,10 @@ func NewParser(matchers []string) (predicate.Parser, error) {
 	parserFuncs := make(map[string]interface{})
 
 	for _, matcherName := range matchers {
+		// Fix for https://github.com/traefik/yaegi/discussions/1643
+		// We need to capture the variable manually.
+		matcherName := matcherName
+
 		fn := func(value ...string) TreeBuilder {
 			return func() *Tree {
 				return &Tree{

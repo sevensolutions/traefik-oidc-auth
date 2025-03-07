@@ -3,7 +3,6 @@ package rules
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
 )
@@ -31,9 +30,6 @@ func ParseRequestCondition(rule string) (*RequestCondition, error) {
 	}
 
 	tree := buildTree()
-
-	// TODO: Remove
-	os.Stdout.WriteString(fmt.Sprintf("Parsed rule: %s -- MATCHER: %s\n", rule, tree.Matcher))
 
 	var matchers requestConditionTree
 	err = matchers.addRule(tree, httpFuncs)

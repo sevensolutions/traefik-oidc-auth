@@ -12,10 +12,10 @@ import (
 var httpFuncs = map[string]func(*requestConditionTree, ...string) error{
 	"Header":       headerFunc,
 	"HeaderRegexp": headerRegexpFunc,
-	// "PathPrefix":   pathPrefixFunc,
-	// "Path":         pathFunc,
-	// "PathRegexp":   pathRegexpFunc,
-	// "Method":       methodFunc,
+	"PathPrefix":   pathPrefixFunc,
+	"Path":         pathFunc,
+	"PathRegexp":   pathRegexpFunc,
+	"Method":       methodFunc,
 }
 
 func headerFunc(tree *requestConditionTree, values ...string) error {
