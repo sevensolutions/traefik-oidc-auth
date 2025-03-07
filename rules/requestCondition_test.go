@@ -110,3 +110,17 @@ func TestRequestConditionLogicalAnd(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestRequestConditionNegatedMethod(t *testing.T) {
+	logger := logging.CreateLogger(logging.LevelDebug)
+
+	rule, _ := ParseRequestCondition("!Method(`POST`)")
+
+	request, _ := http.NewRequest(http.MethodPut, "http://test", nil)
+
+	result := rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+}
