@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
 )
@@ -29,8 +30,13 @@ func ParseRequestCondition(rule string) (*RequestCondition, error) {
 		return nil, fmt.Errorf("error while parsing rule %s", rule)
 	}
 
-	var matchers matchersTree
-	err = matchers.addRule(buildTree(), httpFuncs)
+	tree := buildTree()
+
+	// TODO: Remove
+	os.Stdout.WriteString(fmt.Sprintf("Parsed rule: %s -- MATCHER: %s\n", rule, tree.Matcher))
+
+	var matchers requestConditionTree
+	err = matchers.addRule(tree, httpFuncs)
 	if err != nil {
 		return nil, fmt.Errorf("error while adding rule %s: %w", rule, err)
 	}
@@ -42,22 +48,23 @@ func ParseRequestCondition(rule string) (*RequestCondition, error) {
 	}, nil
 }
 
-type matchersTree struct {
+type requestConditionTree struct {
 	// matcher is a matcher func used to match HTTP request properties.
 	// If matcher is not nil, it means that this matcherTree is a leaf of the tree.
 	// It is therefore mutually exclusive with left and right.
 	matcher func(logger *logging.Logger, request *http.Request) bool
+
 	// operator to combine the evaluation of left and right leaves.
 	operator string
 	// Mutually exclusive with matcher.
-	left  *matchersTree
-	right *matchersTree
+	left  *requestConditionTree
+	right *requestConditionTree
 }
 
-func (m *matchersTree) match(logger *logging.Logger, request *http.Request) bool {
+func (m *requestConditionTree) match(logger *logging.Logger, request *http.Request) bool {
 	if m == nil {
 		// This should never happen as it should have been detected during parsing.
-		//log.Warn().Msg("Rule matcher is nil")
+		logger.Log(logging.LevelWarn, "Rule matcher is nil")
 		return false
 	}
 
@@ -72,24 +79,24 @@ func (m *matchersTree) match(logger *logging.Logger, request *http.Request) bool
 		return m.left.match(logger, request) && m.right.match(logger, request)
 	default:
 		// This should never happen as it should have been detected during parsing.
-		//log.Warn().Str("operator", m.operator).Msg("Invalid rule operator")
+		logger.Log(logging.LevelWarn, "Invalid rule operator %s", m.operator)
 		return false
 	}
 }
 
-type matcherFuncs map[string]func(*matchersTree, ...string) error
+type matcherFuncs map[string]func(*requestConditionTree, ...string) error
 
-func (m *matchersTree) addRule(rule *Tree, funcs matcherFuncs) error {
+func (m *requestConditionTree) addRule(rule *Tree, funcs matcherFuncs) error {
 	switch rule.Matcher {
 	case "and", "or":
 		m.operator = rule.Matcher
-		m.left = &matchersTree{}
+		m.left = &requestConditionTree{}
 		err := m.left.addRule(rule.RuleLeft, funcs)
 		if err != nil {
 			return fmt.Errorf("error while adding rule %s: %w", rule.Matcher, err)
 		}
 
-		m.right = &matchersTree{}
+		m.right = &requestConditionTree{}
 		return m.right.addRule(rule.RuleRight, funcs)
 	default:
 		err := CheckRule(rule)
