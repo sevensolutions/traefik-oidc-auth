@@ -23,6 +23,9 @@ func ParseRequestCondition(rule string) (*RequestCondition, error) {
 	}
 
 	parse, err := parser.Parse(rule)
+	if err != nil {
+		return nil, err
+	}
 
 	buildTree, ok := parse.(TreeBuilder)
 	if !ok {
