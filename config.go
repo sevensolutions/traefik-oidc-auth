@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/rules"
 	"github.com/sevensolutions/traefik-oidc-auth/session"
 	"github.com/sevensolutions/traefik-oidc-auth/utils"
 )
@@ -51,6 +52,8 @@ type Config struct {
 	Authorization *AuthorizationConfig `json:"authorization"`
 
 	Headers []HeaderConfig `json:"headers"`
+
+	BypassAuthenticationRule string
 }
 
 type ProviderConfig struct {
@@ -227,6 +230,17 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	logger.Log(logging.LevelDebug, "SessionCookie: %v", config.SessionCookie)
 
+	var conditionalAuth *rules.RequestCondition
+	if config.BypassAuthenticationRule != "" {
+		ca, err := rules.ParseRequestCondition(config.BypassAuthenticationRule)
+
+		if err != nil {
+			return nil, err
+		}
+
+		conditionalAuth = ca
+	}
+
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
 		rootCAs = x509.NewCertPool()
@@ -280,12 +294,13 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
-		logger:         logger,
-		next:           next,
-		httpClient:     httpClient,
-		ProviderURL:    parsedURL,
-		CallbackURL:    parsedCallbackURL,
-		Config:         config,
-		SessionStorage: session.CreateCookieSessionStorage(),
+		logger:                   logger,
+		next:                     next,
+		httpClient:               httpClient,
+		ProviderURL:              parsedURL,
+		CallbackURL:              parsedCallbackURL,
+		Config:                   config,
+		SessionStorage:           session.CreateCookieSessionStorage(),
+		BypassAuthenticationRule: conditionalAuth,
 	}, nil
 }
