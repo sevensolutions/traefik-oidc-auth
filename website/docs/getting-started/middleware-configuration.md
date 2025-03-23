@@ -106,37 +106,64 @@ Because the name is being interpreted as jsonpath, you may need to escape some n
 So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 :::
 
+:::tip
+If the user is not authorized, all claims, contained in the token, are printed in the console if DEBUG-logging of the plugin is enabled (See `LogLevel` at the top). This may help you to know which claims exist in your token.
+:::
+
 <details>
   <summary>
     <b>Examples</b>
   </summary>
-  All of the examples below work on this json structure:
+  Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.
+  Please note that the actual claims depend on the identity provider you're using and sometimes you need to map them into the token explicitly.
+  You can also check out the [Identity Providers](../identity-providers/index.md) section or the documentation of your identity provider for more details.
+
+  ```yml
+  http:
+    middlewares:
+      oidc-auth:
+        plugin:
+          traefik-oidc-auth:
+            Provider:
+              Url: "https://your-instance.zitadel.cloud"
+              ClientId: "<YourClientId>"
+              UsePkce: true
+            Scopes: ["openid", "profile", "email"]
+            # highlight-start
+            Authorization:
+              AssertClaims:
+                - Name: roles
+                  AnyOf: ["admin", "media"]
+            # highlight-end
+  ```
+
+  Here are some more complex examples based on the following json structure:
 
   ```json
   {
-      "store": {
-        "bicycle": {
-          "color": "red",
-          "price": 19.95
+    "store": {
+      "bicycle": {
+        "color": "red",
+        "price": 19.95
+      },
+      "book": [
+        {
+          "author": "Herman Melville",
+          "category": "fiction",
+          "isbn": "0-553-21311-3",
+          "price": 8.99,
+          "title": "Moby Dick"
         },
-        "book": [
-          {
-            "author": "Herman Melville",
-            "category": "fiction",
-            "isbn": "0-553-21311-3",
-            "price": 8.99,
-            "title": "Moby Dick"
-          },
-          {
-            "author": "J. R. R. Tolkien",
-            "category": "fiction",
-            "isbn": "0-395-19395-8",
-            "price": 22.99,
-            "title": "The Lord of the Rings"
-          }
-        ],
-      }
+        {
+          "author": "J. R. R. Tolkien",
+          "category": "fiction",
+          "isbn": "0-395-19395-8",
+          "price": 22.99,
+          "title": "The Lord of the Rings"
+        }
+      ],
     }
+  }
   ```
 
   **Example**: Expect array to contain a set of values
