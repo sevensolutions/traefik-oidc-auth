@@ -34,12 +34,14 @@ sequenceDiagram
         User->>Traefik: Request to access service
         Traefik-->>User: Redirect to OAuth Provider for login
         User->>OAuth: Login and consent
-        OAuth-->>User: Redirect to Traefik Callback
-        User-->>Traefik: Follow Traefik Callback
+        OAuth->>OAuth: Create SSO session
+        OAuth-->>User: Redirect to Plugin Callback (/oidc/callback)
+        User-->>Traefik: Follow Plugin Callback (/oidc/callback)
         Traefik-->>OAuth: Exchange Code for Token
         OAuth-->>Traefik: Return Tokens
         Traefik->>Traefik: Validate Authorization
         alt Authorized
+            Traefik->>Traefik: Create session and Cookie
             Traefik-->>User: Redirect to requested page (Include Cookie)
         else Not Authorized
             Traefik-->>User: Return 401 Unauthorized
@@ -59,3 +61,36 @@ sequenceDiagram
         end
     end
 ```
+
+## Logout {#logout}
+
+If you want to log out and remove the session it is simply enough to navigate to the `/logout` route or whatever you've configured for `LogoutUri` in the [Plugin Config Block](./middleware-configuration.md#plugin-config-block).
+This can be achieved by a simple link for example:
+
+```html
+<a href="/logout">Logout</a>
+```
+This will then trigger the logout flow which is as follows:
+
+```mermaid
+sequenceDiagram
+    participant User as User
+    participant Traefik as Traefik (with traefik-oidc-auth Plugin)
+    participant OAuth as OAuth Provider
+
+    User->>Traefik: Navigate to /logout
+    Traefik-->>User: Redirect to OAuth Provider for logout
+    User->>OAuth: Follow redirect (end_session_endpoint)
+    OAuth->>OAuth: Clear SSO session
+    OAuth->>User: Redirect to Plugin Callback (/oidc/callback)
+    User->>Traefik: Follow Plugin Callback (/oidc/callback)
+    Traefik->>Traefik: Clear Session and Cookie
+    Traefik->>User: Redirect to `PostLogoutRedirectUri`
+```
+
+:::tip
+The configured `PostLogoutRedirectUri` is the default url to which the user will be redirected after the logout is completed.
+You can also specify a different url when navigating to the `/logout` endpoint like this:  
+`/logout?redirect_uri=/whatever` or `/logout?post_logout_redirect_uri=/whatever`.  
+Both will do the same.
+:::
