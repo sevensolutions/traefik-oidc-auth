@@ -20,7 +20,7 @@ You can generate a random one here: https://it-tools.tech/token-generator?length
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
 | LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthorizedBehavior`-configuration.  |
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
-| LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
+| LogoutUri | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
 | CookieNamePrefix | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookieConfig* where the name can be set individually. |
 | SessionCookie | no | [`SessionCookieConfig`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
@@ -106,37 +106,64 @@ Because the name is being interpreted as jsonpath, you may need to escape some n
 So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 :::
 
+:::tip
+If the user is not authorized, all claims, contained in the token, are printed in the console if DEBUG-logging of the plugin is enabled (See `LogLevel` at the top). This may help you to know which claims exist in your token.
+:::
+
 <details>
   <summary>
     <b>Examples</b>
   </summary>
-  All of the examples below work on this json structure:
+  Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.
+  Please note that the actual claims depend on the identity provider you're using and sometimes you need to map them into the token explicitly.
+  You can also check out the [Identity Providers](../identity-providers/index.md) section or the documentation of your identity provider for more details.
+
+  ```yml
+  http:
+    middlewares:
+      oidc-auth:
+        plugin:
+          traefik-oidc-auth:
+            Provider:
+              Url: "https://your-instance.zitadel.cloud"
+              ClientId: "<YourClientId>"
+              UsePkce: true
+            Scopes: ["openid", "profile", "email"]
+            # highlight-start
+            Authorization:
+              AssertClaims:
+                - Name: roles
+                  AnyOf: ["admin", "media"]
+            # highlight-end
+  ```
+
+  Here are some more complex examples based on the following json structure:
 
   ```json
   {
-      "store": {
-        "bicycle": {
-          "color": "red",
-          "price": 19.95
+    "store": {
+      "bicycle": {
+        "color": "red",
+        "price": 19.95
+      },
+      "book": [
+        {
+          "author": "Herman Melville",
+          "category": "fiction",
+          "isbn": "0-553-21311-3",
+          "price": 8.99,
+          "title": "Moby Dick"
         },
-        "book": [
-          {
-            "author": "Herman Melville",
-            "category": "fiction",
-            "isbn": "0-553-21311-3",
-            "price": 8.99,
-            "title": "Moby Dick"
-          },
-          {
-            "author": "J. R. R. Tolkien",
-            "category": "fiction",
-            "isbn": "0-395-19395-8",
-            "price": 22.99,
-            "title": "The Lord of the Rings"
-          }
-        ],
-      }
+        {
+          "author": "J. R. R. Tolkien",
+          "category": "fiction",
+          "isbn": "0-395-19395-8",
+          "price": 22.99,
+          "title": "The Lord of the Rings"
+        }
+      ],
     }
+  }
   ```
 
   **Example**: Expect array to contain a set of values
