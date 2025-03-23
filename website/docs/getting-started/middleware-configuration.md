@@ -20,7 +20,7 @@ You can generate a random one here: https://it-tools.tech/token-generator?length
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
 | LoginUri | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthorizedBehavior`-configuration.  |
 | PostLoginRedirectUri | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
-| LogoutUri | no | `string` | `/logout` | The url which should trigger a logout-flow. |
+| LogoutUri | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | PostLogoutRedirectUri | no | `string` | `/` | The url where the user should be redirected after logout. |
 | CookieNamePrefix | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookieConfig* where the name can be set individually. |
 | SessionCookie | no | [`SessionCookieConfig`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
