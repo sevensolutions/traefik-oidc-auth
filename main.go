@@ -394,9 +394,14 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	if redirectUrlFromQuery := req.URL.Query().Get("redirect_uri"); toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUrlFromQuery != "" {
 		redirectUrl = redirectUrlFromQuery
 	} else if toa.Config.PostLoginRedirectUri != "" {
-		host := utils.GetFullHost(req)
-		postLoginUri, _ := strings.CutPrefix(toa.Config.PostLoginRedirectUri, "/")
-		redirectUrl = fmt.Sprintf("%s/%s", host, postLoginUri)
+		parsed, parseErr := url.Parse(toa.Config.PostLoginRedirectUri)
+		if parseErr != nil && parsed.IsAbs() {
+			redirectUrl = toa.Config.PostLoginRedirectUri
+		} else {
+			host := utils.GetFullHost(req)
+			postLoginUri, _ := strings.CutPrefix(toa.Config.PostLoginRedirectUri, "/")
+			redirectUrl = fmt.Sprintf("%s/%s", host, postLoginUri)
+		}
 	} else {
 		host := utils.GetFullHost(req)
 		redirectUrl = fmt.Sprintf("%s%s", host, req.RequestURI)
