@@ -385,20 +385,6 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 	}
 }
 
-func EnsureAbsoluteUrl(req *http.Request, url string) string {
-	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
-		return url
-	} else {
-		host := utils.GetFullHost(req)
-
-		if !strings.HasPrefix(url, "/") {
-			url = "/" + url
-		}
-
-		return host + url
-	}
-}
-
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
 
