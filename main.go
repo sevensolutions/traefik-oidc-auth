@@ -385,6 +385,20 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 	}
 }
 
+func EnsureAbsoluteUrl(req *http.Request, url string) string {
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		return url
+	} else {
+		host := utils.GetFullHost(req)
+
+		if !strings.HasPrefix(url, "/") {
+			url = "/" + url
+		}
+
+		return host + url
+	}
+}
+
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
 
@@ -394,14 +408,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	if redirectUrlFromQuery := req.URL.Query().Get("redirect_uri"); toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUrlFromQuery != "" {
 		redirectUrl = redirectUrlFromQuery
 	} else if toa.Config.PostLoginRedirectUri != "" {
-		parsed, parseErr := url.Parse(toa.Config.PostLoginRedirectUri)
-		if parseErr != nil && parsed.IsAbs() {
-			redirectUrl = toa.Config.PostLoginRedirectUri
-		} else {
-			host := utils.GetFullHost(req)
-			postLoginUri, _ := strings.CutPrefix(toa.Config.PostLoginRedirectUri, "/")
-			redirectUrl = fmt.Sprintf("%s/%s", host, postLoginUri)
-		}
+		redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 	} else {
 		host := utils.GetFullHost(req)
 		redirectUrl = fmt.Sprintf("%s%s", host, req.RequestURI)
