@@ -72,6 +72,11 @@ func EnsureAbsoluteUrl(req *http.Request, url string) string {
 		return url
 	} else {
 		host := GetFullHost(req)
+
+		if !strings.HasPrefix(url, "/") {
+			url = "/" + url
+		}
+
 		return host + url
 	}
 }
