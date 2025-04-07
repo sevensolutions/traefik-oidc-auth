@@ -107,10 +107,20 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				return nil, nil, nil, err
 			}
 
-			toa.logger.Log(logging.LevelInfo, "Successfully renewed session")
-
 			session.AccessToken = newTokens.AccessToken
 			session.RefreshToken = newTokens.RefreshToken
+
+			// We had some problems with some providers which didn't return a new IdToken when renewing the tokens.
+			// Thats why i'am logging this case specifically here.
+			if newTokens.IdToken != "" {
+				session.IdToken = newTokens.IdToken
+			} else {
+				if toa.Config.Provider.TokenValidation == "IdToken" {
+					toa.logger.Log(logging.LevelWarn, "The auth provider didn't return a new IdToken. Still keeping the old one.")
+				} else {
+					toa.logger.Log(logging.LevelDebug, "The auth provider didn't return a new IdToken. Still keeping the old one.")
+				}
+			}
 
 			success, claims, err = toa.validateToken(session)
 
@@ -118,6 +128,8 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				toa.logger.Log(logging.LevelError, "Failed to validate renewed session: %v", err)
 				return nil, nil, session, err
 			}
+
+			toa.logger.Log(logging.LevelInfo, "Successfully renewed session")
 
 			return session, claims, session, err
 		} else {
