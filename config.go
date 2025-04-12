@@ -23,7 +23,8 @@ const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 type Config struct {
 	LogLevel string `json:"log_level"`
 
-	Secret string `json:"secret"`
+	Secret    string `json:"secret"`
+	SecretEnv string `json:"secret_env"`
 
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
@@ -159,10 +160,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, errors.New("missing provider configuration")
 	}
 
-	if config.Secret == DefaultSecret {
-		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
-	}
-
 	// Hack: Trick the traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
 	if config.Provider.Url == "https://..." {
 		return &TraefikOidcAuth{
@@ -170,6 +167,9 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}, nil
 	}
 
+	if (config.Secret == "" || config.Secret == DefaultSecret) && config.SecretEnv != "" {
+		config.Secret = os.Getenv(config.SecretEnv)
+	}
 	if config.Provider.Url == "" && config.Provider.UrlEnv != "" {
 		config.Provider.Url = os.Getenv(config.Provider.UrlEnv)
 	}
@@ -187,6 +187,16 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	}
 	if config.Provider.CABundleFile == "" && config.Provider.CABundleFileEnv != "" {
 		config.Provider.CABundleFile = os.Getenv(config.Provider.CABundleFileEnv)
+	}
+
+	if config.Secret == DefaultSecret {
+		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
+	}
+
+	secret := []byte(config.Secret)
+	if len(secret) != 32 {
+		logger.Log(logging.LevelError, "Invalid secret provided. Secret must be exactly 32 characters in length. The provided secret has %d characters.", len(secret))
+		return nil, errors.New("invalid secret")
 	}
 
 	if config.Provider.CABundle != "" && config.Provider.CABundleFile != "" {
