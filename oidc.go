@@ -134,10 +134,10 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		jwt.WithExpirationRequired(),
 	}
 
-	if toa.Config.Provider.ValidateIssuer {
+	if toa.Config.Provider.ValidateIssuerBool {
 		options = append(options, jwt.WithIssuer(toa.Config.Provider.ValidIssuer))
 	}
-	if toa.Config.Provider.ValidateAudience {
+	if toa.Config.Provider.ValidateAudienceBool {
 		options = append(options, jwt.WithAudience(toa.Config.Provider.ValidAudience))
 	}
 
