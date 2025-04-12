@@ -84,7 +84,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		urlValues.Add("client_secret", oidcAuth.Config.Provider.ClientSecret)
 	}
 
-	if oidcAuth.Config.Provider.UsePkce {
+	if oidcAuth.Config.Provider.UsePkceBool {
 		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config))
 		if err != nil {
 			return nil, err

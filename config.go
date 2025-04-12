@@ -68,7 +68,8 @@ type ProviderConfig struct {
 	ClientId     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 
-	UsePkce bool `json:"use_pkce"`
+	UsePkce     string `json:"use_pkce"`
+	UsePkceBool bool   `json:"use_pkce_bool"`
 
 	ValidateAudience     string `json:"validate_audience"`
 	ValidateAudienceBool bool   `json:"validate_audience_bool"`
@@ -122,6 +123,7 @@ func CreateConfig() *Config {
 		LogLevel: logging.LevelWarn,
 		Secret:   DefaultSecret,
 		Provider: &ProviderConfig{
+			UsePkceBool:            false,
 			InsecureSkipVerifyBool: false,
 			ValidateIssuerBool:     true,
 			ValidateAudienceBool:   true,
@@ -181,6 +183,10 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.Url = utils.ExpandEnvironmentVariableString(config.Provider.Url)
 	config.Provider.ClientId = utils.ExpandEnvironmentVariableString(config.Provider.ClientId)
 	config.Provider.ClientSecret = utils.ExpandEnvironmentVariableString(config.Provider.ClientSecret)
+	config.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UsePkce, config.Provider.UsePkceBool)
+	if err != nil {
+		return nil, err
+	}
 	config.Provider.ValidateIssuerBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.ValidateIssuer, config.Provider.ValidateIssuerBool)
 	if err != nil {
 		return nil, err
