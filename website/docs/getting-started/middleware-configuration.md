@@ -7,7 +7,7 @@ sidebar_position: 3
 ## Plugin Config Block
 
 :::caution
-It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`- or `SecretEnv`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
 :::
 
@@ -15,6 +15,7 @@ You can generate a random one here: https://it-tools.tech/token-generator?length
 |---|---|---|---|---|
 | LogLevel | no | `string` | `WARN` | Defines the logging level of the plugin. Can be one of `DEBUG`, `INFO`, `WARN`, `ERROR`. |
 | Secret | no | `string` | `MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ`| A secret used for encryption. Must be a 32 character string. It is strongly suggested to change this. |
+| SecretEnv | no | `string` | *None* | The name of an environment variable, containing the secret instead of providing it inline via `Secret`. The variable needs to contain a 32 character string. |
 | Provider | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
 | Scopes | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
 | CallbackUri | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
