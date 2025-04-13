@@ -432,7 +432,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"state":         {stateBase64},
 	}
 
-	if toa.Config.Provider.UsePkce {
+	if toa.Config.Provider.UsePkceBool {
 		codeVerifier, err := randomBytesInHex(32)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)

@@ -27,9 +27,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTP"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
 
   routers:
@@ -115,9 +115,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTP"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
           Headers:
             - Name: "Authorization"
@@ -166,9 +166,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTP"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
           Headers:
             - Name: "Authorization"
@@ -216,9 +216,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTP"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
           Authorization:
             AssertClaims:
@@ -255,9 +255,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTP"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
           Authorization:
             AssertClaims:
@@ -294,10 +294,10 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTPS"
+            Url: "\${PROVIDER_URL_HTTPS}"
             CABundleFile: "/certificates/bundle/ca_bundle.pem"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
 
   routers:
@@ -339,10 +339,10 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTPS"
+            Url: "\${PROVIDER_URL_HTTPS}"
             CABundle: "base64:${base64CertBundle}"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
 
   routers:
@@ -381,9 +381,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL_HTTP"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
             UsePkce: false
           BypassAuthenticationRule: "Header(\`MY-HEADER\`, \`123\`)"
 

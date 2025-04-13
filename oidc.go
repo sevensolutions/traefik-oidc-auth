@@ -84,7 +84,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		urlValues.Add("client_secret", oidcAuth.Config.Provider.ClientSecret)
 	}
 
-	if oidcAuth.Config.Provider.UsePkce {
+	if oidcAuth.Config.Provider.UsePkceBool {
 		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config))
 		if err != nil {
 			return nil, err
@@ -134,10 +134,10 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		jwt.WithExpirationRequired(),
 	}
 
-	if toa.Config.Provider.ValidateIssuer {
+	if toa.Config.Provider.ValidateIssuerBool {
 		options = append(options, jwt.WithIssuer(toa.Config.Provider.ValidIssuer))
 	}
-	if toa.Config.Provider.ValidateAudience {
+	if toa.Config.Provider.ValidateAudienceBool {
 		options = append(options, jwt.WithAudience(toa.Config.Provider.ValidAudience))
 	}
 
