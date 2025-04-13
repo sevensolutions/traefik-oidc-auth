@@ -18,7 +18,10 @@ Provider:
   Url: "${MY_PROVIDER_URL}"
   ClientSecret: "${MY_CLIENT_SECRET}"
 ```
-If a variable is not defined, the provided value is used as-is.
+If a variable is not defined, the provided value is used as-is.  
+Please note that you can only use a single environment variable using this syntax and it **does not allow templating**.
+So something like this wouldn't work: `https://auth.${MY_DOMAIN}/auth/${CLIENT_ID}`.  
+But: If you're using YAML-files for configuration you can use [traefik's templating](https://doc.traefik.io/traefik/providers/file/#go-templating).
 :::
 
 | Name | Required | Type | Default | Description |
