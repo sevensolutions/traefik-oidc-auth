@@ -143,6 +143,15 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			return
 		}
 
+		// If this request is using external authentication by using a header or custom cookie,
+		// we need to validate the authorization on every request.
+		if session.Id == "AuthorizationHeader" || session.Id == "AuthorizationCookie" {
+			if !isAuthorized(toa.logger, toa.Config.Authorization, claims) {
+				toa.handleUnauthorized(rw, req)
+				return
+			}
+		}
+
 		// Attach upstream headers
 		err = toa.attachHeaders(req, session, claims)
 		if err != nil {
