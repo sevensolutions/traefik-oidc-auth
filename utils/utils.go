@@ -10,8 +10,54 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 )
+
+// Expands the environment variable if it is enclosed in ${}. If the variable is not present, the original value is returned.
+func ExpandEnvironmentVariableString(value string) string {
+	after, hasPrefix := strings.CutPrefix(value, "${")
+
+	if hasPrefix {
+		variableName, hasSuffix := strings.CutSuffix(after, "}")
+
+		if hasSuffix {
+			variableValue, isDefined := os.LookupEnv(variableName)
+
+			if isDefined {
+				return variableValue
+			}
+		}
+	}
+
+	return value
+}
+
+func ExpandEnvironmentVariableBoolean(value string, defaultValue bool) (bool, error) {
+	after, hasPrefix := strings.CutPrefix(value, "${")
+
+	if hasPrefix {
+		variableName, hasSuffix := strings.CutSuffix(after, "}")
+
+		if hasSuffix {
+			variableValue, isDefined := os.LookupEnv(variableName)
+
+			if isDefined {
+				value = variableValue
+			}
+		}
+	}
+
+	if value == "true" || value == "1" {
+		return true, nil
+	} else if value == "false" || value == "0" {
+		return false, nil
+	} else if value != "" {
+		return false, errors.New(fmt.Sprintf("Invalid boolean value \"%s\". Boolean values must be true/false or 1/0.", value))
+	}
+
+	return defaultValue, nil
+}
 
 func UrlIsAbsolute(u *url.URL) bool {
 	return u.Scheme != "" && u.Host != ""

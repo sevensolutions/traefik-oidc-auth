@@ -66,9 +66,9 @@ http:
         traefik-oidc-auth:
           LogLevel: DEBUG
           Provider:
-            UrlEnv: "PROVIDER_URL"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "${PROVIDER_URL}"
+            ClientId: "${CLIENT_ID}"
+            ClientSecret: "${CLIENT_SECRET}"
             UsePkce: false
           Scopes: ["openid", "profile", "email"]
           CallbackUri: "https://auth.127.0.0.1.sslip.io/oidc/callback"

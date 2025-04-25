@@ -23,8 +23,7 @@ const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 type Config struct {
 	LogLevel string `json:"log_level"`
 
-	Secret    string `json:"secret"`
-	SecretEnv string `json:"secret_env"`
+	Secret string `json:"secret"`
 
 	Provider *ProviderConfig `json:"provider"`
 	Scopes   []string        `json:"scopes"`
@@ -58,28 +57,27 @@ type Config struct {
 }
 
 type ProviderConfig struct {
-	Url    string `json:"url"`
-	UrlEnv string `json:"url_env"`
+	Url string `json:"url"`
 
-	InsecureSkipVerify bool   `json:"insecure_skip_verify"`
-	CABundle           string `json:"ca_bundle"`
-	CABundleFile       string `json:"ca_bundle_file"`
-	CABundleFileEnv    string `json:"ca_bundle_file_env"`
+	InsecureSkipVerify     string `json:"insecure_skip_verify"`
+	InsecureSkipVerifyBool bool   `json:"insecure_skip_verify_bool"`
 
-	ClientId        string `json:"client_id"`
-	ClientIdEnv     string `json:"client_id_env"`
-	ClientSecret    string `json:"client_secret"`
-	ClientSecretEnv string `json:"client_secret_env"`
+	CABundle     string `json:"ca_bundle"`
+	CABundleFile string `json:"ca_bundle_file"`
 
-	UsePkce bool `json:"use_pkce"`
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
 
-	ValidateAudience bool   `json:"validate_audience"`
-	ValidAudience    string `json:"valid_audience"`
-	ValidAudienceEnv string `json:"valid_audience_env"`
+	UsePkce     string `json:"use_pkce"`
+	UsePkceBool bool   `json:"use_pkce_bool"`
 
-	ValidateIssuer bool   `json:"validate_issuer"`
-	ValidIssuer    string `json:"valid_issuer"`
-	ValidIssuerEnv string `json:"valid_issuer_env"`
+	ValidateAudience     string `json:"validate_audience"`
+	ValidateAudienceBool bool   `json:"validate_audience_bool"`
+	ValidAudience        string `json:"valid_audience"`
+
+	ValidateIssuer     string `json:"validate_issuer"`
+	ValidateIssuerBool bool   `json:"validate_issuer_bool"`
+	ValidIssuer        string `json:"valid_issuer"`
 
 	// AccessToken or IdToken or Introspection
 	TokenValidation string `json:"verification_token"`
@@ -125,8 +123,10 @@ func CreateConfig() *Config {
 		LogLevel: logging.LevelWarn,
 		Secret:   DefaultSecret,
 		Provider: &ProviderConfig{
-			ValidateIssuer:   true,
-			ValidateAudience: true,
+			UsePkceBool:            false,
+			InsecureSkipVerifyBool: false,
+			ValidateIssuerBool:     true,
+			ValidateAudienceBool:   true,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
@@ -152,6 +152,8 @@ func CreateConfig() *Config {
 
 // Will be called by traefik
 func New(uctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	config.LogLevel = utils.ExpandEnvironmentVariableString(config.LogLevel)
+
 	logger := logging.CreateLogger(config.LogLevel)
 
 	logger.Log(logging.LevelInfo, "Loading Configuration...")
@@ -167,27 +169,42 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		}, nil
 	}
 
-	if (config.Secret == "" || config.Secret == DefaultSecret) && config.SecretEnv != "" {
-		config.Secret = os.Getenv(config.SecretEnv)
+	var err error
+
+	config.Secret = utils.ExpandEnvironmentVariableString(config.Secret)
+	config.CallbackUri = utils.ExpandEnvironmentVariableString(config.CallbackUri)
+	config.LoginUri = utils.ExpandEnvironmentVariableString(config.LoginUri)
+	config.PostLoginRedirectUri = utils.ExpandEnvironmentVariableString(config.PostLoginRedirectUri)
+	config.LogoutUri = utils.ExpandEnvironmentVariableString(config.LogoutUri)
+	config.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(config.PostLogoutRedirectUri)
+	config.CookieNamePrefix = utils.ExpandEnvironmentVariableString(config.CookieNamePrefix)
+	config.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(config.UnauthorizedBehavior)
+	config.BypassAuthenticationRule = utils.ExpandEnvironmentVariableString(config.BypassAuthenticationRule)
+	config.Provider.Url = utils.ExpandEnvironmentVariableString(config.Provider.Url)
+	config.Provider.ClientId = utils.ExpandEnvironmentVariableString(config.Provider.ClientId)
+	config.Provider.ClientSecret = utils.ExpandEnvironmentVariableString(config.Provider.ClientSecret)
+	config.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UsePkce, config.Provider.UsePkceBool)
+	if err != nil {
+		return nil, err
 	}
-	if config.Provider.Url == "" && config.Provider.UrlEnv != "" {
-		config.Provider.Url = os.Getenv(config.Provider.UrlEnv)
+	config.Provider.ValidateIssuerBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.ValidateIssuer, config.Provider.ValidateIssuerBool)
+	if err != nil {
+		return nil, err
 	}
-	if config.Provider.ClientId == "" && config.Provider.ClientIdEnv != "" {
-		config.Provider.ClientId = os.Getenv(config.Provider.ClientIdEnv)
+	config.Provider.ValidIssuer = utils.ExpandEnvironmentVariableString(config.Provider.ValidIssuer)
+	config.Provider.ValidateAudienceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.ValidateAudience, config.Provider.ValidateAudienceBool)
+	if err != nil {
+		return nil, err
 	}
-	if config.Provider.ClientSecret == "" && config.Provider.ClientSecretEnv != "" {
-		config.Provider.ClientSecret = os.Getenv(config.Provider.ClientSecretEnv)
+	config.Provider.ValidAudience = utils.ExpandEnvironmentVariableString(config.Provider.ValidAudience)
+	config.Provider.InsecureSkipVerifyBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.InsecureSkipVerify, config.Provider.InsecureSkipVerifyBool)
+	if err != nil {
+		return nil, err
 	}
-	if config.Provider.ValidIssuer == "" && config.Provider.ValidIssuerEnv != "" {
-		config.Provider.ValidIssuer = os.Getenv(config.Provider.ValidIssuerEnv)
-	}
-	if config.Provider.ValidAudience == "" && config.Provider.ValidAudienceEnv != "" {
-		config.Provider.ValidAudience = os.Getenv(config.Provider.ValidAudienceEnv)
-	}
-	if config.Provider.CABundleFile == "" && config.Provider.CABundleFileEnv != "" {
-		config.Provider.CABundleFile = os.Getenv(config.Provider.CABundleFileEnv)
-	}
+
+	config.Provider.CABundle = utils.ExpandEnvironmentVariableString(config.Provider.CABundle)
+	config.Provider.CABundleFile = utils.ExpandEnvironmentVariableString(config.Provider.CABundleFile)
+	config.Provider.TokenValidation = utils.ExpandEnvironmentVariableString(config.Provider.TokenValidation)
 
 	if config.Secret == DefaultSecret {
 		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
@@ -292,7 +309,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		// MaxIdleConns:    10,
 		// IdleConnTimeout: 30 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.Provider.InsecureSkipVerify,
+			InsecureSkipVerify: config.Provider.InsecureSkipVerifyBool,
 			RootCAs:            rootCAs,
 		},
 	}
