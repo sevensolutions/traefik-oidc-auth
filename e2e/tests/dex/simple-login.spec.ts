@@ -420,6 +420,146 @@ http:
   expect(response?.url()).toMatch(/http:\/\/localhost:5556\/dex\/auth.*/);
 });
 
+test("external authentication", async ({ page }) => {
+  await configureTraefik(`
+    http:
+      services:
+        whoami:
+          loadBalancer:
+            servers:
+              - url: http://whoami:80
+    
+      middlewares:
+        oidc-auth:
+          plugin:
+            traefik-oidc-auth:
+              LogLevel: DEBUG
+              Provider:
+                Url: "\${PROVIDER_URL_HTTP}"
+                ClientId: "\${CLIENT_ID}"
+                ClientSecret: "\${CLIENT_SECRET}"
+                UsePkce: false
+              AuthorizationHeader:
+                Name: "CustomAuth"
+              AuthorizationCookie:
+                Name: "CustomAuth"
+              UnauthorizedBehavior: "Unauthorized"
+    
+      routers:
+        whoami:
+          entryPoints: ["web"]
+          rule: "HostRegexp(\`.+\`)"
+          service: whoami
+          middlewares: ["oidc-auth@file"]
+  `);
+
+  const token = await loginAndGetToken(page, "admin@example.com", "password");
+
+  const response1 = await fetch("http://localhost:9080", {
+    method: "GET"
+  });
+
+  expect(response1.status).toBe(401);
+
+  const response2 = await fetch("http://localhost:9080", {
+    method: "GET",
+    "headers": {
+      CustomAuth: token
+    }
+  });
+
+  expect(response2.status).toBe(200);
+
+  const response3 = await fetch("http://localhost:9080", {
+    method: "GET",
+    "headers": {
+      CustomAuth: "wrong value"
+    }
+  });
+
+  expect(response3.status).toBe(401);
+
+  const response4 = await fetch("http://localhost:9080", {
+    method: "GET",
+    "headers": {
+      Cookie: `CustomAuth=${token}`
+    }
+  });
+
+  expect(response4.status).toBe(200);
+
+  const response5 = await fetch("http://localhost:9080", {
+    method: "GET",
+    "headers": {
+      Cookie: `CustomAuth=wrong-value`
+    }
+  });
+
+  expect(response5.status).toBe(401);
+});
+
+test("external authentication with authorization rules", async ({ page }) => {
+  await configureTraefik(`
+    http:
+      services:
+        whoami:
+          loadBalancer:
+            servers:
+              - url: http://whoami:80
+    
+      middlewares:
+        oidc-auth:
+          plugin:
+            traefik-oidc-auth:
+              LogLevel: DEBUG
+              Provider:
+                Url: "\${PROVIDER_URL_HTTP}"
+                ClientId: "\${CLIENT_ID}"
+                ClientSecret: "\${CLIENT_SECRET}"
+                UsePkce: false
+              AuthorizationHeader:
+                Name: "CustomAuth"
+              UnauthorizedBehavior: "Unauthorized"
+              Authorization:
+                AssertClaims:
+                  - Name: name
+                    AnyOf: ["admin", "alice"]
+    
+      routers:
+        whoami:
+          entryPoints: ["web"]
+          rule: "HostRegexp(\`.+\`)"
+          service: whoami
+          middlewares: ["oidc-auth@file"]
+  `);
+
+  const aliceToken = await loginAndGetToken(page, "alice@example.com", "password");
+
+  const response1 = await fetch("http://localhost:9080", {
+    method: "GET",
+    "headers": {
+      CustomAuth: aliceToken
+    }
+  });
+
+  // Alice should be authorized, based on AssertClaims
+  expect(response1.status).toBe(200);
+
+  const bobToken = await loginAndGetToken(page, "bob@example.com", "password");
+
+  const response2 = await fetch("http://localhost:9080", {
+    method: "GET",
+    "headers": {
+      CustomAuth: bobToken
+    }
+  });
+
+  // but bob should not be authorized
+  expect(response2.status).toBe(401);
+});
+
+
+
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------
@@ -442,4 +582,38 @@ async function login(page: Page, username: string, password: string, waitForUrl:
 async function expectGotoOkay(page: Page, url: string) {
   const response = await page.goto(url); // follows redirects
   expect(response?.status()).toBe(200);
+}
+
+async function loginAndGetToken(page: Page, username: string, password: string): Promise<string> {
+  // This method is a bit hacky but i don't know a better way jet.
+  // It intercepts the auth code and then exchanges it for a token.
+  page.goto("http://localhost:5556/dex/auth?client_id=traefik&redirect_uri=http%3A%2F%2Flocalhost%3A9080%2Foidc%2Fcallback&response_type=code&scope=openid+profile+email&state=MTIz")
+
+  const response = await login(page, username, password, "http://localhost:9080/oidc/callback*");
+
+  const url = response.url();
+  
+  const p1 = url.indexOf("code=") + 5;
+  const p2 = url.indexOf("state=", p1) - 1;
+
+  const code = url.substring(p1, p2);
+  
+  const tokenResponse = await fetch("http://localhost:5556/dex/token", {
+    method: "POST",
+    headers:{
+      "Content-Type": "application/x-www-form-urlencoded"
+    },    
+    body: new URLSearchParams({
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": "traefik",
+        "client_secret": "ZXhhbXBsZS1hcHAtc2VjcmV0",
+        "scope": "openid profile email",
+        "redirect_uri": "http://localhost:9080/oidc/callback",
+        "state": "MTIz"
+    })
+  });
+
+  const tokens = await tokenResponse.json();
+  return tokens.access_token;
 }
