@@ -308,6 +308,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	httpTransport := &http.Transport{
 		// MaxIdleConns:    10,
 		// IdleConnTimeout: 30 * time.Second,
+		Proxy: http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: config.Provider.InsecureSkipVerifyBool,
 			RootCAs:            rootCAs,
