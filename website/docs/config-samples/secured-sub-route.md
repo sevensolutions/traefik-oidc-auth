@@ -21,9 +21,9 @@ http:
           LogLevel: DEBUG
           Secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
           Provider:
-            UrlEnv: "PROVIDER_URL"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "${PROVIDER_URL}"
+            ClientId: "${CLIENT_ID}"
+            ClientSecret: "${CLIENT_SECRET}"
           SessionCookie:
             Path: "/secure" # Optional. If set, the cookie will only be sent to the /secure path.
           

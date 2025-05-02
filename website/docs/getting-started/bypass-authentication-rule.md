@@ -18,9 +18,9 @@ http:
       plugin:
         traefik-oidc-auth:
           Provider:
-            UrlEnv: "PROVIDER_URL"
-            ClientIdEnv: "CLIENT_ID"
-            ClientSecretEnv: "CLIENT_SECRET"
+            Url: "${PROVIDER_URL}"
+            ClientId: "${CLIENT_ID}"
+            ClientSecret: "${CLIENT_SECRET}"
           // highlight-next-line
           BypassAuthenticationRule: "PathPrefix(`/public`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
 ```
