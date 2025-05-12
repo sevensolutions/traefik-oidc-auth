@@ -7,7 +7,7 @@ sidebar_position: 3
 ## Plugin Config Block
 
 :::caution
-It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
 :::
 
@@ -49,7 +49,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | `Url`* | yes | `string` | *none* | The full URL of the Identity Provider. |
-| `InsecureSkipVerify`* | no | `bool` | `false` | Disables SSL certificate verification of your provider. It's highly reccomended to provide the real CA bundle via `CABundleFile` instead. So this option should only be used for quick testing. |
+| `InsecureSkipVerify`* | no | `bool` | `false` | Disables SSL certificate verification of your provider. It's highly recommended to provide the real CA bundle via `CABundleFile` instead. So this option should only be used for quick testing. |
 | `CABundle`* | no | `string` | *none* | An optional CA certificate bundle provided as a raw string in case you're using self-signed certificates for the provider. Please note that the string needs to represent a valid certificate, including new-lines. In case you cannot provide a multi-line argument you can base64-encode the bundle and provide it with the `base64:` prefix. Eg.: `base64:<your-base64-encoded-bundle>`. |
 | `CABundleFile`* | no | `string` | *none* | Specifies the path to an optional CA certificate bundle in case you're using self-signed certificates for the provider. If you're using Docker, make sure the file is mounted into the traefik container. |
 | `ClientId`* | yes | `string` | *none* | The client id of the application. |

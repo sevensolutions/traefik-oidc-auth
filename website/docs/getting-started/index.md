@@ -22,7 +22,7 @@ experimental:
 ## Configure Middleware
 
 :::caution
-It is highly reccomnded to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
+It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
 :::
 
