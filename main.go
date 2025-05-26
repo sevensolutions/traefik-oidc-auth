@@ -146,10 +146,13 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		// If this request is using external authentication by using a header or custom cookie,
 		// we need to validate the authorization on every request.
 		if session.Id == "AuthorizationHeader" || session.Id == "AuthorizationCookie" {
-			if !isAuthorized(toa.logger, toa.Config.Authorization, claims) {
-				toa.handleUnauthorized(rw, req)
-				return
-			}
+			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
+		}
+
+		// Ensure the session is authorized
+		if !session.IsAuthorized {
+			toa.handleUnauthorized(rw, req, false)
+			return
 		}
 
 		// Attach upstream headers
@@ -175,7 +178,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	// Clear the session cookie
 	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
-	toa.handleUnauthorized(rw, req)
+	toa.handleUnauthorized(rw, req, true)
 }
 
 func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
@@ -299,16 +302,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		toa.logger.Log(logging.LevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
-		if !isAuthorized(toa.logger, toa.Config.Authorization, claims) {
-			http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
+		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
 
 		session := &session.SessionState{
 			Id:           session.GenerateSessionId(),
 			AccessToken:  token.AccessToken,
 			IdToken:      token.IdToken,
 			RefreshToken: token.RefreshToken,
+			IsAuthorized: isAuthorized,
 		}
 
 		toa.storeSessionAndAttachCookie(session, rw)
@@ -329,6 +330,11 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
 		} else {
 			redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
+		}
+
+		if !isAuthorized {
+			toa.handleUnauthorized(rw, req, false)
+			return
 		}
 
 	} else if state.Action == "Logout" {
@@ -386,8 +392,8 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
-	if toa.Config.UnauthorizedBehavior == "Challenge" {
+func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, allowChallenge bool) {
+	if allowChallenge && toa.Config.UnauthorizedBehavior == "Challenge" {
 		toa.redirectToProvider(rw, req)
 	} else {
 		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
