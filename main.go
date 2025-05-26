@@ -151,7 +151,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 		// Ensure the session is authorized
 		if !session.IsAuthorized {
-			toa.handleUnauthorized(rw, req, false)
+			toa.handleUnauthorized(rw, req)
 			return
 		}
 
@@ -178,7 +178,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	// Clear the session cookie
 	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
-	toa.handleUnauthorized(rw, req, true)
+	toa.handleUnauthenticated(rw, req)
 }
 
 func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
@@ -333,7 +333,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		if !isAuthorized {
-			toa.handleUnauthorized(rw, req, false)
+			toa.handleUnauthorized(rw, req)
 			return
 		}
 
@@ -392,12 +392,17 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
 
-func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, allowChallenge bool) {
-	if allowChallenge && toa.Config.UnauthorizedBehavior == "Challenge" {
+func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *http.Request) {
+	if toa.Config.UnauthorizedBehavior == "Challenge" {
 		toa.redirectToProvider(rw, req)
 	} else {
 		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 	}
+}
+
+func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
+	// TODO: Should be changed to "Forbidden" to be correct
+	http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
