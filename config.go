@@ -213,6 +213,11 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.CABundleFile = utils.ExpandEnvironmentVariableString(config.Provider.CABundleFile)
 	config.Provider.TokenValidation = utils.ExpandEnvironmentVariableString(config.Provider.TokenValidation)
 
+	config.ErrorPages.Unauthenticated.FilePath = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthenticated.FilePath)
+	config.ErrorPages.Unauthenticated.RedirectTo = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthenticated.RedirectTo)
+	config.ErrorPages.Unauthorized.FilePath = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthorized.FilePath)
+	config.ErrorPages.Unauthorized.RedirectTo = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthorized.RedirectTo)
+
 	if config.Secret == DefaultSecret {
 		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
 	}
