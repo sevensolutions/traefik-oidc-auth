@@ -276,7 +276,7 @@ http:
 
   const response = await login(page, "bob@example.com", "password", "http://localhost:9080/oidc/callback**");
 
-  expect(response.status()).toBe(401);
+  expect(response.status()).toBe(403);
 });
 
 test("login at provider via self signed certificate from file", async ({ page }) => {
@@ -555,7 +555,7 @@ test("external authentication with authorization rules", async ({ page }) => {
   });
 
   // but bob should not be authorized
-  expect(response2.status).toBe(401);
+  expect(response2.status).toBe(403);
 });
 
 
