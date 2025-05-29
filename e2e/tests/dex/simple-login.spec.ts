@@ -277,6 +277,8 @@ http:
   const response = await login(page, "bob@example.com", "password", "http://localhost:9080/oidc/callback**");
 
   expect(response.status()).toBe(403);
+
+  expect(await response.text()).toContain("It seems like your account is not allowed to access this resource.");
 });
 
 test("login at provider via self signed certificate from file", async ({ page }) => {
@@ -558,7 +560,92 @@ test("external authentication with authorization rules", async ({ page }) => {
   expect(response2.status).toBe(403);
 });
 
+test("test authorization custom error page", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
 
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["admin@example.com", "alice@example.com"]
+          ErrorPages:
+            Unauthorized:
+              FilePath: "/data/customUnauthorizedPage.html"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await expectGotoOkay(page, "http://localhost:9080");
+
+  const response = await login(page, "bob@example.com", "password", "http://localhost:9080/oidc/callback**");
+
+  expect(response.status()).toBe(403);
+
+  expect(await response.text()).toContain("CUSTOM ERROR PAGE");
+});
+
+test("test authorization error redirect", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["admin@example.com", "alice@example.com"]
+          ErrorPages:
+            Unauthorized:
+              RedirectTo: "https://httpbin.org/unauthorized"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await expectGotoOkay(page, "http://localhost:9080");
+
+  const response = await login(page, "bob@example.com", "password", "http://localhost:9080/oidc/callback**");
+
+  expect(response.status()).toBe(302);
+  expect(await response.headerValue("Location")).toBe("https://httpbin.org/unauthorized");
+});
 
 //-----------------------------------------------------------------------------
 // Helper functions

@@ -18,6 +18,11 @@ type ProblemDetails struct {
 }
 
 func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseWriter, req *http.Request, data map[string]interface{}) {
+	if page.RedirectTo != "" {
+		http.Redirect(rw, req, page.RedirectTo, http.StatusFound)
+		return
+	}
+
 	acceptHeader := req.Header.Get("Accept")
 
 	if strings.HasPrefix(acceptHeader, "application/json") {
@@ -66,7 +71,7 @@ func renderPage(logger *logging.Logger, page *ErrorPageConfig, evalContext map[s
       display: flex;
       justify-content: center;
       align-items: center;
-      font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif
     }
     h1 {
       all: unset;
@@ -104,10 +109,22 @@ func renderPage(logger *logging.Logger, page *ErrorPageConfig, evalContext map[s
       cursor: pointer;
       padding: 1em;
       border-radius: 0.25em;
+      min-width: 5em;
+      text-align: center;
     }
     .button-secondary {
       all: unset;
       color: orange;
+      cursor: pointer;
+    }
+    .footer {
+      position: absolute;
+      bottom: 2em;
+      color: #aaa;
+      font-weight: 100;
+    }
+    .footer a {
+      all: unset;
       cursor: pointer;
     }
   </style>
@@ -126,6 +143,10 @@ func renderPage(logger *logging.Logger, page *ErrorPageConfig, evalContext map[s
       {{ if .secondaryButtonUrl }}
       <a href="{{ .secondaryButtonUrl }}" class="button-secondary">{{ .secondaryButtonText }}</a>
       {{ end }}
+    </div>
+
+    <div class="footer">
+      <a href="https://traefik-oidc-auth.sevensolutions.cc/" target="_blank">Powered by traefik-oidc-auth</a>
     </div>
   </div>
 </body>
