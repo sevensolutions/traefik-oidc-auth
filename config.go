@@ -151,7 +151,8 @@ func CreateConfig() *Config {
 		UnauthorizedBehavior: "Challenge",
 		Authorization:        &AuthorizationConfig{},
 		ErrorPages: &errorPages.ErrorPagesConfig{
-			Unauthorized: &errorPages.ErrorPageConfig{},
+			Unauthenticated: &errorPages.ErrorPageConfig{},
+			Unauthorized:    &errorPages.ErrorPageConfig{},
 		},
 	}
 }

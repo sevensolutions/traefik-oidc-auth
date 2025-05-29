@@ -120,10 +120,12 @@ func renderPage(logger *logging.Logger, page *ErrorPageConfig, evalContext map[s
     <h2>{{ .description }}</h2>
     
     <div class="button-container">
-      {{ if .loginUrl }}
-      <a href="{{ .loginUrl }}" class="button-primary">Login with a different account</a>
+      {{ if .primaryButtonUrl }}
+      <a href="{{ .primaryButtonUrl }}" class="button-primary">{{ .primaryButtonText }}</a>
       {{ end }}
-      <a href="{{ .logoutUrl }}" class="button-secondary">Logout</a>
+      {{ if .secondaryButtonUrl }}
+      <a href="{{ .secondaryButtonUrl }}" class="button-secondary">{{ .secondaryButtonText }}</a>
+      {{ end }}
     </div>
   </div>
 </body>

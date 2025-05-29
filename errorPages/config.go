@@ -1,7 +1,8 @@
 package errorPages
 
 type ErrorPagesConfig struct {
-	Unauthorized *ErrorPageConfig `json:"unauthorized"`
+	Unauthenticated *ErrorPageConfig `json:"unauthenticated"`
+	Unauthorized    *ErrorPageConfig `json:"unauthorized"`
 }
 
 type ErrorPageConfig struct {
