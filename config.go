@@ -12,6 +12,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/sevensolutions/traefik-oidc-auth/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/rules"
 	"github.com/sevensolutions/traefik-oidc-auth/session"
@@ -53,7 +54,9 @@ type Config struct {
 
 	Headers []HeaderConfig `json:"headers"`
 
-	BypassAuthenticationRule string
+	BypassAuthenticationRule string `json:"bypass_authentication_rule"`
+
+	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
 }
 
 type ProviderConfig struct {
@@ -147,6 +150,9 @@ func CreateConfig() *Config {
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Challenge",
 		Authorization:        &AuthorizationConfig{},
+		ErrorPages: &errorPages.ErrorPagesConfig{
+			Unauthorized: &errorPages.ErrorPageConfig{},
+		},
 	}
 }
 
