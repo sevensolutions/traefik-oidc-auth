@@ -23,3 +23,33 @@ func TestChunkString(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestEncryptDecryptRoundtrip(t *testing.T) {
+	secret := "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+	originalText := "hello"
+
+	encrypted, err := Encrypt(originalText, secret)
+	if err != nil {
+		t.Fail()
+	}
+
+	decrypted, err := Decrypt(encrypted, secret)
+	if err != nil {
+		t.Fail()
+	}
+
+	if decrypted != originalText {
+		t.Fail()
+	}
+}
+
+func TestDecryptEmptyString(t *testing.T) {
+	secret := "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+
+	_, err := Decrypt("", secret)
+
+	// Must return an error
+	if err == nil {
+		t.Fail()
+	}
+}
