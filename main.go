@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/rules"
 
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
@@ -396,13 +397,39 @@ func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *h
 	if toa.Config.UnauthorizedBehavior == "Challenge" {
 		toa.redirectToProvider(rw, req)
 	} else {
-		http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		data := make(map[string]interface{})
+
+		data["statusType"] = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
+		data["statusCode"] = http.StatusUnauthorized
+		data["statusName"] = "Unauthorized"
+		data["description"] = "You're not authorized to access this resource. Please log in to continue."
+
+		if toa.Config.LoginUri != "" {
+			data["primaryButtonText"] = "Login"
+			data["primaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LoginUri)
+		}
+
+		errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
 	}
 }
 
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
-	// TODO: Should be changed to "Forbidden" to be correct
-	http.Error(rw, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+	data := make(map[string]interface{})
+
+	data["statusType"] = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
+	data["statusCode"] = http.StatusForbidden
+	data["statusName"] = "Forbidden"
+	data["description"] = "It seems like your account is not allowed to access this resource.\nTry to log in using a different account or log out by using one of the options below."
+
+	if toa.Config.LoginUri != "" {
+		data["primaryButtonText"] = "Login with a different account"
+		data["primaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LoginUri) + "?prompt=login"
+	}
+
+	data["secondaryButtonText"] = "Logout"
+	data["secondaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LogoutUri)
+
+	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthorized, rw, req, data)
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
@@ -450,6 +477,10 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
 		"state":         {stateBase64},
+	}
+
+	if prompt := req.URL.Query().Get("prompt"); prompt != "" {
+		urlValues.Add("prompt", prompt)
 	}
 
 	if toa.Config.Provider.UsePkceBool {

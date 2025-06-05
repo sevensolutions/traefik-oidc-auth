@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{ .statusName }}</title>
+  <style>
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif
+    }
+    h1 {
+      all: unset;
+      text-align: center;
+      font-size: 3em;
+      font-weight: bold;
+      margin-bottom: 0.5em;
+    }
+    h2 {
+      all: unset;
+      text-align: center;
+      white-space: break-spaces;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .error-code {
+      color: purple;
+      font-size: 1.5em;
+    }
+    .button-container {
+      margin-top: 3em;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 2em;
+    }
+    .button-primary {
+      all: unset;
+      background-color: purple;
+      color: white;
+      cursor: pointer;
+      padding: 1em;
+      border-radius: 0.25em;
+    }
+    .button-secondary {
+      all: unset;
+      color: purple;
+      cursor: pointer;
+    }
+    .footer {
+      position: absolute;
+      bottom: 2em;
+      color: #aaa;
+      font-weight: 100;
+    }
+    .footer a {
+      all: unset;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <span>CUSTOM ERROR PAGE</span>
+    <span class="error-code">{{ .statusCode }}</span>
+    <h1>{{ .statusName }}</h1>
+    <h2>{{ .description }}</h2>
+    
+    <div class="button-container">
+      {{ if .primaryButtonUrl }}
+      <a href="{{ .primaryButtonUrl }}" class="button-primary">{{ .primaryButtonText }}</a>
+      {{ end }}
+      {{ if .secondaryButtonUrl }}
+      <a href="{{ .secondaryButtonUrl }}" class="button-secondary">{{ .secondaryButtonText }}</a>
+      {{ end }}
+    </div>
+
+    <div class="footer">
+      <a href="https://traefik-oidc-auth.sevensolutions.cc/" target="_blank">Powered by traefik-oidc-auth</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -35,14 +35,16 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `PostLoginRedirectUri`* | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | `LogoutUri`* | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | `PostLogoutRedirectUri`* | no | `string` | `/` | The url where the user should be redirected after logout. |
-| `CookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookieConfig* where the name can be set individually. |
-| `SessionCookie` | no | [`SessionCookieConfig`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
-| `AuthorizationHeader` | no | [`AuthorizationHeaderConfig`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeaderConfig* block. |
-| `AuthorizationCookie` | no | [`AuthorizationCookieConfig`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookieConfig* block. |
+| `CookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookie* where the name can be set individually. |
+| `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
+| `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
+| `AuthorizationCookie` | no | [`AuthorizationCookie`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookie* block. |
 | `UnauthorizedBehavior`* | no | `string` | `Challenge` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, whereas `Unauthorized` will simply return a 401 status response. |
 | `Authorization` | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
 | `Headers` | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 | `BypassAuthenticationRule`* | no | `string` | *none* | Specifies an optional rule to bypass authentication. See [Bypass Authentication Rule](./bypass-authentication-rule.md) for more details. |
+| `ErrorPages` | no | [`ErrorPages`](#error-pages) | *none* | Allows you to customize some error pages. See *ErrorPages* block. |
+
 
 ## Provider Block {#provider}
 
@@ -61,7 +63,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `ValidAudience`* | no | `string` | *ClientId* | The audience which must be present in the JWT-token. Defaults to the configured client id. |
 | `TokenValidation`* | no | `string` | `AccessToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. When using Microsoft EntraID, this will automatically default to `IdToken`. `Introspection` may not work when using PKCE. |
 
-## SessionCookieConfig Block {#session-cookie}
+## SessionCookie Block {#session-cookie}
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
@@ -72,7 +74,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `SameSite` | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
 | `MaxAge` | no | `int` | `0` | Cookie time-to-live in seconds.  0 (default) is a ephemeral session cookie. |
 
-## AuthorizationHeaderConfig Block {#authorization-header}
+## AuthorizationHeader Block {#authorization-header}
 
 By specifying this configuration, a request can send an externally generated access token via this header to authenticate the request.
 In this case no session will be created by the middleware. You may also want to set `UnauthorizedBehavior` to `Unauthorized`.
@@ -81,9 +83,9 @@ In this case no session will be created by the middleware. You may also want to 
 |---|---|---|---|---|
 | `Name` | no | `string` | *none* | The name of the header. |
 
-## AuthorizationCookieConfig Block {#authorization-cookie}
+## AuthorizationCookie Block {#authorization-cookie}
 
-This works exactly the same as [AuthorizationHeaderConfig](#authorization-header), but using a cookie instead of a header. You can also use both.
+This works exactly the same as [AuthorizationHeader](#authorization-header), but using a cookie instead of a header. You can also use both.
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
@@ -229,3 +231,17 @@ Headers:
     Value: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js $g}}"{{end}}{{end}}]'
 ```
 :::
+
+## ErrorPages Block {#error-pages}
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `Unauthenticated` | no | [`ErrorPage`](#error-page) | *none* | Configures the page or behavior when the user is not authenticated. |
+| `Unauthorized` | no | [`ErrorPage`](#error-page) | *none* | Configures the page or behavior when the user is not authorized. |
+
+## ErrorPage Block {#error-page}
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `FilePath`* | no | `string` | *none* | Specifies the path to a local html file which should be served. If this is not set, the default page is shown. This html file needs to be self-contained which means all CSS and JS should be inlined. |
+| `RedirectTo`* | no | `string` | *none* | If this is set to a URL, the user is redirected to this page in case of an error, instead of showing an error page. |
