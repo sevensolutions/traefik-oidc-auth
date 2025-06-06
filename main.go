@@ -365,10 +365,22 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	callbackUri := toa.GetAbsoluteCallbackURL(req).String()
 	redirectUri := utils.EnsureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
-	if req.URL.Query().Get("redirect_uri") != "" {
-		redirectUri = utils.EnsureAbsoluteUrl(req, req.URL.Query().Get("redirect_uri"))
-	} else if req.URL.Query().Get("post_logout_redirect_uri") != "" {
-		redirectUri = utils.EnsureAbsoluteUrl(req, req.URL.Query().Get("post_logout_redirect_uri"))
+	redirectUriFromQuery := req.URL.Query().Get("redirect_uri")
+	if redirectUriFromQuery == "" {
+		redirectUriFromQuery = req.URL.Query().Get("post_logout_redirect_uri")
+	}
+
+	if redirectUriFromQuery != "" {
+		redirectUriFromQuery, err = utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris)
+		if err != nil {
+			toa.logger.Log(logging.LevelError, "%s", err.Error())
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if redirectUriFromQuery != "" {
+			redirectUri = utils.EnsureAbsoluteUrl(req, redirectUriFromQuery)
+		}
 	}
 
 	state := &oidc.OidcState{
@@ -438,8 +450,15 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 	var redirectUrl string
 
 	// If the user specified one on the /login request, use this one
-	if redirectUrlFromQuery := req.URL.Query().Get("redirect_uri"); toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUrlFromQuery != "" {
-		redirectUrl = redirectUrlFromQuery
+	redirectUriFromQuery, err := utils.ValidateRedirectUri(req.URL.Query().Get("redirect_uri"), toa.Config.ValidPostLoginRedirectUris)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "%s", err.Error())
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if toa.Config.LoginUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.LoginUri) && redirectUriFromQuery != "" {
+		redirectUrl = redirectUriFromQuery
 	} else if toa.Config.PostLoginRedirectUri != "" {
 		redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLoginRedirectUri)
 	} else {

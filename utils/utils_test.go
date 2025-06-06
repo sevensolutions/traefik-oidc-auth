@@ -53,3 +53,33 @@ func TestDecryptEmptyString(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestValidateRedirectUri(t *testing.T) {
+	validUris := []string{
+		"/",
+		"https://example.com",
+		"https://something.com",
+	}
+
+	// Should succeed
+	uri, err := ValidateRedirectUri("https://example.com", validUris)
+
+	if err != nil {
+		t.Fail()
+	}
+
+	if uri != "https://example.com" {
+		t.Fail()
+	}
+
+	// Should fail
+	uri, err = ValidateRedirectUri("https://malicious.com", validUris)
+
+	if err == nil {
+		t.Fail()
+	}
+
+	if uri != "" {
+		t.Fail()
+	}
+}

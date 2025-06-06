@@ -222,3 +222,19 @@ func ChunkString(input string, chunkSize int) []string {
 
 	return chunks
 }
+
+func ValidateRedirectUri(redirectUri string, validUris []string) (string, error) {
+	if redirectUri == "" {
+		return "", nil
+	}
+
+	if validUris != nil && len(validUris) > 0 {
+		for _, validUri := range validUris {
+			if redirectUri == validUri {
+				return validUri, nil
+			}
+		}
+	}
+
+	return "", errors.New("invalid redirect uri")
+}
