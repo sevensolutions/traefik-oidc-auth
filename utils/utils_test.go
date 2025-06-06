@@ -61,25 +61,43 @@ func TestValidateRedirectUri(t *testing.T) {
 		"https://something.com",
 	}
 
-	// Should succeed
-	uri, err := ValidateRedirectUri("https://example.com", validUris)
+	expectRedirectUriMatch(t, "https://example.com", validUris, true)
+	expectRedirectUriMatch(t, "https://malicious.com", validUris, false)
+}
 
-	if err != nil {
+func TestValidateRedirectUriWildcards(t *testing.T) {
+	validUris := []string{
+		"/",
+		"https://example.com",
+		"https://something.com",
+		"*",
+	}
+
+	expectRedirectUriMatch(t, "https://malicious.com", validUris, true)
+
+	validUris = []string{
+		"https://example.com",
+		"https://*.something.com",
+		"https://*.something.com/good",
+		"https://*.something.com/good/*",
+	}
+
+	expectRedirectUriMatch(t, "https://app.something.com", validUris, true)
+	expectRedirectUriMatch(t, "https://app.sub.something.com", validUris, false)
+	expectRedirectUriMatch(t, "https://app.something.com/login", validUris, false)
+	expectRedirectUriMatch(t, "https://app.something.com/good", validUris, true)
+	expectRedirectUriMatch(t, "https://app.something.com/good/something", validUris, true)
+	expectRedirectUriMatch(t, "https://app.something.com/good/something/bad", validUris, false)
+}
+
+func expectRedirectUriMatch(t *testing.T, uri string, validUris []string, shouldMatch bool) {
+	matchedUri, err := ValidateRedirectUri(uri, validUris)
+
+	if (shouldMatch && err != nil) || (!shouldMatch && err == nil) {
 		t.Fail()
 	}
 
-	if uri != "https://example.com" {
-		t.Fail()
-	}
-
-	// Should fail
-	uri, err = ValidateRedirectUri("https://malicious.com", validUris)
-
-	if err == nil {
-		t.Fail()
-	}
-
-	if uri != "" {
+	if (shouldMatch && matchedUri != uri) || (!shouldMatch && matchedUri != "") {
 		t.Fail()
 	}
 }

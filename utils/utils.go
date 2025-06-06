@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -230,11 +231,37 @@ func ValidateRedirectUri(redirectUri string, validUris []string) (string, error)
 
 	if validUris != nil && len(validUris) > 0 {
 		for _, validUri := range validUris {
-			if redirectUri == validUri {
-				return validUri, nil
+			if matchUriTemplate(redirectUri, validUri) {
+				return redirectUri, nil
 			}
 		}
 	}
 
 	return "", errors.New("invalid redirect uri")
+}
+
+func matchUriTemplate(value string, template string) bool {
+	// Match exactly
+	if value == template {
+		return true
+	}
+
+	// Match all
+	if template == "*" {
+		return true
+	}
+
+	// Match wildcards
+	escapedTemplate := regexp.QuoteMeta(template)
+	escapedTemplate = strings.ReplaceAll(escapedTemplate, "\\*", "[a-zA-Z0-9-_]+")
+	escapedTemplate = fmt.Sprintf("^%s$", escapedTemplate)
+
+	regex, err := regexp.Compile(escapedTemplate)
+	if err != nil {
+		return false
+	}
+
+	result := regex.MatchString(value)
+
+	return result
 }
