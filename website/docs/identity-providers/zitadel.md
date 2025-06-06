@@ -137,3 +137,13 @@ http:
                 AnyOf: ["admin", "media"]
           # highlight-end
 ```
+
+## Map username into the access token
+
+Here is another commonly used script to map the username into the access token as `preferred_username`-claim.
+
+```js
+function addUsernameClaim(ctx, api) {
+  api.v1.claims.setClaim('preferred_username', ctx.v1.getUser().username);
+}
+```

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/sevensolutions/traefik-oidc-auth/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/rules"
 	"github.com/sevensolutions/traefik-oidc-auth/session"
@@ -53,7 +54,9 @@ type Config struct {
 
 	Headers []HeaderConfig `json:"headers"`
 
-	BypassAuthenticationRule string
+	BypassAuthenticationRule string `json:"bypass_authentication_rule"`
+
+	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
 }
 
 type ProviderConfig struct {
@@ -147,6 +150,10 @@ func CreateConfig() *Config {
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Challenge",
 		Authorization:        &AuthorizationConfig{},
+		ErrorPages: &errorPages.ErrorPagesConfig{
+			Unauthenticated: &errorPages.ErrorPageConfig{},
+			Unauthorized:    &errorPages.ErrorPageConfig{},
+		},
 	}
 }
 
@@ -205,6 +212,11 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.CABundle = utils.ExpandEnvironmentVariableString(config.Provider.CABundle)
 	config.Provider.CABundleFile = utils.ExpandEnvironmentVariableString(config.Provider.CABundleFile)
 	config.Provider.TokenValidation = utils.ExpandEnvironmentVariableString(config.Provider.TokenValidation)
+
+	config.ErrorPages.Unauthenticated.FilePath = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthenticated.FilePath)
+	config.ErrorPages.Unauthenticated.RedirectTo = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthenticated.RedirectTo)
+	config.ErrorPages.Unauthorized.FilePath = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthorized.FilePath)
+	config.ErrorPages.Unauthorized.RedirectTo = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthorized.RedirectTo)
 
 	if config.Secret == DefaultSecret {
 		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")

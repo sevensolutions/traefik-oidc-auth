@@ -19,7 +19,7 @@ To create or manage OAuth2 clients, you should use [kanidm client](https://kanid
    ```
 2. Update a scope map to be able to use the client within OpenID Connect (OIDC)
    ```shell
-   kanidm system oauth2 update-scope-map <client_id> <group_name> opened
+   kanidm system oauth2 update-scope-map <client_id> <group_name> openid
    ```
    You might also want to include other scopes here, e.g. `profile`, `email` or `groups`
    ```shell

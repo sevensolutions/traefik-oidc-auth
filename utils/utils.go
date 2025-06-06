@@ -175,6 +175,10 @@ func Encrypt(plaintext string, secret string) (string, error) {
 }
 
 func Decrypt(ciphertext string, secret string) (string, error) {
+	if ciphertext == "" {
+		return "", errors.New("ciphertext must not be an empty string")
+	}
+
 	cipherbytes, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return "", err
