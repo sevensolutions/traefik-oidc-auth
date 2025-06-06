@@ -66,6 +66,9 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 	if err != nil {
 		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
 	}
+	if sessionTicket == "" {
+		return nil, false, nil, fmt.Errorf("no session cookie is present")
+	}
 
 	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used.")
 
