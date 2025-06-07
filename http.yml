@@ -38,6 +38,8 @@ http:
           #       AnyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
           #LoginUri: "/login"
+          #ValidPostLoginRedirectUris: ["https://google.at"]
+          #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"
 
   routers:

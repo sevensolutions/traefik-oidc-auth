@@ -39,10 +39,12 @@ type Config struct {
 	// The URL used to start authorization when needed.
 	// All other requests that are not already authorized will return a 401 Unauthorized.
 	// When left empty, all requests can start authorization.
-	LoginUri              string `json:"login_uri"`
-	PostLoginRedirectUri  string `json:"post_login_redirect_uri"`
-	LogoutUri             string `json:"logout_uri"`
-	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
+	LoginUri                    string   `json:"login_uri"`
+	PostLoginRedirectUri        string   `json:"post_login_redirect_uri"`
+	ValidPostLoginRedirectUris  []string `json:"valid_post_login_redirect_uris"`
+	LogoutUri                   string   `json:"logout_uri"`
+	PostLogoutRedirectUri       string   `json:"post_logout_redirect_uri"`
+	ValidPostLogoutRedirectUris []string `json:"valid_post_logout_redirect_uris"`
 
 	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
 	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
