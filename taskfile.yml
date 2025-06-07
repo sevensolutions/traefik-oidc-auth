@@ -24,6 +24,12 @@ tasks:
     cmds:
       - docker compose up
 
+  run:website:
+    desc: 'Start the website in development mode'
+    dir: 'website'
+    cmds:
+      - npm start
+
   test:
     desc: 'Run all unit and end to end tests'
     deps:

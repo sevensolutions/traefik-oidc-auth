@@ -112,90 +112,14 @@ Additionaly, the `Name` field can be any [json path](https://jsonpath.com/). The
 
 It is possible to combine `AnyOf` and `AllOf` quantifiers for one assertion.
 
+:::tip
+Also see the [Authorization](./authorization.md) section for more details about how to use this feature.
+:::
+
 :::important
 Because the name is being interpreted as jsonpath, you may need to escape some names, if they contain special characters like a colon or minus.
 So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 :::
-
-:::tip
-If the user is not authorized, all claims, contained in the token, are printed in the console if DEBUG-logging of the plugin is enabled (See `LogLevel` at the top). This may help you to know which claims exist in your token.
-:::
-
-<details>
-  <summary>
-    <b>Examples</b>
-  </summary>
-  Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.
-  Please note that the actual claims depend on the identity provider you're using and sometimes you need to map them into the token explicitly.
-  You can also check out the [Identity Providers](../identity-providers/index.md) section or the documentation of your identity provider for more details.
-
-  ```yml
-  http:
-    middlewares:
-      oidc-auth:
-        plugin:
-          traefik-oidc-auth:
-            Provider:
-              Url: "https://your-instance.zitadel.cloud"
-              ClientId: "<YourClientId>"
-              UsePkce: true
-            Scopes: ["openid", "profile", "email"]
-            # highlight-start
-            Authorization:
-              AssertClaims:
-                - Name: roles
-                  AnyOf: ["admin", "media"]
-            # highlight-end
-  ```
-
-  Here are some more complex examples based on the following json structure:
-
-  ```json
-  {
-    "store": {
-      "bicycle": {
-        "color": "red",
-        "price": 19.95
-      },
-      "book": [
-        {
-          "author": "Herman Melville",
-          "category": "fiction",
-          "isbn": "0-553-21311-3",
-          "price": 8.99,
-          "title": "Moby Dick"
-        },
-        {
-          "author": "J. R. R. Tolkien",
-          "category": "fiction",
-          "isbn": "0-395-19395-8",
-          "price": 22.99,
-          "title": "The Lord of the Rings"
-        }
-      ],
-    }
-  }
-  ```
-
-  **Example**: Expect array to contain a set of values
-  ```yaml
-  Name: store.book[*].price
-  AllOf: [ 22.99, 8.99 ]
-  ```
-  This assertion would succeed as the `book` array contains all values specified by the `AllOf` quantifier
-  ```yaml
-  Name: store.book[*].price
-  AllOf: [ 22.99, 8.99, 1 ]
-  ```
-  This assertion would fail as the `book` array contains no entry for which the `price` is `1`
-
-  **Example**: Expect object key to be any value of a set of values
-  ```yaml
-  Name: store.bicycle.color
-  AnyOf: [ "red", "blue", "green" ]
-  ```
-  This assertion would succeed as the `store` object contains a `bicycle` object whose `color` is `red`
-</details>
 
 ## Header Block {#header}
 
@@ -245,5 +169,5 @@ Headers:
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| `FilePath`* | no | `string` | *none* | Specifies the path to a local html file which should be served. If this is not set, the default page is shown. This html file needs to be self-contained which means all CSS and JS should be inlined. |
+| `FilePath`* | no | `string` | *none* | Specifies the path to a local html file which should be served. If this is not set, the default page is shown. This html file needs to be self-contained which means all CSS and JS must be inlined. |
 | `RedirectTo`* | no | `string` | *none* | If this is set to a URL, the user is redirected to this page in case of an error, instead of showing an error page. |
