@@ -1,0 +1,31 @@
+services:
+  pocketId:
+    image: ghcr.io/pocket-id/pocket-id:v1.2.0
+    restart: unless-stopped
+    ports:
+      - 1411:1411
+    environment:
+      APP_URL: http://localhost:1411
+    volumes:
+      - "pocketId_data:/app/data"
+
+  traefik:
+    image: "traefik:v3.3.2"
+    ports:
+      - "9080:80"
+      - "8080:8080"
+    extra_hosts:
+      - "localhost:172.17.0.1" # To make OIDC discovery work correctly
+    volumes:
+      - "../configs/traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "../configs/http.yml:/etc/traefik/configs/http.yml:ro"
+      - "../..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    env_file:
+      - ./.env
+
+  whoami:
+    image: "traefik/whoami:latest"
+
+volumes:
+  pocketId_data:

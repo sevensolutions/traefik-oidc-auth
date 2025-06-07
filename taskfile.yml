@@ -1,0 +1,31 @@
+version: '3'
+
+tasks:
+  run:external:
+    desc: 'Start traefik with an externally provided identity provider'
+    dir: 'workspaces/external-idp'
+    preconditions:
+      - test -f .env
+    cmds:
+      - docker compose up
+  run:pocketid:
+    desc: 'Start traefik with the Pocket ID identity provider'
+    dir: 'workspaces/pocket-id'
+    cmds:
+      - docker compose up
+
+  test:
+    desc: 'Run all unit and end to end tests'
+    deps:
+      - test:unit
+      - test:e2e
+  test:unit:
+    desc: 'Run all go unit tests'
+    dir: 'src'
+    cmds:
+      - go test
+  test:e2e:
+    desc: 'Run all end to end tests'
+    dir: 'e2e'
+    cmds:
+      - npx playwright test
