@@ -51,6 +51,14 @@ You can then run the following command to list all available tasks:
 task --list
 ```
 
+The easiest way to get started is to run the plugin with Keycloak because this repo comes with a pre-configured instance.
+Just do:
+
+1. Run `task run:keycloak` and wait a moment for everything to be settled
+2. Open a web browser and navigate to `http://localhost:9080`
+3. You will be redirected to Keycloak's login page. Log in with user `admin` and password `admin`.
+
+
 If you want to start the plugin with your own identity provider, create the following `.env` file in `workspaces/external-idp`:
 
 ```
@@ -60,7 +68,10 @@ CLIENT_SECRET=...
 VALIDATE_AUDIENCE=true
 ```
 
-Then run `task run:external` to run traefik locally.
+And then do:
+1. Run `task run:external`
+2. Open a web browser and navigate to `http://localhost:9080`
+3. You will be redirected to your own identity provider
 
-Now browse to http://localhost:9080. You should be redirected to your IDP.
-After you've logged in, you should be redirected back to http://localhost:9080 and see a WHOAMI page.
+If you want to play around with the plugin config, modify the file `workspaces/configs/http.yml`.
+Changes will be reloaded automatically and you should see some debug output in the container logs.
