@@ -9,7 +9,7 @@ import TabItem from '@theme/TabItem';
 
 As soon as a user is authenticated it is allowed to use the application, secured by *traefik-oidc-auth*.
 But you may have multiple applications and you may want to specify a more granular definition of who is allowed to access which application.
-This can be achieved using the plugin's `ClaimAssertion`'s.
+This can be achieved using the plugin's `ClaimAssertion`s.
 
 When a user is authenticated, an `access_token` and an `id_token` is returned by the identity provider, a *session* is created and these tokens are stored within that session. By default the `access_token` is used but you can use the other one by setting [`TokenValidation`](./middleware-configuration.md#provider) to `IdToken`.
 
@@ -73,7 +73,22 @@ You can also check out the [Identity Providers section](../identity-providers/in
 
 ## How it works
 
-Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.
+Every authorization rule is expressed by a claim-assertion using the `AssertClaims`-property.
+These rules need to contain a name-selector and an optional `AllOf` or `AnyOf` quantifier.
+If only the name is set without a quantifier, the rule only checks for presence of the claim without further validating it's value.
+It is also possible to combine the `AnyOf` and `AllOf` quantifiers in one assertion.
+
+:::important
+Because the name is being interpreted as [json path](https://jsonpath.com/), you may need to escape some names, if they contain special characters like a colon or minus.
+So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
+:::
+
+:::tip
+If the user is not authorized, all claims, contained in the token, are printed in the console if the [`LogLevel`](./middleware-configuration.md) is set to `DEBUG`. This may help you to know which claims exist in your token.
+:::
+
+Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.  
+As you can see, the name selects the `roles` claim from the token and checks if the value matches *AnyOf* the given values.
 
 <Tabs groupId="examples">
 <TabItem value="config" label="⚙ Configuration">
@@ -160,3 +175,83 @@ traefik.http.middlewares.oidc-auth.traefik-oidc-auth.provider.authorization.asse
 
 </TabItem>
 </Tabs>
+
+## More complicated examples
+
+Here are some more complex examples based on the following json structure. This json doesn't represent an actual JWT but I hope you get the idea.
+
+  ```json
+  {
+    "store": {
+      "bicycle": {
+        "color": "red",
+        "price": 19.95
+      },
+      "book": [
+        {
+          "author": "Herman Melville",
+          "category": "fiction",
+          "isbn": "0-553-21311-3",
+          "price": 8.99,
+          "title": "Moby Dick"
+        },
+        {
+          "author": "J. R. R. Tolkien",
+          "category": "fiction",
+          "isbn": "0-395-19395-8",
+          "price": 22.99,
+          "title": "The Lord of the Rings"
+        }
+      ],
+    }
+  }
+  ```
+
+  **Example**: Expect array to contain a set of values
+  ```yaml
+  Name: store.book[*].price
+  AllOf: [ 22.99, 8.99 ]
+  ```
+  This assertion would succeed as the `book` array contains all values specified by the `AllOf` quantifier
+  ```yaml
+  Name: store.book[*].price
+  AllOf: [ 22.99, 8.99, 1 ]
+  ```
+  This assertion would fail as the `book` array contains no entry for which the `price` is `1`
+
+  **Example**: Expect object key to be any value of a set of values
+  ```yaml
+  Name: store.bicycle.color
+  AnyOf: [ "red", "blue", "green" ]
+  ```
+  This assertion would succeed as the `store` object contains a `bicycle` object whose `color` is `red`
+
+## Custom Error Page
+
+If a user is authenticated but unauthorized, a default error page is showen and a status code 403 - Forbidden is returned.
+You can customize this page by providing your own HTML-file as shown below:
+
+```yml
+http:
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          Provider:
+            Url: "https://your-idp.com"
+            ClientId: "<YourClientId>"
+            UsePkce: true
+          Scopes: ["openid", "profile", "email"]
+          # highlight-start
+          ErrorPages:
+            Unauthorized:
+              FilePath: "/opt/traefik/error-pages/unauthorized.html"
+          # highlight-end
+```
+
+:::note
+If you're running traefik in a docker container, make sure you copy or mount this file into the container.
+:::
+:::important
+This html file needs to be self-contained which means all CSS and JS must be inlined or loaded from a CDN.
+:::
