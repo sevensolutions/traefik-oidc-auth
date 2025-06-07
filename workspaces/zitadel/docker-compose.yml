@@ -1,0 +1,81 @@
+services:
+  zitadel-db:
+    restart: unless-stopped
+    image: postgres:17-alpine
+    volumes:
+      - "zitadel_postgres_data:/var/lib/postgresql/data"
+    environment:
+      PGUSER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "zitadel", "-U", "postgres"]
+      interval: '10s'
+      timeout: '30s'
+      retries: 5
+      start_period: '20s'
+
+  zitadel:
+    restart: unless-stopped
+    image: 'ghcr.io/zitadel/zitadel:v3.2.3'
+    command: 'start-from-init --masterkey "qdUMkPmL6odwLoAXuL5zZ5ujmO294iKo" --tlsMode disabled'
+    volumes:
+      - ./machinekey:/machinekey
+    environment:
+      ZITADEL_TLS_ENABLED: false
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALSECURE: false
+      ZITADEL_EXTERNALDOMAIN: 127-0-0-1.sslip.io
+      ZITADEL_EXTERNALPORT: 8000
+      
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: admin # admin@zitadel.127-0-0-1.sslip.io
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_FIRSTNAME: admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_LASTNAME: admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED: true
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: Password1!
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: false
+      ZITADEL_FIRSTINSTANCE_MACHINEKEYPATH: /machinekey/admin.json
+      ZITADEL_FIRSTINSTANCE_PATPATH: /machinekey/admin-pat.txt
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: admin
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Admin
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINEKEY_TYPE: 1
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "9999-12-31T23:59:59Z"
+    depends_on:
+      zitadel-db:
+        condition: 'service_healthy'
+    ports:
+      - '8000:8080'
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: '20s'
+
+  traefik:
+    image: "traefik:v3.3.2"
+    ports:
+      - "9080:80"
+      - "8080:8080"
+    extra_hosts:
+      - "127-0-0-1.sslip.io:172.17.0.1" # To make OIDC discovery work correctly
+    volumes:
+      - "../configs/traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "../configs/http.yml:/etc/traefik/configs/http.yml:ro"
+      - "../..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    env_file:
+      - ./.env
+
+  whoami:
+    image: "traefik/whoami:latest"
+
+volumes:
+  zitadel_postgres_data:

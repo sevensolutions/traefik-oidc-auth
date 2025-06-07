@@ -13,6 +13,16 @@ tasks:
     dir: 'workspaces/pocket-id'
     cmds:
       - docker compose up
+  run:keycloak:
+    desc: 'Start traefik with the Keycloak identity provider'
+    dir: 'workspaces/keycloak'
+    cmds:
+      - docker compose up
+  run:zitadel:
+    desc: 'Start traefik with the ZITADEL identity provider'
+    dir: 'workspaces/zitadel'
+    cmds:
+      - docker compose up
 
   test:
     desc: 'Run all unit and end to end tests'

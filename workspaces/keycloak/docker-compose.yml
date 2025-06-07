@@ -1,0 +1,50 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2.5
+    restart: unless-stopped
+    ports:
+      - "8000:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: "http://127-0-0-1.sslip.io:8000"
+      KC_DB_URL: jdbc:postgresql://keycloak_postgres:5432/keycloak
+      KC_DB: postgres
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    depends_on:
+      - keycloak_postgres
+    command:
+      - 'start-dev'
+
+  keycloak_postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+
+  traefik:
+    image: "traefik:v3.3.2"
+    ports:
+      - "9080:80"
+      - "8080:8080"
+    extra_hosts:
+      - "127-0-0-1.sslip.io:172.17.0.1" # To make OIDC discovery work correctly
+    volumes:
+      - "../configs/traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "../configs/http.yml:/etc/traefik/configs/http.yml:ro"
+      - "../..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    env_file:
+      - ./.env
+
+  whoami:
+    image: "traefik/whoami:latest"
+
+volumes:
+  keycloak_postgres_data:

@@ -16,6 +16,7 @@ http:
             ClientId: "${CLIENT_ID}"
             ClientSecret: "${CLIENT_SECRET}"
             UsePkce: true
+            ValidateAudience: "${VALIDATE_AUDIENCE}"
           Scopes: ["openid", "profile", "email"]
           Headers:
             - Name: "X-Oidc-Username"
