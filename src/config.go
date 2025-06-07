@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/sevensolutions/traefik-oidc-auth/errorPages"
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/rules"
-	"github.com/sevensolutions/traefik-oidc-auth/session"
-	"github.com/sevensolutions/traefik-oidc-auth/utils"
+	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/rules"
+	"github.com/sevensolutions/traefik-oidc-auth/src/session"
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
