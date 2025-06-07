@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"crypto/rand"
@@ -13,9 +13,9 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/oidc"
-	"github.com/sevensolutions/traefik-oidc-auth/utils"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 func GetOidcDiscovery(logger *logging.Logger, httpClient *http.Client, providerUrl *url.URL) (*oidc.OidcDiscovery, error) {

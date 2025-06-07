@@ -43,15 +43,24 @@ Please see the full documentation [HERE](https://traefik-oidc-auth.sevensolution
 
 ## 🧪 Local Development and Testing
 
-Create the following `.env` file:
+This project uses a [Taskfile](https://taskfile.dev/) for easy access to commonly used tasks. You need to install the Taskfile CLI by following the [official documentation](https://taskfile.dev/installation/). You also need Docker installed on your machine.
+
+You can then run the following command to list all available tasks:
+
+```
+task --list
+```
+
+If you want to start the plugin with your own identity provider, create the following `.env` file in `workspaces/external-idp`:
 
 ```
 PROVIDER_URL=...
 CLIENT_ID=...
 CLIENT_SECRET=...
+VALIDATE_AUDIENCE=true
 ```
 
-The run `docker compose up` to run traefik locally.
+Then run `task run:external` to run traefik locally.
 
 Now browse to http://localhost:9080. You should be redirected to your IDP.
 After you've logged in, you should be redirected back to http://localhost:9080 and see a WHOAMI page.

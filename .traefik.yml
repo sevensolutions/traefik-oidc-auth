@@ -5,7 +5,7 @@ displayName: OIDC Authentication
 type: middleware
 
 # The import path of your plugin.
-import: github.com/sevensolutions/traefik-oidc-auth
+import: github.com/sevensolutions/traefik-oidc-auth/src
 
 # A brief description of what your plugin is doing.
 summary: "A traefik Plugin for securing the upstream service with OpenID Connect using the Relying Party Flow."

@@ -5,10 +5,10 @@ services:
       - "9080:80"
       - "8080:8080"
     volumes:
-      - "./traefik-config.yml:/etc/traefik/traefik.yml:ro"
-      - "./http.yml:/etc/traefik/configs/http.yml:ro"
-      - ".:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
-      - /var/run/docker.sock:/var/run/docker.sock
+      - "../configs/traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "../configs/http.yml:/etc/traefik/configs/http.yml:ro"
+      - "../..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
     env_file:
       - ./.env
 
@@ -25,3 +25,6 @@ services:
     #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.provider.clientsecretEnv=CLIENT_SECRET
     #   - traefik.http.middlewares.auth.plugin.traefik-oidc-auth.scopes=openid,profile
     #   #- traefik.http.middlewares.auth.plugin.traefik-oidc-auth.scopes[0]=openid
+
+volumes:
+  pocketId_data:
