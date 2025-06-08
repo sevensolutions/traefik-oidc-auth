@@ -82,7 +82,6 @@ http:
           Provider:
             Url: "https://idm.example.com/oauth2/openid/<client_id>"
             ClientId: "<client_id>"
-            TokenValidation: "IdToken"
             UsePkce: true
           Scopes: ["openid", "profile"]
 ```
@@ -100,7 +99,6 @@ http:
             Url: "https://idm.example.com/oauth2/openid/<client_id>"
             ClientId: "<client_id>"
             ClientSecret: "<client_secret>"
-            TokenValidation: "IdToken"
           Scopes: ["openid", "profile"]
 ```
 
@@ -121,7 +119,6 @@ http:
             Url: "https://idm.example.com/oauth2/openid/<client_id>"
             ClientId: "<client_id>"
             ClientSecret: "<client_secret>"
-            TokenValidation: "IdToken"
             UsePkce: false
           Scopes: ["openid", "profile", "email", "groups"]
           Headers:

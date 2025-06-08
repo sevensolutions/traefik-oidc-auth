@@ -132,6 +132,7 @@ func CreateConfig() *Config {
 			InsecureSkipVerifyBool: false,
 			ValidateIssuerBool:     true,
 			ValidateAudienceBool:   true,
+			TokenValidation:        "IdToken",
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
@@ -250,15 +251,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if err != nil {
 		logger.Log(logging.LevelError, "Error while parsing CallbackUri: %s", err.Error())
 		return nil, err
-	}
-
-	if config.Provider.TokenValidation == "" {
-		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
-		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
-			config.Provider.TokenValidation = "IdToken"
-		} else {
-			config.Provider.TokenValidation = "AccessToken"
-		}
 	}
 
 	logger.Log(logging.LevelInfo, "Provider Url: %v", parsedURL)
