@@ -115,8 +115,8 @@ http:
 
 **Docker Labels**
 ```
-traefik.http.middlewares.oidc-auth.traefik-oidc-auth.provider.authorization.assertClaims[0].name=roles"
-traefik.http.middlewares.oidc-auth.traefik-oidc-auth.provider.authorization.assertClaims[0].anyOf=admin,media"
+traefik.http.middlewares.oidc-auth.traefik-oidc-auth.authorization.assertClaims[0].name=roles"
+traefik.http.middlewares.oidc-auth.traefik-oidc-auth.authorization.assertClaims[0].anyOf=admin,media"
 ```
 
 </TabItem>
