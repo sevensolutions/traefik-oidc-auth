@@ -58,6 +58,9 @@ type Config struct {
 
 	BypassAuthenticationRule string `json:"bypass_authentication_rule"`
 
+	// If true, always check the session for every route
+	AlwaysCheckSession bool `json:"always_check_session"`
+
 	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
 }
 
@@ -156,6 +159,7 @@ func CreateConfig() *Config {
 			Unauthenticated: &errorPages.ErrorPageConfig{},
 			Unauthorized:    &errorPages.ErrorPageConfig{},
 		},
+		AlwaysCheckSession:     false,
 	}
 }
 

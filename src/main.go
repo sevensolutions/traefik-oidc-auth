@@ -150,7 +150,10 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
 		}
 
-		// Ensure the session is authorized
+		// Always check authorization for every session before enforcing
+		if toa.Config.AlwaysCheckSession {
+			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
+		}
 		if !session.IsAuthorized {
 			toa.handleUnauthorized(rw, req)
 			return
@@ -446,7 +449,6 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
-
 	var redirectUrl string
 
 	// If the user specified one on the /login request, use this one
