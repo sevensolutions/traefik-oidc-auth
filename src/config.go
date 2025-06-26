@@ -105,7 +105,8 @@ type AuthorizationCookieConfig struct {
 }
 
 type AuthorizationConfig struct {
-	AssertClaims []ClaimAssertion `json:"assert_claims"`
+	AssertClaims        []ClaimAssertion `json:"assert_claims"`
+	CheckOnEveryRequest bool             `json:"check_on_every_request"`
 }
 
 type ClaimAssertion struct {
@@ -151,7 +152,9 @@ func CreateConfig() *Config {
 		AuthorizationHeader:  &AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Challenge",
-		Authorization:        &AuthorizationConfig{},
+		Authorization: &AuthorizationConfig{
+			CheckOnEveryRequest: false,
+		},
 		ErrorPages: &errorPages.ErrorPagesConfig{
 			Unauthenticated: &errorPages.ErrorPageConfig{},
 			Unauthorized:    &errorPages.ErrorPageConfig{},
