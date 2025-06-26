@@ -46,7 +46,6 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `Headers` | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 | `BypassAuthenticationRule`* | no | `string` | *none* | Specifies an optional rule to bypass authentication. See [Bypass Authentication Rule](./bypass-authentication-rule.md) for more details. |
 | `ErrorPages` | no | [`ErrorPages`](#error-pages) | *none* | Allows you to customize some error pages. See *ErrorPages* block. |
-| `AlwaysCheckSession` | no | `bool` | `false` |  Allow to check the session for every route.
 
 
 ## Provider Block {#provider}
@@ -99,6 +98,8 @@ This works exactly the same as [AuthorizationHeader](#authorization-header), but
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | `AssertClaims` | no | [`ClaimAssertion[]`](#claim-assertion) | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
+| `CheckOnEveryRequest` | no | `bool` | `false` |  When set to true, authorization is checked on every single request. When set to false, authorization is only checked when the user logs in and the session is being created.
+
 
 ## ClaimAssertion Block {#claim-assertion}
 

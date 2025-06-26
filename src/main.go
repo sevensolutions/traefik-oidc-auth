@@ -150,8 +150,8 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
 		}
 
-		// Always check authorization for every session before enforcing
-		if toa.Config.AlwaysCheckSession {
+		// Check authorization for every request if configured to do so
+		if toa.Config.Authorization.CheckOnEveryRequest {
 			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
 		}
 		if !session.IsAuthorized {

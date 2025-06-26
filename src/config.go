@@ -58,9 +58,6 @@ type Config struct {
 
 	BypassAuthenticationRule string `json:"bypass_authentication_rule"`
 
-	// If true, always check the session for every route
-	AlwaysCheckSession bool `json:"always_check_session"`
-
 	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
 }
 
@@ -108,7 +105,8 @@ type AuthorizationCookieConfig struct {
 }
 
 type AuthorizationConfig struct {
-	AssertClaims []ClaimAssertion `json:"assert_claims"`
+	AssertClaims        []ClaimAssertion `json:"assert_claims"`
+	CheckOnEveryRequest bool             `json:"check_on_every_request"`
 }
 
 type ClaimAssertion struct {
@@ -154,12 +152,13 @@ func CreateConfig() *Config {
 		AuthorizationHeader:  &AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Challenge",
-		Authorization:        &AuthorizationConfig{},
+		Authorization: &AuthorizationConfig{
+			CheckOnEveryRequest: false,
+		},
 		ErrorPages: &errorPages.ErrorPagesConfig{
 			Unauthenticated: &errorPages.ErrorPageConfig{},
 			Unauthorized:    &errorPages.ErrorPageConfig{},
 		},
-		AlwaysCheckSession:     false,
 	}
 }
 
