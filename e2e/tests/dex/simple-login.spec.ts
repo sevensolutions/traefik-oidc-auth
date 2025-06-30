@@ -655,14 +655,6 @@ http:
       loadBalancer:
         servers:
           - url: http://whoami:80
-    whoami-bob:
-      loadBalancer:
-        servers:
-          - url: http://whoami:80
-    whoami-alice:
-      loadBalancer:
-        servers:
-          - url: http://whoami:80
 
   middlewares:
     auth:
@@ -719,14 +711,14 @@ http:
     whoami-bob:
       entryPoints: ["web"]
       rule: "PathPrefix(\`/bob\`)"
-      service: whoami-bob
+      service: whoami
       middlewares: ["auth-bob"]
 
     whoami-alice:
       entryPoints: ["web"]
       rule: "PathPrefix(\`/alice\`)"
       middlewares: ["auth-alice"]
-      service: whoami-alice
+      service: whoami
 `);
   await expectGotoOkay(page, "http://localhost:9080/alice");
 
