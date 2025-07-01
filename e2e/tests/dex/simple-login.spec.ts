@@ -647,6 +647,91 @@ http:
   expect(await response.headerValue("Location")).toBe("https://httpbin.org/unauthorized");
 });
 
+test("test CheckOnEveryRequest", async ({ page }) => {
+   await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["bob@example.com", "alice@example.com"]
+            CheckOnEveryRequest: true
+    auth-bob:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["bob@example.com"]
+            CheckOnEveryRequest: true
+
+    auth-alice:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["alice@example.com"]
+            CheckOnEveryRequest: true
+
+  routers:
+    oidc-callback:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/oidc/callback\`)"
+      service: noop@internal
+      middlewares: ["auth"]
+
+    whoami-bob:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/bob\`)"
+      service: whoami
+      middlewares: ["auth-bob"]
+
+    whoami-alice:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/alice\`)"
+      middlewares: ["auth-alice"]
+      service: whoami
+`);
+  await expectGotoOkay(page, "http://localhost:9080/alice");
+
+  const response = await login(page, "alice@example.com", "password", "http://localhost:9080/alice");
+  expect(response.status()).toBe(200);
+
+  await expectGotoOkay(page, "http://localhost:9080/alice");
+
+  const respBob = await page.goto("http://localhost:9080/bob");
+  expect(respBob?.status()).toBe(403);
+
+});
+
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------
