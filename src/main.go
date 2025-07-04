@@ -94,10 +94,8 @@ func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 		return false
 	}
 
-	if utils.UrlIsAbsolute(toa.CallbackURL) {
-		if u.Scheme != toa.CallbackURL.Scheme || u.Host != toa.CallbackURL.Host {
-			return false
-		}
+	if utils.UrlIsAbsolute(toa.CallbackURL) && u.Host != toa.CallbackURL.Host {
+		return false
 	}
 
 	return true
