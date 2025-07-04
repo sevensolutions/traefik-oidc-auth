@@ -25,6 +25,8 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
+            - Name: "IdToken"
+              Value: "{{`Bearer {{ .idToken }}`}}"
           AuthorizationHeader:
             Name: "CustomAuth"
           AuthorizationCookie:
