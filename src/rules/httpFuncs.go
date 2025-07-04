@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 )
 
 var httpFuncs = map[string]func(*requestConditionTree, ...string) error{

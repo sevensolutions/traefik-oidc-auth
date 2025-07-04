@@ -33,8 +33,10 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `CallbackUri`* | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
 | `LoginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthorizedBehavior`-configuration.  |
 | `PostLoginRedirectUri`* | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
+| `ValidPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
 | `LogoutUri`* | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | `PostLogoutRedirectUri`* | no | `string` | `/` | The url where the user should be redirected after logout. |
+| `ValidPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
 | `CookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookie* where the name can be set individually. |
 | `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
@@ -61,7 +63,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `ValidIssuer`* | no | `string` | *discovery document* | The issuer which must be present in the JWT-token. By default this will be read from the OIDC discovery document. |
 | `ValidateAudience`* | no | `bool` | `true` | Specifies whether the `aud` claim in the JWT-token should be validated. |
 | `ValidAudience`* | no | `string` | *ClientId* | The audience which must be present in the JWT-token. Defaults to the configured client id. |
-| `TokenValidation`* | no | `string` | `AccessToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. When using Microsoft EntraID, this will automatically default to `IdToken`. `Introspection` may not work when using PKCE. |
+| `TokenValidation`* | no | `string` | `IdToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. `Introspection` may not work when using PKCE. |
 
 ## SessionCookie Block {#session-cookie}
 
@@ -96,6 +98,8 @@ This works exactly the same as [AuthorizationHeader](#authorization-header), but
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | `AssertClaims` | no | [`ClaimAssertion[]`](#claim-assertion) | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
+| `CheckOnEveryRequest` | no | `bool` | `false` |  When set to true, authorization is checked on every single request. When set to false, authorization is only checked when the user logs in and the session is being created. When using external authentication using ˋAuthorizationHeaderˋ or ˋAuthorizationCookieˋ this is always treated as true.
+
 
 ## ClaimAssertion Block {#claim-assertion}
 
@@ -110,90 +114,14 @@ Additionaly, the `Name` field can be any [json path](https://jsonpath.com/). The
 
 It is possible to combine `AnyOf` and `AllOf` quantifiers for one assertion.
 
+:::tip
+Also see the [Authorization](./authorization.md) section for more details about how to use this feature.
+:::
+
 :::important
 Because the name is being interpreted as jsonpath, you may need to escape some names, if they contain special characters like a colon or minus.
 So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 :::
-
-:::tip
-If the user is not authorized, all claims, contained in the token, are printed in the console if DEBUG-logging of the plugin is enabled (See `LogLevel` at the top). This may help you to know which claims exist in your token.
-:::
-
-<details>
-  <summary>
-    <b>Examples</b>
-  </summary>
-  Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.
-  Please note that the actual claims depend on the identity provider you're using and sometimes you need to map them into the token explicitly.
-  You can also check out the [Identity Providers](../identity-providers/index.md) section or the documentation of your identity provider for more details.
-
-  ```yml
-  http:
-    middlewares:
-      oidc-auth:
-        plugin:
-          traefik-oidc-auth:
-            Provider:
-              Url: "https://your-instance.zitadel.cloud"
-              ClientId: "<YourClientId>"
-              UsePkce: true
-            Scopes: ["openid", "profile", "email"]
-            # highlight-start
-            Authorization:
-              AssertClaims:
-                - Name: roles
-                  AnyOf: ["admin", "media"]
-            # highlight-end
-  ```
-
-  Here are some more complex examples based on the following json structure:
-
-  ```json
-  {
-    "store": {
-      "bicycle": {
-        "color": "red",
-        "price": 19.95
-      },
-      "book": [
-        {
-          "author": "Herman Melville",
-          "category": "fiction",
-          "isbn": "0-553-21311-3",
-          "price": 8.99,
-          "title": "Moby Dick"
-        },
-        {
-          "author": "J. R. R. Tolkien",
-          "category": "fiction",
-          "isbn": "0-395-19395-8",
-          "price": 22.99,
-          "title": "The Lord of the Rings"
-        }
-      ],
-    }
-  }
-  ```
-
-  **Example**: Expect array to contain a set of values
-  ```yaml
-  Name: store.book[*].price
-  AllOf: [ 22.99, 8.99 ]
-  ```
-  This assertion would succeed as the `book` array contains all values specified by the `AllOf` quantifier
-  ```yaml
-  Name: store.book[*].price
-  AllOf: [ 22.99, 8.99, 1 ]
-  ```
-  This assertion would fail as the `book` array contains no entry for which the `price` is `1`
-
-  **Example**: Expect object key to be any value of a set of values
-  ```yaml
-  Name: store.bicycle.color
-  AnyOf: [ "red", "blue", "green" ]
-  ```
-  This assertion would succeed as the `store` object contains a `bicycle` object whose `color` is `red`
-</details>
 
 ## Header Block {#header}
 
@@ -243,5 +171,5 @@ Headers:
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
-| `FilePath`* | no | `string` | *none* | Specifies the path to a local html file which should be served. If this is not set, the default page is shown. This html file needs to be self-contained which means all CSS and JS should be inlined. |
+| `FilePath`* | no | `string` | *none* | Specifies the path to a local html file which should be served. If this is not set, the default page is shown. This html file needs to be self-contained which means all CSS and JS must be inlined. |
 | `RedirectTo`* | no | `string` | *none* | If this is set to a URL, the user is redirected to this page in case of an error, instead of showing an error page. |

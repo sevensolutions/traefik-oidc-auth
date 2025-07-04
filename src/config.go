@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"context"
@@ -12,11 +12,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/sevensolutions/traefik-oidc-auth/errorPages"
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/rules"
-	"github.com/sevensolutions/traefik-oidc-auth/session"
-	"github.com/sevensolutions/traefik-oidc-auth/utils"
+	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/rules"
+	"github.com/sevensolutions/traefik-oidc-auth/src/session"
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
@@ -39,10 +39,12 @@ type Config struct {
 	// The URL used to start authorization when needed.
 	// All other requests that are not already authorized will return a 401 Unauthorized.
 	// When left empty, all requests can start authorization.
-	LoginUri              string `json:"login_uri"`
-	PostLoginRedirectUri  string `json:"post_login_redirect_uri"`
-	LogoutUri             string `json:"logout_uri"`
-	PostLogoutRedirectUri string `json:"post_logout_redirect_uri"`
+	LoginUri                    string   `json:"login_uri"`
+	PostLoginRedirectUri        string   `json:"post_login_redirect_uri"`
+	ValidPostLoginRedirectUris  []string `json:"valid_post_login_redirect_uris"`
+	LogoutUri                   string   `json:"logout_uri"`
+	PostLogoutRedirectUri       string   `json:"post_logout_redirect_uri"`
+	ValidPostLogoutRedirectUris []string `json:"valid_post_logout_redirect_uris"`
 
 	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
 	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
@@ -103,7 +105,8 @@ type AuthorizationCookieConfig struct {
 }
 
 type AuthorizationConfig struct {
-	AssertClaims []ClaimAssertion `json:"assert_claims"`
+	AssertClaims        []ClaimAssertion `json:"assert_claims"`
+	CheckOnEveryRequest bool             `json:"check_on_every_request"`
 }
 
 type ClaimAssertion struct {
@@ -130,6 +133,7 @@ func CreateConfig() *Config {
 			InsecureSkipVerifyBool: false,
 			ValidateIssuerBool:     true,
 			ValidateAudienceBool:   true,
+			TokenValidation:        "IdToken",
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
@@ -149,7 +153,9 @@ func CreateConfig() *Config {
 		AuthorizationHeader:  &AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Challenge",
-		Authorization:        &AuthorizationConfig{},
+		Authorization: &AuthorizationConfig{
+			CheckOnEveryRequest: false,
+		},
 		ErrorPages: &errorPages.ErrorPagesConfig{
 			Unauthenticated: &errorPages.ErrorPageConfig{},
 			Unauthorized:    &errorPages.ErrorPageConfig{},
@@ -248,15 +254,6 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	if err != nil {
 		logger.Log(logging.LevelError, "Error while parsing CallbackUri: %s", err.Error())
 		return nil, err
-	}
-
-	if config.Provider.TokenValidation == "" {
-		// For EntraID, we cannot validate the access token using JWKS, so we fall back to the id token by default
-		if strings.HasPrefix(config.Provider.Url, "https://login.microsoftonline.com") {
-			config.Provider.TokenValidation = "IdToken"
-		} else {
-			config.Provider.TokenValidation = "AccessToken"
-		}
 	}
 
 	logger.Log(logging.LevelInfo, "Provider Url: %v", parsedURL)

@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"errors"
@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
-	"github.com/sevensolutions/traefik-oidc-auth/session"
-	"github.com/sevensolutions/traefik-oidc-auth/utils"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/session"
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {

@@ -1,11 +1,11 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 )
 
 func createAuthInstance(claims []ClaimAssertion) *AuthorizationConfig {

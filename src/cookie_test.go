@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"fmt"

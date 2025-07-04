@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sevensolutions/traefik-oidc-auth/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/spyzhov/ajson"
 )
 

@@ -1,4 +1,4 @@
-package traefik_oidc_auth
+package src
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sevensolutions/traefik-oidc-auth/utils"
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 func setChunkedCookies(config *Config, rw http.ResponseWriter, cookieName string, cookieValue string) {

@@ -1,0 +1,47 @@
+version: '3'
+
+tasks:
+  run:external:
+    desc: 'Start traefik with an externally provided identity provider'
+    dir: 'workspaces/external-idp'
+    preconditions:
+      - test -f .env
+    cmds:
+      - docker compose up
+  run:pocketid:
+    desc: 'Start traefik with the Pocket ID identity provider'
+    dir: 'workspaces/pocket-id'
+    cmds:
+      - docker compose up
+  run:keycloak:
+    desc: 'Start traefik with the Keycloak identity provider'
+    dir: 'workspaces/keycloak'
+    cmds:
+      - docker compose up
+  run:zitadel:
+    desc: 'Start traefik with the ZITADEL identity provider'
+    dir: 'workspaces/zitadel'
+    cmds:
+      - docker compose up
+
+  run:website:
+    desc: 'Start the website in development mode'
+    dir: 'website'
+    cmds:
+      - npm start
+
+  test:
+    desc: 'Run all unit and end to end tests'
+    deps:
+      - test:unit
+      - test:e2e
+  test:unit:
+    desc: 'Run all go unit tests'
+    dir: 'src'
+    cmds:
+      - go test
+  test:e2e:
+    desc: 'Run all end to end tests'
+    dir: 'e2e'
+    cmds:
+      - npx playwright test

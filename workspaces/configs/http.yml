@@ -16,6 +16,7 @@ http:
             ClientId: "${CLIENT_ID}"
             ClientSecret: "${CLIENT_SECRET}"
             UsePkce: true
+            ValidateAudience: "${VALIDATE_AUDIENCE}"
           Scopes: ["openid", "profile", "email"]
           Headers:
             - Name: "X-Oidc-Username"
@@ -24,6 +25,8 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
+            - Name: "IdToken"
+              Value: "{{`Bearer {{ .idToken }}`}}"
           AuthorizationHeader:
             Name: "CustomAuth"
           AuthorizationCookie:
@@ -38,6 +41,8 @@ http:
           #       AnyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
           #LoginUri: "/login"
+          #ValidPostLoginRedirectUris: ["https://google.at"]
+          #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"
 
   routers:
