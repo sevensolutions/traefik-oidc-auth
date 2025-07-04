@@ -43,7 +43,7 @@ services:
       PROVIDER_URL: http://127-0-0-1.sslip.io:8000/realms/master
       CLIENT_ID: traefik
       CLIENT_SECRET: LQslcjK8ZeRrrhW7jKaFUUous9W5QvCr
-      VALIDATE_AUDIENCE: false
+      VALIDATE_AUDIENCE: true
 
   whoami:
     image: "traefik/whoami:latest"

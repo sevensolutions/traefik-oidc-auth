@@ -27,6 +27,5 @@ http:
             Url: "https://pocket-id.mydomain.com/"
             ClientId: "<YourClientId>"
             ClientSecret: "<YourClientSecret>"
-            TokenValidation: "IdToken"
           Scopes: ["openid", "profile", "email"]  # "groups" also supported
 ```
