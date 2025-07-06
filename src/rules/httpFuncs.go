@@ -16,6 +16,8 @@ var httpFuncs = map[string]func(*requestConditionTree, ...string) error{
 	"Path":         pathFunc,
 	"PathRegexp":   pathRegexpFunc,
 	"Method":       methodFunc,
+	"Query":        queryFunc,
+	"QueryRegexp":  queryRegexpFunc,
 }
 
 func headerFunc(tree *requestConditionTree, values ...string) error {
@@ -143,6 +145,53 @@ func methodFunc(tree *requestConditionTree, values ...string) error {
 		matched := method == expectedMethod
 
 		logger.Log(logging.LevelDebug, "%s Eval rule Method(`%s`). Actual value: %s", getMatchedText(matched), expectedMethod, method)
+
+		return matched
+	}
+
+	return nil
+}
+
+func queryFunc(tree *requestConditionTree, values ...string) error {
+	if len(values) != 2 {
+		return fmt.Errorf("Query-rule requires exactly two arguments.")
+	}
+
+	parameterName := values[0]
+	parameterValue := values[1]
+
+	tree.matcher = func(logger *logging.Logger, request *http.Request) bool {
+		actualValue := request.URL.Query().Get(parameterName)
+
+		matched := actualValue == parameterValue
+
+		logger.Log(logging.LevelDebug, "%s Eval rule Query(`%s`, `%s`). Actual value: %s", getMatchedText(matched), parameterName, parameterValue, actualValue)
+
+		return matched
+	}
+
+	return nil
+}
+
+func queryRegexpFunc(tree *requestConditionTree, values ...string) error {
+	if len(values) != 2 {
+		return fmt.Errorf("QueryRegexp-rule requires exactly two arguments.")
+	}
+
+	parameterName := values[0]
+	parameterValueRegex := values[1]
+
+	valueRegex, err := regexp.Compile(parameterValueRegex)
+	if err != nil {
+		return err
+	}
+
+	tree.matcher = func(logger *logging.Logger, request *http.Request) bool {
+		actualValue := request.URL.Query().Get(parameterName)
+
+		matched := valueRegex.MatchString(actualValue)
+
+		logger.Log(logging.LevelDebug, "%s Eval rule QueryRegexp(`%s`, `%s`). Actual value: %s", getMatchedText(matched), parameterName, parameterValueRegex, actualValue)
 
 		return matched
 	}
