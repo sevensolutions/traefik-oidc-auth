@@ -2,6 +2,7 @@ package src
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -28,6 +29,7 @@ type TraefikOidcAuth struct {
 	next                     http.Handler
 	httpClient               *http.Client
 	ProviderURL              *url.URL
+	ClientJwtPrivateKey      *rsa.PrivateKey
 	CallbackURL              *url.URL
 	Config                   *Config
 	SessionStorage           session.SessionStorage

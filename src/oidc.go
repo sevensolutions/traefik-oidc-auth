@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
@@ -84,6 +85,16 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		urlValues.Add("client_secret", oidcAuth.Config.Provider.ClientSecret)
 	}
 
+	if oidcAuth.ClientJwtPrivateKey != nil {
+		clientAssertionToken, err := oidcAuth.getClientAssertionJwtToken()
+		if err != nil {
+			return nil, err
+		}
+
+		urlValues.Add("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+		urlValues.Add("client_assertion", clientAssertionToken)
+	}
+
 	if oidcAuth.Config.Provider.UsePkceBool {
 		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config))
 		if err != nil {
@@ -105,6 +116,8 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	oidcAuth.logger.Log(logging.LevelDebug, "Status Code: %d", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -170,6 +183,16 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]interface{}, error) {
 	data := url.Values{
 		"token": {token},
+	}
+
+	if toa.ClientJwtPrivateKey != nil {
+		clientAssertionToken, err := toa.getClientAssertionJwtToken()
+		if err != nil {
+			return false, nil, err
+		}
+
+		data.Add("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+		data.Add("client_assertion", clientAssertionToken)
 	}
 
 	//log(toa.Config.LogLevel, LogLevelDebug, "Token: %s", token)
@@ -253,4 +276,24 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResp
 	}
 
 	return tokenResponse, nil
+}
+
+func (toa *TraefikOidcAuth) getClientAssertionJwtToken() (string, error) {
+	claims := jwt.MapClaims{
+		"iss": toa.Config.Provider.ClientId,
+		"sub": toa.Config.Provider.ClientId,
+		"aud": toa.Config.Provider.Url,
+		"iat": time.Now().Unix(),
+		"exp": time.Now().Add(5 * time.Minute).Unix(),
+	}
+
+	assertionToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	assertionToken.Header["kid"] = toa.Config.Provider.ClientJwtPrivateKeyId
+
+	clientAssertionJwt, err := assertionToken.SignedString(toa.ClientJwtPrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return clientAssertionJwt, nil
 }

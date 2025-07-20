@@ -2,6 +2,7 @@ package src
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -11,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
@@ -70,8 +73,10 @@ type ProviderConfig struct {
 	CABundle     string `json:"ca_bundle"`
 	CABundleFile string `json:"ca_bundle_file"`
 
-	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
+	ClientId              string `json:"client_id"`
+	ClientSecret          string `json:"client_secret"`
+	ClientJwtPrivateKey   string `json:"client_jwt_private_key"`
+	ClientJwtPrivateKeyId string `json:"client_jwt_private_key_id"`
 
 	UsePkce     string `json:"use_pkce"`
 	UsePkceBool bool   `json:"use_pkce_bool"`
@@ -215,6 +220,14 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		return nil, err
 	}
 
+	var clientAssertionPrivateKey *rsa.PrivateKey
+	if config.Provider.ClientJwtPrivateKey != "" && config.Provider.ClientJwtPrivateKeyId != "" {
+		clientAssertionPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(config.Provider.ClientJwtPrivateKey))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	config.Provider.CABundle = utils.ExpandEnvironmentVariableString(config.Provider.CABundle)
 	config.Provider.CABundleFile = utils.ExpandEnvironmentVariableString(config.Provider.CABundleFile)
 	config.Provider.TokenValidation = utils.ExpandEnvironmentVariableString(config.Provider.TokenValidation)
@@ -335,6 +348,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		next:                     next,
 		httpClient:               httpClient,
 		ProviderURL:              parsedURL,
+		ClientJwtPrivateKey:      clientAssertionPrivateKey,
 		CallbackURL:              parsedCallbackURL,
 		Config:                   config,
 		SessionStorage:           session.CreateCookieSessionStorage(),
