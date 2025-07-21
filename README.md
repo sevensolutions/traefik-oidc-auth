@@ -2,6 +2,8 @@
 
 ![E2E Tests](https://img.shields.io/github/actions/workflow/status/sevensolutions/traefik-oidc-auth/.github%2Fworkflows%2Fe2e-tests.yml?logo=github&label=E2E%20Tests&color=green)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sevensolutions/traefik-oidc-auth)](https://goreportcard.com/report/github.com/sevensolutions/traefik-oidc-auth)
+[![Release](https://img.shields.io/github/v/release/sevensolutions/traefik-oidc-auth?label=Release)](https://github.com/sevensolutions/traefik-oidc-auth/releases/latest)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/sevensolutions/traefik-oidc-auth/blob/main/LICENSE)
 
 <p align="left" style="text-align:left;">
   <a href="https://github.com/sevensolutions/traefik-oidc-auth">
