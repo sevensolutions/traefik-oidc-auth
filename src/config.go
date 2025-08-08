@@ -201,6 +201,8 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.Url = utils.ExpandEnvironmentVariableString(config.Provider.Url)
 	config.Provider.ClientId = utils.ExpandEnvironmentVariableString(config.Provider.ClientId)
 	config.Provider.ClientSecret = utils.ExpandEnvironmentVariableString(config.Provider.ClientSecret)
+	config.Provider.ClientJwtPrivateKeyId = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKeyId)
+	config.Provider.ClientJwtPrivateKey = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKey)
 	config.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UsePkce, config.Provider.UsePkceBool)
 	if err != nil {
 		return nil, err
