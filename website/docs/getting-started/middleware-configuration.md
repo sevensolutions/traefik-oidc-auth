@@ -58,6 +58,8 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `CABundleFile`* | no | `string` | *none* | Specifies the path to an optional CA certificate bundle in case you're using self-signed certificates for the provider. If you're using Docker, make sure the file is mounted into the traefik container. |
 | `ClientId`* | yes | `string` | *none* | The client id of the application. |
 | `ClientSecret`* | no | `string` | *none* | The client secret of the application. May not be needed for some providers when using PKCE. |
+| `ClientJwtPrivateKeyId`* | no | `string` | *none* | Specifies the key id (`keyId` field in the downloaded file) of a [JWT Profile](https://zitadel.com/docs/guides/integrate/token-introspection/private-key-jwt). Only works with ZITADEL. Note: This is a little bit experimental and not well tested yet. |
+| `ClientJwtPrivateKey`* | no | `string` | *none* | Specifies the private key (`key` field in the downloaded file) of a [JWT Profile](https://zitadel.com/docs/guides/integrate/token-introspection/private-key-jwt). Only works with ZITADEL. Note: This is a little bit experimental and not well tested yet. |
 | `UsePkce`* | no | `bool` | `false`| Enable PKCE. In this case, a client secret may not be needed for some providers. The following algorithms are supported: *RS*, *EC*, *ES*. |
 | `ValidateIssuer`* | no | `bool` | `true` | Specifies whether the `iss` claim in the JWT-token should be validated. |
 | `ValidIssuer`* | no | `string` | *discovery document* | The issuer which must be present in the JWT-token. By default this will be read from the OIDC discovery document. |
