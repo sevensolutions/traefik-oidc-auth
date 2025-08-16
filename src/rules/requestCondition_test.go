@@ -59,6 +59,50 @@ func TestRequestConditionHeaderRegexp(t *testing.T) {
 	}
 }
 
+func TestRequestConditionHost(t *testing.T) {
+	logger := logging.CreateLogger(logging.LevelDebug)
+
+	rule, _ := ParseRequestCondition("Host(`example.com`)")
+
+	request, _ := http.NewRequest(http.MethodPost, "http://example.com", nil)
+
+	result := rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+
+	request, _ = http.NewRequest(http.MethodPost, "http://test", nil)
+
+	result = rule.Match(logger, request)
+
+	if result {
+		t.Fail()
+	}
+}
+
+func TestRequestConditionHostRegexp(t *testing.T) {
+	logger := logging.CreateLogger(logging.LevelDebug)
+
+	rule, _ := ParseRequestCondition("HostRegexp(`[a-z]+\\.example\\.com`)")
+
+	request, _ := http.NewRequest(http.MethodPost, "http://abc.example.com", nil)
+
+	result := rule.Match(logger, request)
+
+	if !result {
+		t.Fail()
+	}
+
+	request, _ = http.NewRequest(http.MethodPost, "http://example.com", nil)
+
+	result = rule.Match(logger, request)
+
+	if result {
+		t.Fail()
+	}
+}
+
 func TestRequestConditionPath(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 
