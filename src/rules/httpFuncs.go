@@ -18,6 +18,8 @@ var httpFuncs = map[string]func(*requestConditionTree, ...string) error{
 	"Method":       methodFunc,
 	"Query":        queryFunc,
 	"QueryRegexp":  queryRegexpFunc,
+	"Host":         hostFunc,
+	"HostRegexp":   hostRegexpFunc,
 }
 
 func headerFunc(tree *requestConditionTree, values ...string) error {
@@ -192,6 +194,51 @@ func queryRegexpFunc(tree *requestConditionTree, values ...string) error {
 		matched := valueRegex.MatchString(actualValue)
 
 		logger.Log(logging.LevelDebug, "%s Eval rule QueryRegexp(`%s`, `%s`). Actual value: %s", getMatchedText(matched), parameterName, parameterValueRegex, actualValue)
+
+		return matched
+	}
+
+	return nil
+}
+
+func hostFunc(tree *requestConditionTree, values ...string) error {
+	if len(values) != 1 {
+		return fmt.Errorf("Host-rule requires exactly one argument.")
+	}
+
+	expectedHost := values[0]
+
+	tree.matcher = func(logger *logging.Logger, request *http.Request) bool {
+		actualValue := request.Host
+
+		matched := actualValue == expectedHost
+
+		logger.Log(logging.LevelDebug, "%s Eval rule Host(`%s`). Actual value: %s", getMatchedText(matched), expectedHost, actualValue)
+
+		return matched
+	}
+
+	return nil
+}
+
+func hostRegexpFunc(tree *requestConditionTree, values ...string) error {
+	if len(values) != 1 {
+		return fmt.Errorf("HostRegexp-rule requires exactly one argument.")
+	}
+
+	hostValueRegex := values[0]
+
+	hostRegex, err := regexp.Compile(hostValueRegex)
+	if err != nil {
+		return err
+	}
+
+	tree.matcher = func(logger *logging.Logger, request *http.Request) bool {
+		path := request.Host
+
+		matched := hostRegex.MatchString(path)
+
+		logger.Log(logging.LevelDebug, "%s Eval rule HostRegexp(`%s`). Actual value: %s", getMatchedText(matched), hostValueRegex, path)
 
 		return matched
 	}
