@@ -2,6 +2,7 @@ package src
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -11,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
@@ -70,8 +73,10 @@ type ProviderConfig struct {
 	CABundle     string `json:"ca_bundle"`
 	CABundleFile string `json:"ca_bundle_file"`
 
-	ClientId     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
+	ClientId              string `json:"client_id"`
+	ClientSecret          string `json:"client_secret"`
+	ClientJwtPrivateKey   string `json:"client_jwt_private_key"`
+	ClientJwtPrivateKeyId string `json:"client_jwt_private_key_id"`
 
 	UsePkce     string `json:"use_pkce"`
 	UsePkceBool bool   `json:"use_pkce_bool"`
@@ -196,6 +201,8 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.Url = utils.ExpandEnvironmentVariableString(config.Provider.Url)
 	config.Provider.ClientId = utils.ExpandEnvironmentVariableString(config.Provider.ClientId)
 	config.Provider.ClientSecret = utils.ExpandEnvironmentVariableString(config.Provider.ClientSecret)
+	config.Provider.ClientJwtPrivateKeyId = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKeyId)
+	config.Provider.ClientJwtPrivateKey = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKey)
 	config.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UsePkce, config.Provider.UsePkceBool)
 	if err != nil {
 		return nil, err
@@ -213,6 +220,14 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.InsecureSkipVerifyBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.InsecureSkipVerify, config.Provider.InsecureSkipVerifyBool)
 	if err != nil {
 		return nil, err
+	}
+
+	var clientAssertionPrivateKey *rsa.PrivateKey
+	if config.Provider.ClientJwtPrivateKey != "" && config.Provider.ClientJwtPrivateKeyId != "" {
+		clientAssertionPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(config.Provider.ClientJwtPrivateKey))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	config.Provider.CABundle = utils.ExpandEnvironmentVariableString(config.Provider.CABundle)
@@ -335,6 +350,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		next:                     next,
 		httpClient:               httpClient,
 		ProviderURL:              parsedURL,
+		ClientJwtPrivateKey:      clientAssertionPrivateKey,
 		CallbackURL:              parsedCallbackURL,
 		Config:                   config,
 		SessionStorage:           session.CreateCookieSessionStorage(),
