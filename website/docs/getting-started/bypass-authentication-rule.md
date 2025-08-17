@@ -35,6 +35,8 @@ The following rules are available:
 |---|---|
 | <code>Header(&#96;X-Real-Ip&#96;, &#96;172.18.0.2&#96;)</code> | Match every request with an `X-Real-Ip` header set to `172.18.0.2`. |
 | <code>HeaderRegexp(&#96;X-Real-Ip&#96;, &#96;^172\\.18\\.&#96;)</code> | Match every request with an `X-Real-Ip` header matching the given regex. |
+| <code>Host(&#96;example\\.com&#96;)</code> | Match every request with the host set to `example.com`. |
+| <code>HostRegexp(&#96;[a-z]\\.example\\.com&#96;)</code> | Match every request with the host matching the given regex. |
 | <code>Path(&#96;/products&#96;)</code> | Match every request where the path matches `/products` exactly. |
 | <code>PathPrefix(&#96;/products&#96;)</code> | Match every request by a path prefix. Eg. `/products/123` would match, `/user` would not match. |
 | <code>PathRegexp(&#96;^/products/(shoes&#124;socks)/[0-9]+$&#96;)</code> | Match every request path against the given regex. |

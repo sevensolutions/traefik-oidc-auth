@@ -22,6 +22,11 @@ You will find the client id and tenant-id on the *Overview* page of your *App re
 The client secret can be found on the left side under *Manage > Certificates & secrets*. Be sure you copy the Value, not the Secret ID.
 :::
 
+:::caution
+Make sure you use the EntraID url ending with `/v2.0`. It should be in the form `https://login.microsoftonline.com/<YourTenantId>/v2.0`.
+The old url will not work.
+:::
+
 ```yml
 http:
   middlewares:
