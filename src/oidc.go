@@ -117,11 +117,9 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	}
 	defer resp.Body.Close()
 
-	oidcAuth.logger.Log(logging.LevelDebug, "Status Code: %d", resp.StatusCode)
-
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: received bad HTTP response from Provider: %s", string(body))
+		oidcAuth.logger.Log(logging.LevelError, "exchangeAuthCode: received bad HTTP response from Provider (Status: %d): %s", resp.StatusCode, string(body))
 		return nil, errors.New("invalid status code")
 	}
 
