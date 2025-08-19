@@ -41,7 +41,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
 | `AuthorizationCookie` | no | [`AuthorizationCookie`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookie* block. |
-| `UnauthorizedBehavior`* | no | `string` | `Challenge` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, whereas `Unauthorized` will simply return a 401 status response. |
+| `UnauthorizedBehavior`* | no | `string` | `Auto` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, `Unauthorized` will return a 401 status response, and `Auto` will automatically choose based on request type (HTML requests get redirected, AJAX requests get 401). |
 | `Authorization` | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
 | `Headers` | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 | `BypassAuthenticationRule`* | no | `string` | *none* | Specifies an optional rule to bypass authentication. See [Bypass Authentication Rule](./bypass-authentication-rule.md) for more details. |
