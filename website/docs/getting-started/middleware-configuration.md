@@ -138,6 +138,7 @@ By using Go-Templates you have access to the following attributes:
 |---|---|
 | `{{ .accessToken }}` | The OAuth Access Token |
 | `{{ .idToken }}` | The OAuth Id Token |
+| `{{ .refreshToken }}` | The OAuth Refresh Token |
 | `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim |
 
 :::info
