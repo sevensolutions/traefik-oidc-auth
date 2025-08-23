@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
@@ -70,13 +71,13 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 		return nil, false, nil, fmt.Errorf("no session cookie is present")
 	}
 
-	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used.")
-
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
 
 	if err != nil {
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
+
+	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used. It expires at %s.", session.Expires)
 
 	return session, updatedSession != nil, claims, nil
 }
@@ -123,6 +124,11 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				} else {
 					toa.logger.Log(logging.LevelDebug, "The auth provider didn't return a new IdToken. Still keeping the old one.")
 				}
+			}
+
+			// Update expiration
+			if toa.Config.SessionCookie.MaxAge > 0 {
+				session.Expires = time.Now().Add(time.Duration(toa.Config.SessionCookie.MaxAge) * time.Second)
 			}
 
 			success, claims, err = toa.validateToken(session)
