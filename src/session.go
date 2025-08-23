@@ -101,7 +101,20 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 
 	success, claims, err := toa.validateToken(session)
 
-	if !success || err != nil {
+	// Check if the session expires soon
+	expiresSoon := false
+	if success && toa.Config.SessionCookie.MaxAge > 0 && !session.Expires.IsZero() {
+		duration := session.Expires.Sub(time.Now())
+
+		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
+
+		if duration.Seconds() < halfMaxAge {
+			expiresSoon = true
+			toa.logger.Log(logging.LevelDebug, "The session is half-way it's expiration. Renewing now...")
+		}
+	}
+
+	if !success || err != nil || expiresSoon {
 		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew session...")
 
