@@ -78,6 +78,13 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `SameSite` | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
 | `MaxAge` | no | `int` | `0` | Cookie time-to-live in seconds.  0 (default) is a ephemeral session cookie. |
 
+:::info
+If `MaxAge = 0` (the default), an ephemeral session cookie is issued, which is deleted when the browser is closed.
+Expired access or ID tokens are refreshed automatically once they expire and before the request is sent upstream.
+
+If `MaxAge > 0` is set, a persistent cookie is issued with the specified lifetime. The cookie is refreshed on the next request once half of its lifetime has passed, and the tokens are renewed at the same time.  
+:::
+
 ## AuthorizationHeader Block {#authorization-header}
 
 By specifying this configuration, a request can send an externally generated access token via this header to authenticate the request.

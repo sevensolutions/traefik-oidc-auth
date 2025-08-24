@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
@@ -70,13 +71,20 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 		return nil, false, nil, fmt.Errorf("no session cookie is present")
 	}
 
-	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used.")
-
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
 
 	if err != nil {
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
+
+	var expiryText string
+	if session.Expires.IsZero() {
+		expiryText = "It expires when the browser is closed."
+	} else {
+		expiryText = fmt.Sprintf("It expires at: %s.", session.Expires)
+	}
+
+	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used. %s", expiryText)
 
 	return session, updatedSession != nil, claims, nil
 }
@@ -100,7 +108,20 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 
 	success, claims, err := toa.validateToken(session)
 
-	if !success || err != nil {
+	// Check if the session expires soon
+	expiresSoon := false
+	if success && toa.Config.SessionCookie.MaxAge > 0 && !session.Expires.IsZero() {
+		remainingDuration := session.Expires.Sub(time.Now())
+
+		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
+
+		if remainingDuration.Seconds() < halfMaxAge {
+			expiresSoon = true
+			toa.logger.Log(logging.LevelDebug, "The session is half-way it's expiration. Renewing now...")
+		}
+	}
+
+	if !success || err != nil || expiresSoon {
 		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew session...")
 
@@ -123,6 +144,11 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				} else {
 					toa.logger.Log(logging.LevelDebug, "The auth provider didn't return a new IdToken. Still keeping the old one.")
 				}
+			}
+
+			// Update expiration
+			if toa.Config.SessionCookie.MaxAge > 0 {
+				session.Expires = time.Now().Add(time.Duration(toa.Config.SessionCookie.MaxAge) * time.Second)
 			}
 
 			success, claims, err = toa.validateToken(session)
