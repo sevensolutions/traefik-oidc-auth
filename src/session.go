@@ -77,7 +77,14 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
 
-	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used. It expires at %s.", session.Expires)
+	var expiryText string
+	if session.Expires.IsZero() {
+		expiryText = "It expires when the browser is closed."
+	} else {
+		expiryText = fmt.Sprintf("It expires at: %s.", session.Expires)
+	}
+
+	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used. %s", expiryText)
 
 	return session, updatedSession != nil, claims, nil
 }
@@ -104,11 +111,11 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 	// Check if the session expires soon
 	expiresSoon := false
 	if success && toa.Config.SessionCookie.MaxAge > 0 && !session.Expires.IsZero() {
-		duration := session.Expires.Sub(time.Now())
+		remainingDuration := session.Expires.Sub(time.Now())
 
 		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
 
-		if duration.Seconds() < halfMaxAge {
+		if remainingDuration.Seconds() < halfMaxAge {
 			expiresSoon = true
 			toa.logger.Log(logging.LevelDebug, "The session is half-way it's expiration. Renewing now...")
 		}
