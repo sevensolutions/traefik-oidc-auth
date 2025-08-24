@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/http"
 	"testing"
 )
 
@@ -98,6 +99,146 @@ func expectRedirectUriMatch(t *testing.T, uri string, validUris []string, should
 	}
 
 	if (shouldMatch && matchedUri != uri) || (!shouldMatch && matchedUri != "") {
+		t.Fail()
+	}
+}
+
+func TestParseAcceptType(t *testing.T) {
+	acceptType := ParseAcceptType("text/html")
+	if acceptType.Type != "text/html" {
+		t.Fail()
+	}
+	if acceptType.Weight != 1.0 {
+		t.Fail()
+	}
+
+	acceptType = ParseAcceptType("text/html;q=0.8")
+	if acceptType.Type != "text/html" {
+		t.Fail()
+	}
+	if acceptType.Weight != 0.8 {
+		t.Fail()
+	}
+
+	acceptType = ParseAcceptType("application/json; q=0.5")
+	if acceptType.Type != "application/json" {
+		t.Fail()
+	}
+	if acceptType.Weight != 0.5 {
+		t.Fail()
+	}
+
+	acceptType = ParseAcceptType("text/html;q=invalid")
+	if acceptType.Type != "" {
+		t.Fail()
+	}
+	if acceptType.Weight != 0.0 {
+		t.Fail()
+	}
+
+	acceptType = ParseAcceptType("*/*")
+	if acceptType.Type != "*/*" {
+		t.Fail()
+	}
+	if acceptType.Weight != 1.0 {
+		t.Fail()
+	}
+
+	acceptType = ParseAcceptType("")
+	if acceptType.Type != "" {
+		t.Fail()
+	}
+	if acceptType.Weight != 0.0 {
+		t.Fail()
+	}
+}
+
+func TestParseAcceptHeader(t *testing.T) {
+	acceptTypes := ParseAcceptHeader("text/html,application/json")
+	if len(acceptTypes) != 2 {
+		t.Fail()
+	}
+	if acceptTypes[0].Type != "text/html" {
+		t.Fail()
+	}
+	if acceptTypes[0].Weight != 1.0 {
+		t.Fail()
+	}
+	if acceptTypes[1].Type != "application/json" {
+		t.Fail()
+	}
+	if acceptTypes[1].Weight != 1.0 {
+		t.Fail()
+	}
+
+	acceptTypes = ParseAcceptHeader("application/json;q=0.8,text/html;q=0.9")
+	if len(acceptTypes) != 2 {
+		t.Fail()
+	}
+	if acceptTypes[0].Type != "text/html" {
+		t.Fail()
+	}
+	if acceptTypes[0].Weight != 0.9 {
+		t.Fail()
+	}
+	if acceptTypes[1].Type != "application/json" {
+		t.Fail()
+	}
+	if acceptTypes[1].Weight != 0.8 {
+		t.Fail()
+	}
+
+	acceptTypes = ParseAcceptHeader("*/*")
+	if len(acceptTypes) != 1 {
+		t.Fail()
+	}
+	if acceptTypes[0].Type != "*/*" {
+		t.Fail()
+	}
+	if acceptTypes[0].Weight != 1.0 {
+		t.Fail()
+	}
+}
+
+func TestIsHtmlRequest(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	if !IsHtmlRequest(req) {
+		t.Fail()
+	}
+
+	req, _ = http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "application/json")
+	if IsHtmlRequest(req) {
+		t.Fail()
+	}
+
+	req, _ = http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "text/html, application/json")
+	if !IsHtmlRequest(req) {
+		t.Fail()
+	}
+
+	req, _ = http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "application/json;q=0.9, text/html;q=0.8")
+	if IsHtmlRequest(req) {
+		t.Fail()
+	}
+
+	req, _ = http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "application/json;q=0.8, text/html;q=0.9")
+	if !IsHtmlRequest(req) {
+		t.Fail()
+	}
+
+	req, _ = http.NewRequest("GET", "/", nil)
+	req.Header.Set("Accept", "*/*")
+	if IsHtmlRequest(req) {
+		t.Fail()
+	}
+
+	req, _ = http.NewRequest("GET", "/", nil)
+	if IsHtmlRequest(req) {
 		t.Fail()
 	}
 }
