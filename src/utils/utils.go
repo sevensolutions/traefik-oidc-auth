@@ -8,12 +8,20 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 )
+
+type AcceptType struct {
+	Type   string
+	Weight float64
+}
 
 // Expands the environment variable if it is enclosed in ${}. If the variable is not present, the original value is returned.
 func ExpandEnvironmentVariableString(value string) string {
@@ -264,4 +272,61 @@ func matchUriTemplate(value string, template string) bool {
 	result := regex.MatchString(value)
 
 	return result
+}
+
+func ParseAcceptType(raw string) AcceptType {
+	// Parse MIME type and parameters
+	mimeType, params, err := mime.ParseMediaType(raw)
+
+	if err != nil {
+		return AcceptType{}
+	}
+
+	weight := 1.0 // Default weight is 1.0
+
+	// Take weight from the "q" parameter if it exists
+	if weightString, ok := params["q"]; ok {
+		weight, err = strconv.ParseFloat(weightString, 64)
+		if err != nil {
+			return AcceptType{}
+		}
+	}
+
+	return AcceptType{
+		Type:   mimeType,
+		Weight: weight,
+	}
+}
+
+func ParseAcceptHeader(raw string) []AcceptType {
+	var acceptTypes []AcceptType
+
+	for _, part := range strings.Split(raw, ",") {
+		acceptType := ParseAcceptType(part)
+
+		if acceptType.Type == "" {
+			continue
+		}
+
+		acceptTypes = append(acceptTypes, acceptType)
+	}
+
+	// Sort by weight in descending order
+	sort.Slice(acceptTypes, func(i, j int) bool {
+		return acceptTypes[i].Weight > acceptTypes[j].Weight
+	})
+
+	return acceptTypes
+}
+
+func IsHtmlRequest(req *http.Request) bool {
+	acceptTypes := ParseAcceptHeader(req.Header.Get("Accept"))
+
+	if len(acceptTypes) == 0 {
+		// Assume it's not an HTML request if no Accept header is present
+		return false
+	}
+
+	// Assume HTML request have text/html or application/xhtml+xml with the highest weight
+	return acceptTypes[0].Type == "text/html" || acceptTypes[0].Type == "application/xhtml+xml"
 }

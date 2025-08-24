@@ -6,9 +6,9 @@ import (
 	"html/template"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
+	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 type ProblemDetails struct {
@@ -23,17 +23,7 @@ func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseW
 		return
 	}
 
-	acceptHeader := req.Header.Get("Accept")
-
-	if strings.HasPrefix(acceptHeader, "application/json") {
-		problemDetails := ProblemDetails{
-			Type:   data["statusType"].(string),
-			Title:  data["statusName"].(string),
-			Detail: data["description"].(string),
-		}
-
-		writeProblemDetail(logger, problemDetails, rw, data["statusCode"].(int))
-	} else {
+	if utils.IsHtmlRequest(req) {
 		html, err := renderPage(logger, page, data)
 		if err != nil {
 			logger.Log(logging.LevelError, "Error while rendering unauthorized page", err.Error())
@@ -43,7 +33,16 @@ func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseW
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 		rw.WriteHeader(data["statusCode"].(int))
 		rw.Write([]byte(html))
+		return
 	}
+
+	problemDetails := ProblemDetails{
+		Type:   data["statusType"].(string),
+		Title:  data["statusName"].(string),
+		Detail: data["description"].(string),
+	}
+
+	writeProblemDetail(logger, problemDetails, rw, data["statusCode"].(int))
 }
 
 func writeProblemDetail(logger *logging.Logger, problem ProblemDetails, rw http.ResponseWriter, statusCode int) {

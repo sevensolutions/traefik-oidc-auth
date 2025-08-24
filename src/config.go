@@ -157,7 +157,7 @@ func CreateConfig() *Config {
 		},
 		AuthorizationHeader:  &AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &AuthorizationCookieConfig{},
-		UnauthorizedBehavior: "Challenge",
+		UnauthorizedBehavior: "Auto",
 		Authorization: &AuthorizationConfig{
 			CheckOnEveryRequest: false,
 		},
