@@ -91,6 +91,9 @@ type ProviderConfig struct {
 
 	// AccessToken or IdToken or Introspection
 	TokenValidation string `json:"verification_token"`
+
+	UseClaimsFromUserInfo     string `json:"use_claims_from_user_info"`
+	UseClaimsFromUserInfoBool bool   `json:"use_claims_from_user_info_bool"`
 }
 
 type SessionCookieConfig struct {
@@ -134,11 +137,12 @@ func CreateConfig() *Config {
 		LogLevel: logging.LevelWarn,
 		Secret:   DefaultSecret,
 		Provider: &ProviderConfig{
-			UsePkceBool:            false,
-			InsecureSkipVerifyBool: false,
-			ValidateIssuerBool:     true,
-			ValidateAudienceBool:   true,
-			TokenValidation:        "IdToken",
+			UsePkceBool:               false,
+			InsecureSkipVerifyBool:    false,
+			ValidateIssuerBool:        true,
+			ValidateAudienceBool:      true,
+			TokenValidation:           "IdToken",
+			UseClaimsFromUserInfoBool: false,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
 		// Maybe a traefik bug. So I've moved this to the New() method.
@@ -204,6 +208,10 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.Provider.ClientJwtPrivateKeyId = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKeyId)
 	config.Provider.ClientJwtPrivateKey = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKey)
 	config.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UsePkce, config.Provider.UsePkceBool)
+	if err != nil {
+		return nil, err
+	}
+	config.Provider.UseClaimsFromUserInfoBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UseClaimsFromUserInfo, config.Provider.UseClaimsFromUserInfoBool)
 	if err != nil {
 		return nil, err
 	}
