@@ -3,6 +3,7 @@ package src
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -77,14 +78,18 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
 
-	var expiryText string
-	if session.Expires.IsZero() {
-		expiryText = "It expires when the browser is closed."
-	} else {
-		expiryText = fmt.Sprintf("It expires at: %s.", session.Expires)
-	}
+	if toa.logger.MinLevel == logging.LevelDebug {
+		var expiryText string
+		if session.ExpiresAt.IsZero() {
+			expiryText = "It expires when the browser is closed."
+		} else {
+			expiryText = fmt.Sprintf("It expires at: %s.", session.ExpiresAt)
+		}
 
-	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used. %s", expiryText)
+		tokenExpiresText := fmt.Sprintf("The IDP token expires in %ds.", int(math.Round(time.Until(session.RefreshedAt.Add(time.Duration(session.TokenExpiresIn)*time.Second)).Seconds())))
+
+		toa.logger.Log(logging.LevelDebug, "A session is present for the request. %s %s", expiryText, tokenExpiresText)
+	}
 
 	return session, updatedSession != nil, claims, nil
 }
@@ -108,16 +113,27 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 
 	success, claims, err := toa.validateToken(session)
 
-	// Check if the session expires soon
+	// Check if the session or IDP token expires soon
 	expiresSoon := false
-	if success && toa.Config.SessionCookie.MaxAge > 0 && !session.Expires.IsZero() {
-		remainingDuration := session.Expires.Sub(time.Now())
+	if success && toa.Config.SessionCookie.MaxAge > 0 && !session.ExpiresAt.IsZero() {
+		remainingDuration := time.Until(session.ExpiresAt)
 
 		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
 
 		if remainingDuration.Seconds() < halfMaxAge {
 			expiresSoon = true
-			toa.logger.Log(logging.LevelDebug, "The session is half-way it's expiration. Renewing now...")
+			toa.logger.Log(logging.LevelDebug, "The session is halfway through it's expiration. Renewing now...")
+		}
+	}
+
+	if success && !expiresSoon {
+		pastDuration := time.Since(session.RefreshedAt)
+
+		halfMaxAge := float64(session.TokenExpiresIn) / 2
+
+		if pastDuration.Seconds() > halfMaxAge {
+			expiresSoon = true
+			toa.logger.Log(logging.LevelDebug, "The IDP token is halfway through it's expiration. Renewing now...")
 		}
 	}
 
@@ -146,9 +162,12 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				}
 			}
 
-			// Update expiration
+			// Update expirations
+			session.RefreshedAt = time.Now()
+			session.TokenExpiresIn = newTokens.ExpiresIn
+
 			if toa.Config.SessionCookie.MaxAge > 0 {
-				session.Expires = time.Now().Add(time.Duration(toa.Config.SessionCookie.MaxAge) * time.Second)
+				session.ExpiresAt = time.Now().Add(time.Duration(toa.Config.SessionCookie.MaxAge) * time.Second)
 			}
 
 			success, claims, err = toa.validateToken(session)

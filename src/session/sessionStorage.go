@@ -12,12 +12,14 @@ type SessionStorage interface {
 }
 
 type SessionState struct {
-	Id           string    `json:"id"`
-	AccessToken  string    `json:"access_token"`
-	IdToken      string    `json:"id_token"`
-	RefreshToken string    `json:"refresh_token"`
-	IsAuthorized bool      `json:"is_authorized"`
-	Expires      time.Time `json:"expires"`
+	Id             string    `json:"id"`
+	RefreshedAt    time.Time `json:"created_at"`
+	AccessToken    string    `json:"access_token"`
+	IdToken        string    `json:"id_token"`
+	RefreshToken   string    `json:"refresh_token"`
+	IsAuthorized   bool      `json:"is_authorized"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	TokenExpiresIn int       `json:"token_expires_in"`
 }
 
 func GenerateSessionId() string {
