@@ -115,26 +115,8 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 
 	// Check if the session or IDP token expires soon
 	expiresSoon := false
-	if success && toa.Config.SessionCookie.MaxAge > 0 && !session.ExpiresAt.IsZero() {
-		remainingDuration := time.Until(session.ExpiresAt)
-
-		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
-
-		if remainingDuration.Seconds() < halfMaxAge {
-			expiresSoon = true
-			toa.logger.Log(logging.LevelDebug, "The session is halfway through it's expiration. Renewing now...")
-		}
-	}
-
-	if success && !expiresSoon {
-		pastDuration := time.Since(session.RefreshedAt)
-
-		halfMaxAge := float64(session.TokenExpiresIn) / 2
-
-		if pastDuration.Seconds() > halfMaxAge {
-			expiresSoon = true
-			toa.logger.Log(logging.LevelDebug, "The IDP token is halfway through it's expiration. Renewing now...")
-		}
+	if success {
+		expiresSoon = checkSessionExpiresSoon(toa, session)
 	}
 
 	if !success || err != nil || expiresSoon {
@@ -186,6 +168,33 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 	}
 
 	return session, claims, nil, nil
+}
+
+func checkSessionExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {
+	expiresSoon := false
+	if toa.Config.SessionCookie.MaxAge > 0 && !session.ExpiresAt.IsZero() {
+		remainingDuration := time.Until(session.ExpiresAt)
+
+		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
+
+		if remainingDuration.Seconds() < halfMaxAge {
+			expiresSoon = true
+			toa.logger.Log(logging.LevelDebug, "The session is halfway through it's expiration. Renewing now...")
+		}
+	}
+
+	if !expiresSoon {
+		pastDuration := time.Since(session.RefreshedAt)
+
+		halfMaxAge := float64(session.TokenExpiresIn) / 2
+
+		if pastDuration.Seconds() > halfMaxAge {
+			expiresSoon = true
+			toa.logger.Log(logging.LevelDebug, "The IDP token is halfway through it's expiration. Renewing now...")
+		}
+	}
+
+	return expiresSoon
 }
 
 func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, map[string]interface{}, error) {
