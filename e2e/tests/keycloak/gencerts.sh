@@ -51,6 +51,8 @@ openssl req -new -key $WEBSITE_KEY -out $WEBSITE_CSR -subj "/C=US/ST=California/
 openssl x509 -req -in $WEBSITE_CSR -CA $INTERMEDIATE_CERT -CAkey $INTERMEDIATE_KEY -CAcreateserial -out $WEBSITE_CERT -days 825 -sha256 \
     -extfile <(printf "subjectAltName=DNS:localhost,DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth")
 
+chmod 644 `ls -d $WEBSITE_CERT_DIR/*`
+
 echo "Website certificate created: $WEBSITE_CERT"
 
 # Summary
