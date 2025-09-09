@@ -70,6 +70,10 @@ Before you start, make sure your Kanidm has a valid (and not self-signed) TLS ce
 To display the client's secret, use `kanidm system oauth2 show-basic-secret <client_id>`
 :::
 
+:::note
+Kanidm enforces PKCE by default. To disable this behaviour use `kanidm system oauth2 warning-insecure-client-disable-pkce <client_id>`
+:::
+
 <Tabs groupId="type">
   <TabItem value="relative-secure" label="Relative URL with PKCE">
   
@@ -140,11 +144,3 @@ http:
 
   </TabItem>
 </Tabs>
-
-:::note
-You need to set `TokenValidation` to `IdToken` to populate claims. Otherwise, they do not include any scopes.
-:::
-
-:::note
-Kanidm enforces PKCE by default. To disable this behaviour use `kanidm system oauth2 warning-insecure-client-disable-pkce <client_id>`
-:::
