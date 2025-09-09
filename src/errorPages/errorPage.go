@@ -26,7 +26,7 @@ func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseW
 	if utils.IsHtmlRequest(req) {
 		html, err := renderPage(logger, page, data)
 		if err != nil {
-			logger.Log(logging.LevelError, "Error while rendering unauthorized page", err.Error())
+			logger.Log(logging.LevelError, "Error while rendering unauthorized page: %s", err.Error())
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 
@@ -134,7 +134,7 @@ func renderPage(logger *logging.Logger, page *ErrorPageConfig, evalContext map[s
     <span class="error-code">{{ .statusCode }}</span>
     <h1>{{ .statusName }}</h1>
     <h2>{{ .description }}</h2>
-    
+
     <div class="button-container">
       {{ if .primaryButtonUrl }}
       <a href="{{ .primaryButtonUrl }}" class="button-primary">{{ .primaryButtonText }}</a>

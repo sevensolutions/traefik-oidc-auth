@@ -302,6 +302,24 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
+		if toa.Config.Provider.UseClaimsFromUserInfoBool {
+			subClaim, ok := claims["sub"].(string)
+			if !ok {
+				toa.logger.Log(logging.LevelError, "failed to fetch UserInfo: 'sub' claim is not a string or missing")
+				http.Error(rw, "Failed to fetch UserInfo", http.StatusInternalServerError)
+				return
+			}
+
+			userInfoClaims, err := toa.getUserInfo(token.AccessToken, subClaim)
+			if err != nil {
+				toa.logger.Log(logging.LevelError, "failed to fetch UserInfo: %s", err.Error())
+				http.Error(rw, "Failed to fetch UserInfo", http.StatusInternalServerError)
+				return
+			}
+
+			claims = mergeClaims(claims, userInfoClaims)
+		}
+
 		toa.logger.Log(logging.LevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
 		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
