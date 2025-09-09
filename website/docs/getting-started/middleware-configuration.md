@@ -153,7 +153,7 @@ By using Go-Templates you have access to the following attributes:
 
 | Template | Description |
 |---|---|
-| `{{ .accessToken }}` | The OAuth Access Token |
+| `{{ .accessToken }}` | The OAuth Access Token. The access token gets renewed automatically once half of it's lifetime has passed. This means that when sending this token upstream, it has a guaranteed lifetime of half it's expiration time.  |
 | `{{ .idToken }}` | The OAuth Id Token |
 | `{{ .refreshToken }}` | The OAuth Refresh Token |
 | `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim. If `UseClaimsFromUserInfo` is enabled, the claims from the `userinfo_endpoint` are merged directly into the token claims and accessible via `{{ .claims.* }}`. |
@@ -171,7 +171,7 @@ Headers:
 
 The outer curly braces and backticks are used to escape the inner curly braces.
 
-Note that this *only* applies for configuring Traefik from a YAML file, where it performs its own template expansion.  If you are using the Kubernetes CRDs, you should *not* escape, just template as usual:
+Note that this *only* applies for configuring Traefik from a YAML file, where it performs it's own template expansion.  If you are using the Kubernetes CRDs, you should *not* escape, just template as usual:
 
 ```yml
 Headers:
