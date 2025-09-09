@@ -295,3 +295,124 @@ func (toa *TraefikOidcAuth) getClientAssertionJwtToken() (string, error) {
 
 	return clientAssertionJwt, nil
 }
+
+func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject string) (map[string]interface{}, error) {
+	if toa.DiscoveryDocument.UserinfoEndpoint == "" {
+		return nil, errors.New("userinfo_endpoint is not set")
+	}
+
+	req, err := http.NewRequest("GET", toa.DiscoveryDocument.UserinfoEndpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Authorization", "Bearer "+accessToken)
+
+	resp, err := toa.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, errors.New("token is not valid")
+		}
+		body, _ := io.ReadAll(resp.Body)
+		toa.logger.Log(logging.LevelError, "getUserInfo: received bad HTTP response from Provider (Status: %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("invalid status code: %d", resp.StatusCode)
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	var userInfoClaims map[string]interface{}
+
+	switch {
+	case strings.HasPrefix(contentType, "application/jwt"):
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		tokenString := string(body)
+
+		claims := jwt.MapClaims{}
+
+		err = toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, false)
+		if err != nil {
+			return nil, err
+		}
+
+		options := []jwt.ParserOption{}
+
+		if toa.Config.Provider.ValidateIssuerBool {
+			options = append(options, jwt.WithIssuer(toa.Config.Provider.ValidIssuer))
+		}
+
+		parser := jwt.NewParser(options...)
+
+		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
+
+		if err != nil {
+			err := toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, true)
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
+
+			if err != nil {
+				toa.logger.Log(logging.LevelError, "Failed to parse userinfo token: %v", err)
+				return nil, err
+			}
+		}
+		userInfoClaims = claims
+	case strings.HasPrefix(contentType, "application/json"):
+		err = json.NewDecoder(resp.Body).Decode(&userInfoClaims)
+		if err != nil {
+			toa.logger.Log(logging.LevelError, "getUserInfo: couldn't decode OidcTokenResponse: %s", err.Error())
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupported content type: %s", contentType)
+	}
+
+	userInfoSub, ok := userInfoClaims["sub"].(string)
+	if !ok {
+		toa.logger.Log(logging.LevelWarn, "getUserInfo: 'sub' claim in userinfo response is not a string or missing, discarding userinfo response")
+		return map[string]interface{}{}, nil
+	}
+
+	if userInfoSub != idTokenSubject {
+		toa.logger.Log(logging.LevelWarn, "getUserInfo: mismatch between 'sub' in userinfo response (%s) and 'sub' in id_token (%s), discarding userinfo response", userInfoSub, idTokenSubject)
+		return map[string]interface{}{}, nil
+	}
+
+	return userInfoClaims, nil
+}
+
+// mergeClaims merges userinfo claims into token claims, preserving security-critical claims
+func mergeClaims(tokenClaims, userInfoClaims map[string]interface{}) map[string]interface{} {
+	// Create a copy of the token claims to avoid modifying the original
+	mergedClaims := make(map[string]interface{})
+	for key, value := range tokenClaims {
+		mergedClaims[key] = value
+	}
+
+	// Define claims that should NOT be overwritten from userinfo
+	protectedClaims := map[string]bool{
+		"iss": true, // issuer
+		"aud": true, // audience
+		"exp": true, // expiration time
+		"iat": true, // issued at
+		"nbf": true, // not before
+		"jti": true, // JWT ID
+		"azp": true, // authorized party
+	}
+
+	// Merge userinfo claims, skipping protected claims
+	for key, value := range userInfoClaims {
+		if !protectedClaims[key] {
+			mergedClaims[key] = value
+		}
+	}
+
+	return mergedClaims
+}

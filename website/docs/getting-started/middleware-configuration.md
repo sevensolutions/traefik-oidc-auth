@@ -66,6 +66,16 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `ValidateAudience`* | no | `bool` | `true` | Specifies whether the `aud` claim in the JWT-token should be validated. |
 | `ValidAudience`* | no | `string` | *ClientId* | The audience which must be present in the JWT-token. Defaults to the configured client id. |
 | `TokenValidation`* | no | `string` | `IdToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. `Introspection` may not work when using PKCE. |
+| `UseClaimsFromUserInfo`* | no | `bool` | `false` | When enabled, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims. The userinfo claims are merged directly into the token claims, with userinfo values overriding token values for non-security-critical claims. |
+
+:::warning
+When using `UseClaimsFromUserInfo`, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims.
+When `CheckOnEveryRequest` is enabled, this will greatly increase the hit rate on the IDP and may introduce latency.
+:::
+
+:::info
+**Claims Merging Behavior**: When `UseClaimsFromUserInfo` is enabled, claims from the userinfo endpoint are merged directly into the token claims. Security-critical JWT claims (`iss`, `aud`, `exp`, `iat`, `nbf`, `jti`, `azp`) are protected and cannot be overwritten by userinfo data. All other claims from userinfo will override corresponding token claims, allowing you to access updated profile information directly via `{{ .claims.* }}` templates.
+:::
 
 ## SessionCookie Block {#session-cookie}
 
@@ -139,7 +149,7 @@ By using Go-Templates you have access to the following attributes:
 | `{{ .accessToken }}` | The OAuth Access Token |
 | `{{ .idToken }}` | The OAuth Id Token |
 | `{{ .refreshToken }}` | The OAuth Refresh Token |
-| `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim |
+| `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim. If `UseClaimsFromUserInfo` is enabled, the claims from the `userinfo_endpoint` are merged directly into the token claims and accessible via `{{ .claims.* }}`. |
 
 :::info
 Because [traefik configuration files already support Go-templating](https://doc.traefik.io/traefik/providers/file/#go-templating), you need to *escape* your templates in a weird way. Here are some examples:

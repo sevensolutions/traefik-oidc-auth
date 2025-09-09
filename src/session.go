@@ -165,7 +165,27 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 		return toa.introspectToken(token)
 	}
 
-	return toa.validateTokenLocally(token)
+	ok, claims, err := toa.validateTokenLocally(token)
+
+	if !ok {
+		return ok, claims, err
+	}
+
+	if toa.Config.Provider.UseClaimsFromUserInfoBool {
+		subClaim, ok := claims["sub"].(string)
+		if !ok {
+			return false, nil, fmt.Errorf("failed to fetch UserInfo: 'sub' claim is not a string or missing")
+		}
+
+		userInfoClaims, err := toa.getUserInfo(session.AccessToken, subClaim)
+		if err != nil {
+			return false, nil, fmt.Errorf("failed to fetch UserInfo: %s", err.Error())
+		}
+
+		claims = mergeClaims(claims, userInfoClaims)
+	}
+
+	return ok, claims, err
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
