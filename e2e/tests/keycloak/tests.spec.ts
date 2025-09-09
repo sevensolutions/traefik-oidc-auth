@@ -13,6 +13,8 @@ test.use({
 });
 
 test.beforeAll("Starting traefik", async () => {
+  test.setTimeout(300000);
+
   process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
 
   await configureTraefik(`
@@ -54,7 +56,7 @@ http:
   });
 
   // Wait some time for keycloak to start
-  for(let i = 0; i < 20; i++) {
+  for(let i = 0; i < 300; i++) {
     console.log("Waiting for Keycloak...");
     
     await new Promise(r => setTimeout(r, 1000));
