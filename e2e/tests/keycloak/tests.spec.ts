@@ -110,18 +110,18 @@ test("login https", async ({ page }) => {
   expect(response.status()).toBe(200);
 });
 
-// Seems like logout is not supported by dex yet :(
-// https://github.com/dexidp/dex/issues/1697
-// test("logout", async ({ page }) => {
-//   await expectGotoOkay(page, "http://localhost:9080");
+test("logout", async ({ page }) => {
+  await expectGotoOkay(page, "http://localhost:9080");
 
-//   const response = await login(page, "admin", "admin", "http://localhost:9080");
+  const response = await login(page, "admin", "admin", "http://localhost:9080");
 
-//   expect(response.status()).toBe(200);
+  expect(response.status()).toBe(200);
 
-//   await page.goto("http://localhost:9080/logout");
+  const logoutResponse = await page.goto("http://localhost:9080/logout");
 
-// });
+  // After logout we should be at the login page again
+  expect(logoutResponse?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
+});
 
 test("test two services is seamless", async ({ page }) => {
   await configureTraefik(`
