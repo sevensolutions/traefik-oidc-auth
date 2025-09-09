@@ -66,14 +66,10 @@ http:
         method: "HEAD"
       });
 
-      console.log("Received status:", response.status, response.statusText);
-
       if (response.status === 200)
         return;
     }
-    catch(ex: any) {
-      console.log(ex);
-    }
+    catch {}
   }
 
   throw new Error("Timeout occurred while waiting for Keycloak to start.");
