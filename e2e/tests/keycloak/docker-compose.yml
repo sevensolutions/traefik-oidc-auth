@@ -2,6 +2,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.2.5
     restart: unless-stopped
+    privileged: true
     ports:
       - "8000:8080"
       - "8001:8443"

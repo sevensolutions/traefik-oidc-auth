@@ -18,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Note: You cannot connect from the "Warp" terminal for whatever reason.
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
         with:
