@@ -77,3 +77,13 @@ And then do:
 
 If you want to play around with the plugin config, modify the file `workspaces/configs/http.yml`.
 Changes will be reloaded automatically and you should see some debug output in the container logs.
+
+## ☕ Support
+
+I put a lot of ❤️ and effort into this project. PRs are very welcome and together we can make this a great free alternative to the enterprise OIDC plugin 😎.
+Every contribution helps me to improve it, fix bugs and develop new features.  
+Please also dont forget to ★ the repo.  
+If you'd like to make a small donation, I'd be very grateful. Just click the button below.  
+Thank You!
+
+[![](https://img.shields.io/static/v1?label=Sponsor&color=blue&message=%E2%9D%A4&logo=GitHub)](https://github.com/sponsors/sevensolutions)

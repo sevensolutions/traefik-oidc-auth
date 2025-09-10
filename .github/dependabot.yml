@@ -5,12 +5,17 @@
 
 version: 2
 updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+
   - package-ecosystem: npm
     directory: "/website"
     schedule:
       interval: monthly
     groups:
-      dependencies: # Just a name
+      website: # Just a name
         patterns: ["*"]
     allow:
       - dependency-name: "@docusaurus/*"
