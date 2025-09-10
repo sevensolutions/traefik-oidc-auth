@@ -97,21 +97,21 @@ var (
 		"**": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _floats(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "power", Numeric, math.Pow(lnum, rnum)), nil
 		},
 		"*": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _floats(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "multiply", Numeric, float64(lnum*rnum)), nil
 		},
 		"/": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _floats(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			if rnum == 0 {
 				return nil, errorRequest("division by zero")
@@ -121,47 +121,47 @@ var (
 		"%": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, err := left.getInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			rnum, err := right.getInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "remainder", Numeric, float64(lnum%rnum)), nil
 		},
 		"<<": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, err := left.getInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			rnum, err := right.getUInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "left shift", Numeric, float64(lnum<<rnum)), nil
 		},
 		">>": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, err := left.getInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			rnum, err := right.getUInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "right shift", Numeric, float64(lnum>>rnum)), nil
 		},
 		"&": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _ints(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "bitwise AND", Numeric, float64(lnum&rnum)), nil
 		},
 		"&^": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _ints(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "bit clear (AND NOT)", Numeric, float64(lnum&^rnum)), nil
 		},
@@ -182,14 +182,14 @@ var (
 		"-": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _floats(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "sub", Numeric, float64(lnum-rnum)), nil
 		},
 		"|": func(left *Node, right *Node) (result *Node, err error) {
 			lnum, rnum, err := _ints(left, right)
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "bitwise OR", Numeric, float64(lnum|rnum)), nil
 		},
@@ -355,7 +355,7 @@ var (
 			}
 			num, err := node.getInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "Pow10", Numeric, float64(math.Pow10(num))), nil
 		},
@@ -384,7 +384,7 @@ var (
 			}
 			num, err := node.getUInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "factorial", Numeric, float64(mathFactorial(num))), nil
 		},
@@ -445,9 +445,9 @@ var (
 					if remainder != 0 {
 						size += 1 + remainder
 					}
-					var result []byte = make([]byte, size)
-					base64.StdEncoding.WithPadding(base64.NoPadding).Encode(result, []byte(sourceString))
-					return valueNode(nil, "b64encoden", String, string(result)), nil
+					var bytes = make([]byte, size)
+					base64.StdEncoding.WithPadding(base64.NoPadding).Encode(bytes, []byte(sourceString))
+					return valueNode(nil, "b64encoden", String, string(bytes)), nil
 				}
 			}
 			return valueNode(nil, "b64encoden", Null, nil), nil
@@ -462,9 +462,9 @@ var (
 					if remainder != 0 {
 						size += 4
 					}
-					var result []byte = make([]byte, size)
-					base64.StdEncoding.WithPadding(base64.StdPadding).Encode(result, []byte(sourceString))
-					return valueNode(nil, "b64encode", String, string(result)), nil
+					var bytes = make([]byte, size)
+					base64.StdEncoding.WithPadding(base64.StdPadding).Encode(bytes, []byte(sourceString))
+					return valueNode(nil, "b64encode", String, string(bytes)), nil
 				}
 			}
 			return valueNode(nil, "b64encode", Null, nil), nil
@@ -510,7 +510,7 @@ var (
 			}
 			num, err := node.GetNumeric()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "Rand", Numeric, randFunc()*num), nil
 		},
@@ -520,7 +520,7 @@ var (
 			}
 			num, err := node.getInteger()
 			if err != nil {
-				return
+				return nil, err
 			}
 			return valueNode(nil, "RandInt", Numeric, float64(randIntFunc(num))), nil
 		},
@@ -571,6 +571,74 @@ var (
 				}
 			}
 			return valueNode(nil, "key", Null, nil), nil
+		},
+		"is_null": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_null", Null, nil), nil
+			}
+			return valueNode(nil, "is_null", Bool, node.IsNull()), nil
+		},
+		"is_numeric": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_numeric", Null, nil), nil
+			}
+			return valueNode(nil, "is_numeric", Bool, node.IsNumeric()), nil
+		},
+		"is_int": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_int", Null, nil), nil
+			}
+			_, err = node.getInteger()
+			if err != nil {
+				return valueNode(nil, "is_int", Bool, false), nil
+			}
+			return valueNode(nil, "is_int", Bool, true), nil
+		},
+		"is_uint": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_uint", Null, nil), nil
+			}
+			_, err = node.getUInteger()
+			if err != nil {
+				return valueNode(nil, "is_uint", Bool, false), nil
+			}
+			return valueNode(nil, "is_uint", Bool, true), nil
+		},
+		"is_float": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_float", Null, nil), nil
+			}
+			if node.IsNumeric() {
+				_, err = node.getInteger()
+				if err != nil {
+					return valueNode(nil, "is_float", Bool, true), nil
+				}
+			}
+			return valueNode(nil, "is_float", Bool, false), nil
+		},
+		"is_string": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_string", Null, nil), nil
+			}
+			return valueNode(nil, "is_string", Bool, node.IsString()), nil
+		},
+		"is_bool": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_bool", Null, nil), nil
+			}
+			return valueNode(nil, "is_bool", Bool, node.IsBool()), nil
+		},
+		"is_array": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_array", Null, nil), nil
+			}
+			return valueNode(nil, "is_array", Bool, node.IsArray()), nil
+		},
+		"is_object": func(node *Node) (result *Node, err error) {
+			if node == nil {
+				return valueNode(nil, "is_object", Null, nil), nil
+			}
+			return valueNode(nil, "is_object", Bool, node.IsObject()), nil
 		},
 	}
 
