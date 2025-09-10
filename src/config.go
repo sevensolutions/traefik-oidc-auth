@@ -46,6 +46,7 @@ type Config struct {
 	PostLoginRedirectUri        string   `json:"post_login_redirect_uri"`
 	ValidPostLoginRedirectUris  []string `json:"valid_post_login_redirect_uris"`
 	LogoutUri                   string   `json:"logout_uri"`
+	FrontChannelLogoutUri       string   `json:"front_channel_logout_uri"`
 	PostLogoutRedirectUri       string   `json:"post_logout_redirect_uri"`
 	ValidPostLogoutRedirectUris []string `json:"valid_post_logout_redirect_uris"`
 
@@ -149,6 +150,7 @@ func CreateConfig() *Config {
 		//Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
+		FrontChannelLogoutUri: "/oidc/frontchannel_logout",
 		PostLogoutRedirectUri: "/",
 		CookieNamePrefix:      "TraefikOidcAuth",
 		SessionCookie: &SessionCookieConfig{
@@ -198,6 +200,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	config.LoginUri = utils.ExpandEnvironmentVariableString(config.LoginUri)
 	config.PostLoginRedirectUri = utils.ExpandEnvironmentVariableString(config.PostLoginRedirectUri)
 	config.LogoutUri = utils.ExpandEnvironmentVariableString(config.LogoutUri)
+	config.FrontChannelLogoutUri = utils.ExpandEnvironmentVariableString(config.FrontChannelLogoutUri)
 	config.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(config.PostLogoutRedirectUri)
 	config.CookieNamePrefix = utils.ExpandEnvironmentVariableString(config.CookieNamePrefix)
 	config.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(config.UnauthorizedBehavior)

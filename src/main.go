@@ -138,6 +138,12 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 	session, updateSession, claims, err := toa.getSessionForRequest(req)
 
+	// Handle front-channel logout
+	if strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+		toa.handleFrontChannelLogout(rw, req, session)
+		return
+	}
+
 	if err == nil && session != nil {
 		// Handle logout
 		if strings.HasPrefix(req.RequestURI, toa.Config.LogoutUri) {
@@ -422,6 +428,30 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}.Encode()
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
+}
+
+func (toa *TraefikOidcAuth) handleFrontChannelLogout(rw http.ResponseWriter, req *http.Request, session *session.SessionState) {
+	// https://openid.net/specs/openid-connect-frontchannel-1_0.html
+
+	rw.Header().Set("Cache-Control", "no-store")
+
+	if session == nil {
+		rw.WriteHeader(http.StatusOK)
+		return
+	}
+
+	issuer := req.URL.Query().Get("iss")
+	sessionId := req.URL.Query().Get("sid")
+
+	toa.logger.Log(logging.LevelDebug, "Front-channel logout. ISS: %s  -- SID: %s", issuer, sessionId)
+
+	toa.logger.Log(logging.LevelDebug, "Front-channel logout. Clearing cookie.")
+
+	// Clear the cookie
+	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+
+	rw.WriteHeader(http.StatusOK)
+	return
 }
 
 func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *http.Request) {
