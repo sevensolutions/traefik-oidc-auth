@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "prepare": "cd tests/dex && ./gencerts.sh",
+    "prepare": "cd tests/keycloak && ./gencerts.sh && docker compose pull",
     "test": "playwright test"
   },
   "keywords": [],

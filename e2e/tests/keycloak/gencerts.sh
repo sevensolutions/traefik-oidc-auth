@@ -46,10 +46,12 @@ WEBSITE_CSR="$WEBSITE_CERT_DIR/website.csr"
 WEBSITE_CERT="$WEBSITE_CERT_DIR/website.pem"
 
 openssl genrsa -out $WEBSITE_KEY 2048
-openssl req -new -key $WEBSITE_KEY -out $WEBSITE_CSR -subj "/C=US/ST=California/L=San Francisco/O=Example Website/OU=IT Department/CN=dex-https"
+openssl req -new -key $WEBSITE_KEY -out $WEBSITE_CSR -subj "/C=US/ST=California/L=San Francisco/O=Example Website/OU=IT Department/CN=localhost"
 
 openssl x509 -req -in $WEBSITE_CSR -CA $INTERMEDIATE_CERT -CAkey $INTERMEDIATE_KEY -CAcreateserial -out $WEBSITE_CERT -days 825 -sha256 \
-    -extfile <(printf "subjectAltName=DNS:dex-https,DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth")
+    -extfile <(printf "subjectAltName=DNS:localhost,DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth")
+
+chmod 644 `ls -d $WEBSITE_CERT_DIR/*`
 
 echo "Website certificate created: $WEBSITE_CERT"
 

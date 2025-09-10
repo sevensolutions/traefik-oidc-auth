@@ -24,3 +24,11 @@ npx playwright test --headed
 ```
 npx playwright test --ui
 ```
+
+## How to update keycloak master-realm.json
+
+Run the docker compose stack and make changes to keycloak. Then run:
+
+```
+docker compose exec -it keycloak /opt/keycloak/bin/kc.sh export --file /opt/keycloak/data/import/master-realm.json --realm master
+```
