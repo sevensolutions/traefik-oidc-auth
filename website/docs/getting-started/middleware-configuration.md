@@ -67,6 +67,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `ValidAudience`* | no | `string` | *ClientId* | The audience which must be present in the JWT-token. Defaults to the configured client id. |
 | `TokenValidation`* | no | `string` | `IdToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. `Introspection` may not work when using PKCE. |
 | `UseClaimsFromUserInfo`* | no | `bool` | `false` | When enabled, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims. The userinfo claims are merged directly into the token claims, with userinfo values overriding token values for non-security-critical claims. |
+| `TokenRenewalThreshold` | no | `float` | `0.75` | The percentage of the token's lifetime after which it should be renewed before expiration. The value must be between 0.5 and 1.0. |
 
 :::warning
 When using `UseClaimsFromUserInfo`, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims.
@@ -153,7 +154,7 @@ By using Go-Templates you have access to the following attributes:
 
 | Template | Description |
 |---|---|
-| `{{ .accessToken }}` | The OAuth Access Token. The access token gets renewed automatically once half of it's lifetime has passed. This means that when sending this token upstream, it has a guaranteed lifetime of half it's expiration time.  |
+| `{{ .accessToken }}` | The OAuth Access Token. The access token gets renewed automatically after `TokenRenewalThreshold` percent of it's lifetime has passed. This means that when sending this token upstream, it is still valid for at least `1 - TokenRenewalThreshold` percent of it's lifetime. |
 | `{{ .idToken }}` | The OAuth Id Token |
 | `{{ .refreshToken }}` | The OAuth Refresh Token |
 | `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim. If `UseClaimsFromUserInfo` is enabled, the claims from the `userinfo_endpoint` are merged directly into the token claims and accessible via `{{ .claims.* }}`. |

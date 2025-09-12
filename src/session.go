@@ -86,7 +86,10 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 			expiryText = fmt.Sprintf("It expires at: %s.", session.ExpiresAt)
 		}
 
-		tokenExpiresText := fmt.Sprintf("The IDP token expires in %ds.", int(math.Round(time.Until(session.RefreshedAt.Add(time.Duration(session.TokenExpiresIn)*time.Second)).Seconds())))
+		tokenExpiresText := ""
+		if session.TokenExpiresIn > 0 {
+			tokenExpiresText = fmt.Sprintf("The IDP token expires in %ds.", int(math.Round(time.Until(session.RefreshedAt.Add(time.Duration(session.TokenExpiresIn)*time.Second)).Seconds())))
+		}
 
 		toa.logger.Log(logging.LevelDebug, "A session is present for the request. %s %s", expiryText, tokenExpiresText)
 	}
@@ -183,14 +186,14 @@ func checkSessionExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState
 		}
 	}
 
-	if !expiresSoon {
+	if !expiresSoon && session.TokenExpiresIn > 0 {
 		pastDuration := time.Since(session.RefreshedAt)
 
-		halfMaxAge := float64(session.TokenExpiresIn) / 2
+		halfMaxAge := float64(session.TokenExpiresIn) * toa.Config.Provider.TokenRenewalThreshold
 
 		if pastDuration.Seconds() > halfMaxAge {
 			expiresSoon = true
-			toa.logger.Log(logging.LevelDebug, "The IDP token is halfway through it's expiration. Renewing now...")
+			toa.logger.Log(logging.LevelDebug, "The IDP token reached %d%% of it's expiration. Renewing now...", int32(toa.Config.Provider.TokenRenewalThreshold*100))
 		}
 	}
 
