@@ -88,12 +88,13 @@ When `CheckOnEveryRequest` is enabled, this will greatly increase the hit rate o
 | `HttpOnly` | no | `bool` | `true` | Whether the cookie should be marked http-only. |
 | `SameSite` | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
 | `MaxAge` | no | `int` | `0` | Cookie time-to-live in seconds.  0 (default) is a ephemeral session cookie. |
+| `SlidingExpiration` | no | `bool` | `false` | Enables cookie renewal after half of `MaxAge` has passed and before it expires. |
 
 :::info
 If `MaxAge = 0` (the default), an ephemeral session cookie is issued, which is deleted when the browser is closed.
 Expired access or ID tokens are refreshed automatically once they expire and before the request is sent upstream.
 
-If `MaxAge > 0` is set, a persistent cookie is issued with the specified lifetime. The cookie is refreshed on the next request once half of its lifetime has passed, and the tokens are renewed at the same time.  
+If `MaxAge > 0` and `SlidingExpiration = true` is set, a persistent cookie is issued with the specified lifetime. The cookie is refreshed on the next request once half of its lifetime has passed. This will keep the cookie *active* as long as the user is using the application.
 :::
 
 ## AuthorizationHeader Block {#authorization-header}

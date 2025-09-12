@@ -99,12 +99,13 @@ type ProviderConfig struct {
 }
 
 type SessionCookieConfig struct {
-	Path     string `json:"path"`
-	Domain   string `json:"domain"`
-	Secure   bool   `json:"secure"`
-	HttpOnly bool   `json:"http_only"`
-	SameSite string `json:"same_site"`
-	MaxAge   int    `json:"max_age"`
+	Path              string `json:"path"`
+	Domain            string `json:"domain"`
+	Secure            bool   `json:"secure"`
+	HttpOnly          bool   `json:"http_only"`
+	SameSite          string `json:"same_site"`
+	MaxAge            int    `json:"max_age"`
+	SlidingExpiration bool   `json:"sliding_expiration"`
 }
 
 type AuthorizationHeaderConfig struct {

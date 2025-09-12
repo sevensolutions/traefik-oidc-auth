@@ -14,7 +14,8 @@ func TestSessionExpiration(t *testing.T) {
 			TokenRenewalThreshold: 0.5,
 		},
 		SessionCookie: &SessionCookieConfig{
-			MaxAge: 10, // seconds
+			MaxAge:            10, // seconds
+			SlidingExpiration: true,
 		},
 	}
 
@@ -25,10 +26,12 @@ func TestSessionExpiration(t *testing.T) {
 		Config: config,
 	}
 
+	now := time.Now()
+
 	sessionState := &session.SessionState{
-		RefreshedAt:    time.Now(),
+		RefreshedAt:    now,
 		TokenExpiresIn: 60,
-		ExpiresAt:      time.Now().Add(6 * time.Second),
+		ExpiresAt:      now.Add(6 * time.Second),
 	}
 
 	expiresSoon := checkSessionExpiresSoon(toa, sessionState)
@@ -38,9 +41,9 @@ func TestSessionExpiration(t *testing.T) {
 	}
 
 	sessionState = &session.SessionState{
-		RefreshedAt:    time.Now(),
+		RefreshedAt:    now,
 		TokenExpiresIn: 60,
-		ExpiresAt:      time.Now().Add(5 * time.Second),
+		ExpiresAt:      now.Add(5 * time.Second),
 	}
 
 	expiresSoon = checkSessionExpiresSoon(toa, sessionState)
@@ -67,8 +70,10 @@ func TestSessionIdpTokenExpiration(t *testing.T) {
 		Config: config,
 	}
 
+	now := time.Now()
+
 	sessionState := &session.SessionState{
-		RefreshedAt:    time.Now().Add(-29 * time.Second),
+		RefreshedAt:    now.Add(-29 * time.Second),
 		TokenExpiresIn: 60,
 	}
 
@@ -79,7 +84,7 @@ func TestSessionIdpTokenExpiration(t *testing.T) {
 	}
 
 	sessionState = &session.SessionState{
-		RefreshedAt:    time.Now().Add(-30 * time.Second),
+		RefreshedAt:    now.Add(-30 * time.Second),
 		TokenExpiresIn: 60,
 	}
 

@@ -181,7 +181,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 }
 
 func checkSessionExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {
-	if toa.Config.SessionCookie.MaxAge > 0 && !session.ExpiresAt.IsZero() {
+	if toa.Config.SessionCookie.SlidingExpiration && toa.Config.SessionCookie.MaxAge > 0 && !session.ExpiresAt.IsZero() {
 		remainingDuration := time.Until(session.ExpiresAt)
 
 		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
