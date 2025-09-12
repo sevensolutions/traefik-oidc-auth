@@ -10,6 +10,9 @@ import (
 
 func TestSessionExpiration(t *testing.T) {
 	config := &Config{
+		Provider: &ProviderConfig{
+			TokenRenewalThreshold: 0.5,
+		},
 		SessionCookie: &SessionCookieConfig{
 			MaxAge: 10, // seconds
 		},
@@ -49,6 +52,9 @@ func TestSessionExpiration(t *testing.T) {
 
 func TestSessionIdpTokenExpiration(t *testing.T) {
 	config := &Config{
+		Provider: &ProviderConfig{
+			TokenRenewalThreshold: 0.5,
+		},
 		SessionCookie: &SessionCookieConfig{
 			MaxAge: 0,
 		},
@@ -66,7 +72,7 @@ func TestSessionIdpTokenExpiration(t *testing.T) {
 		TokenExpiresIn: 60,
 	}
 
-	expiresSoon := checkSessionExpiresSoon(toa, sessionState)
+	expiresSoon := checkIdpTokenExpiresSoon(toa, sessionState)
 
 	if expiresSoon {
 		t.Fail()
@@ -77,7 +83,7 @@ func TestSessionIdpTokenExpiration(t *testing.T) {
 		TokenExpiresIn: 60,
 	}
 
-	expiresSoon = checkSessionExpiresSoon(toa, sessionState)
+	expiresSoon = checkIdpTokenExpiresSoon(toa, sessionState)
 
 	if !expiresSoon {
 		t.Fail()
