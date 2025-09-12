@@ -83,7 +83,7 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 		if session.ExpiresAt.IsZero() {
 			expiryText = "It expires when the browser is closed."
 		} else {
-			expiryText = fmt.Sprintf("It expires at: %s.", session.ExpiresAt)
+			expiryText = fmt.Sprintf("It expires in: %ds.", int(math.Round(time.Until(session.ExpiresAt).Seconds())))
 		}
 
 		tokenExpiresText := ""
