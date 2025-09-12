@@ -28,7 +28,7 @@ services:
       - keycloak_postgres_data:/var/lib/postgresql/data
 
   traefik:
-    image: "traefik:v3.3.2"
+    image: "traefik:v3.5.0"
     ports:
       - "9080:80"
       - "8080:8080"

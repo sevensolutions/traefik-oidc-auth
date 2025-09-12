@@ -302,6 +302,24 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
+		if toa.Config.Provider.UseClaimsFromUserInfoBool {
+			subClaim, ok := claims["sub"].(string)
+			if !ok {
+				toa.logger.Log(logging.LevelError, "failed to fetch UserInfo: 'sub' claim is not a string or missing")
+				http.Error(rw, "Failed to fetch UserInfo", http.StatusInternalServerError)
+				return
+			}
+
+			userInfoClaims, err := toa.getUserInfo(token.AccessToken, subClaim)
+			if err != nil {
+				toa.logger.Log(logging.LevelError, "failed to fetch UserInfo: %s", err.Error())
+				http.Error(rw, "Failed to fetch UserInfo", http.StatusInternalServerError)
+				return
+			}
+
+			claims = mergeClaims(claims, userInfoClaims)
+		}
+
 		toa.logger.Log(logging.LevelInfo, "Exchange Auth Code completed. Token: %+v", redactedToken)
 
 		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
@@ -407,26 +425,48 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 }
 
 func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *http.Request) {
-	if toa.Config.UnauthorizedBehavior == "Challenge" {
+	switch toa.Config.UnauthorizedBehavior {
+	case "Challenge":
+		// Redirect to Identity Provider
 		toa.redirectToProvider(rw, req)
-	} else {
-		data := make(map[string]interface{})
-
-		data["statusType"] = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
-		data["statusCode"] = http.StatusUnauthorized
-		data["statusName"] = "Unauthorized"
-		data["description"] = "You're not authorized to access this resource. Please log in to continue."
-
-		if toa.Config.LoginUri != "" {
-			data["primaryButtonText"] = "Login"
-			data["primaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LoginUri)
+	case "Unauthorized":
+		// Respond with 401 Unauthorized
+		toa.writeUnauthenticatedError(rw, req)
+	case "Auto":
+		if utils.IsHtmlRequest(req) {
+			// Redirect to Identity Provider for HTML requests
+			toa.redirectToProvider(rw, req)
+		} else {
+			// Respond with 401 Unauthorized for non-HTML requests
+			toa.writeUnauthenticatedError(rw, req)
 		}
-
-		errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
+	default:
+		// Respond with 401 Unauthorized as a fallback
+		toa.writeUnauthenticatedError(rw, req)
 	}
 }
 
+func (toa *TraefikOidcAuth) writeUnauthenticatedError(rw http.ResponseWriter, req *http.Request) {
+	data := make(map[string]interface{})
+
+	data["statusType"] = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
+	data["statusCode"] = http.StatusUnauthorized
+	data["statusName"] = "Unauthorized"
+	data["description"] = "You're not authorized to access this resource. Please log in to continue."
+
+	if toa.Config.LoginUri != "" {
+		data["primaryButtonText"] = "Login"
+		data["primaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LoginUri)
+	}
+
+	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
+}
+
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
+	toa.writeUnauthorizedError(rw, req)
+}
+
+func (toa *TraefikOidcAuth) writeUnauthorizedError(rw http.ResponseWriter, req *http.Request) {
 	data := make(map[string]interface{})
 
 	data["statusType"] = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
