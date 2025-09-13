@@ -213,10 +213,10 @@ http:
 
   expect(response.status()).toBe(200);
 
-  const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  const authHeaderExists = await page.getByText("Authorization: Bearer: ey").isVisible();
   expect(authHeaderExists).toBeTruthy();
 
-  const staticHeaderExists = await page.locator(`text=X-Static-Header: 42`).isVisible();
+  const staticHeaderExists = await page.getByText("X-Static-Header: 42").isVisible();
   expect(staticHeaderExists).toBeTruthy();
 
   // Authorization cookie should not be present in the rendered contents
@@ -760,12 +760,12 @@ http:
 //-----------------------------------------------------------------------------
 
 async function login(page: Page, username: string, password: string, waitForUrl: string): Promise<Response> {
-  await page.locator("#username").fill(username);
-  await page.locator("#password").fill(password);
+  await page.getByRole("textbox", { name: 'Username or email' }).fill(username);
+  await page.getByRole("textbox", { name: "Password" }).fill(password);
 
   const responsePromise = page.waitForResponse(waitForUrl);
 
-  await page.locator('#kc-login').click();
+  await page.getByRole("button", { name: "Sign In" }).click();
 
   const response = await responsePromise;
 
