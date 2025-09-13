@@ -79,19 +79,12 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 	}
 
 	if toa.logger.MinLevel == logging.LevelDebug {
-		var expiryText string
-		if session.ExpiresAt.IsZero() {
-			expiryText = "It expires when the browser is closed."
-		} else {
-			expiryText = fmt.Sprintf("It expires in: %ds.", int(math.Round(time.Until(session.ExpiresAt).Seconds())))
-		}
-
 		tokenExpiresText := ""
 		if session.TokenExpiresIn > 0 {
 			tokenExpiresText = fmt.Sprintf("The IDP token expires in %ds.", int(math.Round(time.Until(session.RefreshedAt.Add(time.Duration(session.TokenExpiresIn)*time.Second)).Seconds())))
 		}
 
-		toa.logger.Log(logging.LevelDebug, "A session is present for the request. %s %s", expiryText, tokenExpiresText)
+		toa.logger.Log(logging.LevelDebug, "A session is present for the request. %s", tokenExpiresText)
 	}
 
 	return session, updatedSession != nil, claims, nil
@@ -117,15 +110,13 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 	success, claims, err := toa.validateToken(session)
 
 	// Check if the session or IDP token expires soon
-	renewSession := false
 	idpTokenExpiresSoon := false
 	if success {
-		renewSession = checkSessionExpiresSoon(toa, session)
 		idpTokenExpiresSoon = checkIdpTokenExpiresSoon(toa, session)
 	}
 
 	if !success || err != nil || idpTokenExpiresSoon {
-		if idpTokenExpiresSoon && session.RefreshToken != "" {
+		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
 			newTokens, err := toa.renewToken(session.RefreshToken)
@@ -149,50 +140,26 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				}
 			}
 
+			success, claims, err = toa.validateToken(session)
+
+			if !success || err != nil {
+				toa.logger.Log(logging.LevelError, "Failed to validate renewed session: %v", err)
+				return nil, nil, session, err
+			}
+
 			// Update expirations
 			session.RefreshedAt = time.Now()
 			session.TokenExpiresIn = newTokens.ExpiresIn
 
-			success, claims, err = toa.validateToken(session)
+			toa.logger.Log(logging.LevelInfo, "Successfully renewed session")
 
-			if !success || err != nil {
-				toa.logger.Log(logging.LevelError, "Failed to validate renewed token: %v", err)
-				return nil, nil, session, err
-			}
-
-			// Set to true because we also need to renew the session
-			renewSession = true
+			return session, claims, session, err
 		} else {
 			return nil, nil, nil, err
 		}
 	}
 
-	if renewSession {
-		if toa.Config.SessionCookie.MaxAge > 0 {
-			session.ExpiresAt = time.Now().Add(time.Duration(toa.Config.SessionCookie.MaxAge) * time.Second)
-		}
-
-		toa.logger.Log(logging.LevelInfo, "Successfully renewed session")
-
-		return session, claims, session, err
-	}
-
 	return session, claims, nil, nil
-}
-
-func checkSessionExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {
-	if toa.Config.SessionCookie.SlidingExpiration && toa.Config.SessionCookie.MaxAge > 0 && !session.ExpiresAt.IsZero() {
-		remainingDuration := time.Until(session.ExpiresAt)
-
-		halfMaxAge := float64(toa.Config.SessionCookie.MaxAge) / 2
-
-		if remainingDuration.Seconds() < halfMaxAge {
-			toa.logger.Log(logging.LevelDebug, "The session is halfway through it's expiration. Renewing now...")
-			return true
-		}
-	}
-
-	return false
 }
 
 func checkIdpTokenExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {

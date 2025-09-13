@@ -18,7 +18,6 @@ type SessionState struct {
 	IdToken        string    `json:"id_token"`
 	RefreshToken   string    `json:"refresh_token"`
 	IsAuthorized   bool      `json:"is_authorized"`
-	ExpiresAt      time.Time `json:"expires_at"`
 	TokenExpiresIn int       `json:"token_expires_in"`
 }
 

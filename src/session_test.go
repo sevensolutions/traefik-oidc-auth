@@ -8,51 +8,6 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
 )
 
-func TestSessionExpiration(t *testing.T) {
-	config := &Config{
-		Provider: &ProviderConfig{
-			TokenRenewalThreshold: 0.5,
-		},
-		SessionCookie: &SessionCookieConfig{
-			MaxAge:            10, // seconds
-			SlidingExpiration: true,
-		},
-	}
-
-	logger := logging.CreateLogger(logging.LevelDebug)
-
-	toa := &TraefikOidcAuth{
-		logger: logger,
-		Config: config,
-	}
-
-	now := time.Now()
-
-	sessionState := &session.SessionState{
-		RefreshedAt:    now,
-		TokenExpiresIn: 60,
-		ExpiresAt:      now.Add(6 * time.Second),
-	}
-
-	expiresSoon := checkSessionExpiresSoon(toa, sessionState)
-
-	if expiresSoon {
-		t.Fail()
-	}
-
-	sessionState = &session.SessionState{
-		RefreshedAt:    now,
-		TokenExpiresIn: 60,
-		ExpiresAt:      now.Add(5 * time.Second),
-	}
-
-	expiresSoon = checkSessionExpiresSoon(toa, sessionState)
-
-	if !expiresSoon {
-		t.Fail()
-	}
-}
-
 func TestSessionIdpTokenExpiration(t *testing.T) {
 	config := &Config{
 		Provider: &ProviderConfig{

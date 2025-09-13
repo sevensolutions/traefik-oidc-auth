@@ -324,11 +324,6 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
 
-		sessionExpire := time.Time{}
-		if toa.Config.SessionCookie.MaxAge > 0 {
-			sessionExpire = time.Now().Add(time.Duration(toa.Config.SessionCookie.MaxAge) * time.Second)
-		}
-
 		session := &session.SessionState{
 			Id:             session.GenerateSessionId(),
 			RefreshedAt:    time.Now(),
@@ -336,7 +331,6 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			IdToken:        token.IdToken,
 			RefreshToken:   token.RefreshToken,
 			IsAuthorized:   isAuthorized,
-			ExpiresAt:      sessionExpire,
 			TokenExpiresIn: token.ExpiresIn,
 		}
 
