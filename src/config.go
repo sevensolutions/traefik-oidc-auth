@@ -92,6 +92,8 @@ type ProviderConfig struct {
 	// AccessToken or IdToken or Introspection
 	TokenValidation string `json:"verification_token"`
 
+	TokenRenewalThreshold float64 `json:"token_renewal_threshold"`
+
 	UseClaimsFromUserInfo     string `json:"use_claims_from_user_info"`
 	UseClaimsFromUserInfoBool bool   `json:"use_claims_from_user_info_bool"`
 }
@@ -142,6 +144,7 @@ func CreateConfig() *Config {
 			ValidateIssuerBool:        true,
 			ValidateAudienceBool:      true,
 			TokenValidation:           "IdToken",
+			TokenRenewalThreshold:     0.75,
 			UseClaimsFromUserInfoBool: false,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
@@ -288,6 +291,11 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	}
 	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
 	logger.Log(logging.LevelDebug, "SessionCookie: %v", config.SessionCookie)
+
+	if config.Provider.TokenRenewalThreshold < 0.5 || config.Provider.TokenRenewalThreshold > 1.0 {
+		logger.Log(logging.LevelError, "Invalid TokenRenewalThreshold. The value must be >= 0.5 and <= 1.0.")
+		return nil, errors.New("invalid TokenRenewalThreshold")
+	}
 
 	var conditionalAuth *rules.RequestCondition
 	if config.BypassAuthenticationRule != "" {
