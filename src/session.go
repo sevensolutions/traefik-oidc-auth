@@ -126,7 +126,12 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 			}
 
 			session.AccessToken = newTokens.AccessToken
-			session.RefreshToken = newTokens.RefreshToken
+
+			if newTokens.RefreshToken != "" {
+				session.RefreshToken = newTokens.RefreshToken
+			} else {
+				toa.logger.Log(logging.LevelDebug, "The auth provider didn't return a new RefreshToken. Still keeping the old one.")
+			}
 
 			// We had some problems with some providers which didn't return a new IdToken when renewing the tokens.
 			// Thats why i'am logging this case specifically here.
