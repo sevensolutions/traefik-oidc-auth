@@ -184,6 +184,11 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	// Clear the session cookie
 	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
+	// Don't display unauthenticated error for frontchannel-logout URI
+	if strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+		toa.writeSuccessfulLogout(rw, req)
+		return
+	}
 	toa.handleUnauthenticated(rw, req)
 }
 
