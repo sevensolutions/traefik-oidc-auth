@@ -123,6 +123,24 @@ test("logout", async ({ page }) => {
   expect(logoutResponse?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
 });
 
+test("frontchannel logout", async ({ page }) => {
+  await expectGotoOkay(page, "http://localhost:9080");
+
+  const response = await login(page, "admin", "admin", "http://localhost:9080");
+
+  expect(response.status()).toBe(200);
+
+  const logoutResponse = await page.goto("http://localhost:9080/frontchannel-logout");
+
+  expect(logoutResponse?.status()).toBe(200);
+});
+
+test("frontchannel logout doesn't fail if no session", async ({ page }) => {
+  const logoutResponse = await page.goto("http://localhost:9080/frontchannel-logout");
+
+  expect(logoutResponse?.status()).toBe(200);
+});
+
 test("test two services is seamless", async ({ page }) => {
   await configureTraefik(`
 http:
