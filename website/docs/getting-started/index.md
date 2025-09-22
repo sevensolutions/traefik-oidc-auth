@@ -75,7 +75,8 @@ metadata:
   namespace: traefik
 type: Opaque
 stringData:
-  pluginSecret: x
+  pluginSecret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+  providerClientSecret: "<YourClientSecret>"
 ---
 apiVersion: traefik.io/v1alpha1
 # highlight-next-line
