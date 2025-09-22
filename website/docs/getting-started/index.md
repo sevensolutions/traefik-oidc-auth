@@ -77,7 +77,7 @@ metadata:
 spec:
   # highlight-start
   plugin:
-    traefik-oidc-plugin:  # same key as in the static configuration
+    traefik-oidc-auth: # same key as in the static configuration
       Secret: "urn:k8s:secret:oidc-secret:pluginSecret"
       Provider:
         # You could just write strings here for the values.
