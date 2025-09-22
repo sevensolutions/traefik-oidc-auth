@@ -68,6 +68,16 @@ http:
 This is an example using [Kubernetes IngressRoute CRD](https://doc.traefik.io/traefik/providers/kubernetes-crd/) config
 
 ```yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oidc-secret
+  namespace: traefik
+type: Opaque
+stringData:
+  pluginSecret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+  providerClientSecret: "<YourClientSecret>"
+---
 apiVersion: traefik.io/v1alpha1
 # highlight-next-line
 kind: Middleware
