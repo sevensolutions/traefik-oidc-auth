@@ -144,6 +144,10 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			toa.handleLogout(rw, req, session)
 			return
 		}
+		if toa.Config.FrontChannelLogoutUri != "" && strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+			toa.handleFrontchannelLogout(rw, req, claims)
+			return
+		}
 
 		// If this request is using external authentication by using a header or custom cookie,
 		// we need to validate the authorization on every request.
@@ -180,6 +184,11 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	// Clear the session cookie
 	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
+	// Don't display unauthenticated error for frontchannel-logout URI
+	if strings.HasPrefix(req.RequestURI, toa.Config.FrontChannelLogoutUri) {
+		toa.writeSuccessfulLogout(rw, req)
+		return
+	}
 	toa.handleUnauthenticated(rw, req)
 }
 
@@ -425,6 +434,50 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 
 	http.Redirect(rw, req, endSessionURL.String(), http.StatusFound)
 }
+
+func (toa *TraefikOidcAuth) handleFrontchannelLogout(rw http.ResponseWriter, req *http.Request, claims map[string]interface{}) {
+	toa.logger.Log(logging.LevelInfo, "Handling frontchannel logout...")
+	// https://openid.net/specs/openid-connect-frontchannel-1_0.html
+
+	// if exactly one of iss or sid is missing, we ignore the request
+	iss := req.URL.Query().Get("iss")
+	sid := req.URL.Query().Get("sid")
+	if (iss == "" && sid != "") || (iss != "" && sid == "") {
+		toa.logger.Log(logging.LevelWarn, "Ignoring frontchannel logout request: iss or sid is missing")
+		http.Error(rw, "iss or sid is missing", http.StatusBadRequest)
+		return
+	}
+
+	if (iss == "" && sid == "") || (claims["iss"] == iss && claims["sid"] == sid) {
+		// If both are missing or the issuer is valid, we proceed
+		toa.logger.Log(logging.LevelInfo, "Proceeding with frontchannel logout")
+
+		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+		toa.writeSuccessfulLogout(rw, req)
+		return
+	} else {
+		toa.logger.Log(logging.LevelWarn, "Ignoring frontchannel logout request: sid or iss does not match")
+		http.Error(rw, "sid or iss does not match", http.StatusBadRequest)
+		return
+	}
+}
+
+func (toa *TraefikOidcAuth) writeSuccessfulLogout(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+	data := make(map[string]interface{})
+	data["statusCode"] = http.StatusOK
+	data["statusName"] = "Logged out"
+	data["description"] = "You have been logged out successfully."
+
+	if toa.Config.LoginUri != "" {
+		data["primaryButtonText"] = "Log back in"
+		data["primaryButtonUrl"] = utils.EnsureAbsoluteUrl(req, toa.Config.LoginUri)
+	}
+
+	errorPages.WriteError(toa.logger, &errorPages.ErrorPageConfig{}, rw, req, data)
+}
+
 
 func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *http.Request) {
 	switch toa.Config.UnauthorizedBehavior {

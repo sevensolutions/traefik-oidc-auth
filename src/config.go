@@ -48,6 +48,7 @@ type Config struct {
 	LogoutUri                   string   `json:"logout_uri"`
 	PostLogoutRedirectUri       string   `json:"post_logout_redirect_uri"`
 	ValidPostLogoutRedirectUris []string `json:"valid_post_logout_redirect_uris"`
+	FrontChannelLogoutUri       string   `json:"front_channel_logout_uri"`
 
 	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
 	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
@@ -152,6 +153,7 @@ func CreateConfig() *Config {
 		//Scopes:                []string{"openid", "profile", "email"},
 		CallbackUri:           "/oidc/callback",
 		LogoutUri:             "/logout",
+		FrontChannelLogoutUri: "/frontchannel-logout",
 		PostLogoutRedirectUri: "/",
 		CookieNamePrefix:      "TraefikOidcAuth",
 		SessionCookie: &SessionCookieConfig{
