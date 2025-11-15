@@ -325,11 +325,13 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
 
 		session := &session.SessionState{
-			Id:           session.GenerateSessionId(),
-			AccessToken:  token.AccessToken,
-			IdToken:      token.IdToken,
-			RefreshToken: token.RefreshToken,
-			IsAuthorized: isAuthorized,
+			Id:             session.GenerateSessionId(),
+			RefreshedAt:    time.Now(),
+			AccessToken:    token.AccessToken,
+			IdToken:        token.IdToken,
+			RefreshToken:   token.RefreshToken,
+			IsAuthorized:   isAuthorized,
+			TokenExpiresIn: token.ExpiresIn,
 		}
 
 		toa.storeSessionAndAttachCookie(session, rw)

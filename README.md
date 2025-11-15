@@ -87,3 +87,8 @@ If you'd like to make a small donation, I'd be very grateful. Just click the but
 Thank You!
 
 [![](https://img.shields.io/static/v1?label=Sponsor&color=blue&message=%E2%9D%A4&logo=GitHub)](https://github.com/sponsors/sevensolutions)
+
+Are you looking for the right hosting provider?  
+Click the link below and get 20€ starting credit when you sign up via this link 😎.
+
+[![Hetzner](https://a11ybadges.com/badge?logo=hetzner)](https://hetzner.cloud/?ref=98cdlRHw6PL5)

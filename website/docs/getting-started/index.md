@@ -16,7 +16,7 @@ experimental:
   plugins:
     traefik-oidc-auth:
       moduleName: "github.com/sevensolutions/traefik-oidc-auth"
-      version: "v0.16.0"
+      version: "v0.17.0"
 ```
 
 ## Configure Middleware
