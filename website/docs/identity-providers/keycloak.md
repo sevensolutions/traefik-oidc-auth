@@ -35,10 +35,5 @@ http:
             ClientId: "<YourClientId>"
             ClientSecret: "<YourClientSecret>"
             UsePkce: true
-            ValidAudience: "account"
           Scopes: ["openid", "profile", "email"]
 ```
-
-:::note
-You need to set `ValidAudience`to `account`. I don't really know why Keycloak tokens always contain the `account` audience.
-:::
