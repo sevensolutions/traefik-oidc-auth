@@ -258,12 +258,12 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			toa.logger.Log(logging.LevelWarn, "Code is missing.")
+			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
 
-		token, err := exchangeAuthCode(toa, req, authCode)
+		token, err := exchangeAuthCode(toa, req, authCode, state)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
@@ -513,11 +513,18 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 	}
 
+	requestedResources := toa.Config.RequestedResources
+
+	if req.URL.Query().Has("resource") {
+		requestedResources = req.URL.Query()["resource"]
+	}
+
 	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
 
 	state := oidc.OidcState{
-		Action:      "Login",
-		RedirectUrl: redirectUrl,
+		Action:             "Login",
+		RedirectUrl:        redirectUrl,
+		RequestedResources: requestedResources,
 	}
 
 	stateBase64, err := oidc.EncodeState(&state)
@@ -542,6 +549,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
 		"state":         {stateBase64},
+		"resource":      requestedResources,
 	}
 
 	if prompt := req.URL.Query().Get("prompt"); prompt != "" {

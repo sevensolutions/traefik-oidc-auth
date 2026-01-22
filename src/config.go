@@ -62,6 +62,8 @@ type Config struct {
 	BypassAuthenticationRule string `json:"bypass_authentication_rule"`
 
 	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
+
+	RequestedResources []string
 }
 
 type ProviderConfig struct {

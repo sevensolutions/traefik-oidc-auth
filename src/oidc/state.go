@@ -6,8 +6,9 @@ import (
 )
 
 type OidcState struct {
-	Action      string `json:"action"`
-	RedirectUrl string `json:"redirect_url"`
+	Action             string   `json:"action"`
+	RedirectUrl        string   `json:"redirect_url"`
+	RequestedResources []string `json:"resources"`
 }
 
 func EncodeState(state *OidcState) (string, error) {

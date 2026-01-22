@@ -71,7 +71,7 @@ func randomBytesInHex(count int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string) (*oidc.OidcTokenResponse, error) {
+func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, state *oidc.OidcState) (*oidc.OidcTokenResponse, error) {
 	redirectUrl := oidcAuth.GetAbsoluteCallbackURL(req).String()
 
 	urlValues := url.Values{
@@ -79,6 +79,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		"client_id":    {oidcAuth.Config.Provider.ClientId},
 		"code":         {authCode},
 		"redirect_uri": {redirectUrl},
+		"resource":     state.RequestedResources,
 	}
 
 	if oidcAuth.Config.Provider.ClientSecret != "" {
