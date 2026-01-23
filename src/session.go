@@ -160,6 +160,9 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 
 			return session, claims, session, err
 		} else {
+			if err == nil {
+				err = errors.New("no refresh_token available")
+			}
 			return nil, nil, nil, err
 		}
 	}
