@@ -263,7 +263,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
-		token, err := exchangeAuthCode(toa, req, authCode, state)
+		token, err := exchangeAuthCode(toa, req, authCode)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
@@ -513,18 +513,11 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 	}
 
-	requestedResources := toa.Config.RequestedResources
-
-	if req.URL.Query().Has("resource") {
-		requestedResources = req.URL.Query()["resource"]
-	}
-
 	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
 
 	state := oidc.OidcState{
-		Action:             "Login",
-		RedirectUrl:        redirectUrl,
-		RequestedResources: requestedResources,
+		Action:      "Login",
+		RedirectUrl: redirectUrl,
 	}
 
 	stateBase64, err := oidc.EncodeState(&state)
@@ -549,7 +542,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
 		"state":         {stateBase64},
-		"resource":      requestedResources,
+		"resource":      toa.Config.RequestedResources,
 	}
 
 	if prompt := req.URL.Query().Get("prompt"); prompt != "" {

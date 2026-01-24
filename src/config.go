@@ -63,7 +63,7 @@ type Config struct {
 
 	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
 
-	RequestedResources []string
+	RequestedResources []string `json:"requested_resources"`
 }
 
 type ProviderConfig struct {

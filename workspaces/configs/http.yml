@@ -18,6 +18,7 @@ http:
             UsePkce: true
             ValidateAudience: "${VALIDATE_AUDIENCE}"
           Scopes: ["openid", "profile", "email"]
+          RequestedResources: ["https://danielpeinhopf.com"]
           Headers:
             - Name: "X-Oidc-Username"
               Value: "{{`{{ .claims.preferred_username }}`}}"
@@ -40,7 +41,7 @@ http:
           #     - Name: some.nested.key
           #       AnyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
-          #LoginUri: "/login"
+          LoginUri: "/login"
           #ValidPostLoginRedirectUris: ["https://google.at"]
           #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"
