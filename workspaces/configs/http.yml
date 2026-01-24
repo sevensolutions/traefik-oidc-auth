@@ -18,7 +18,6 @@ http:
             UsePkce: true
             ValidateAudience: "${VALIDATE_AUDIENCE}"
           Scopes: ["openid", "profile", "email"]
-          RequestedResources: ["https://danielpeinhopf.com"]
           Headers:
             - Name: "X-Oidc-Username"
               Value: "{{`{{ .claims.preferred_username }}`}}"
