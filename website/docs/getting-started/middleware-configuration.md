@@ -138,10 +138,11 @@ So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 
 ## Header Block {#header}
 
-| Name | Required | Type | Default | Description |
-|---|---|---|---|---|
-| `Name` | yes | `string` | *none* | The name of the header which should be added to the upstream request. |
-| `Value` | yes | `string` | *none* | The value of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Please see the info below. |
+| Name     | Required           | Type     | Default | Description                                                                                                                               |
+|----------|--------------------|----------|---------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `Name`   | yes                | `string` | *none*  | The name of the header which should be added to the upstream request.                                                                     |
+| `Value`  | if `Values` absent | `string` | *none*  | The value of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Please see the info below.                       |
+| `Values` | if `Value` absent  | `string` | *none*  | The values of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Should evaluate to valid json array of strings. |
 
 By using Go-Templates you have access to the following attributes:
 
@@ -171,6 +172,19 @@ Note that this *only* applies for configuring Traefik from a YAML file, where it
 Headers:
   - Name: X-Oidc-Groups-Json-Array
     Value: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js $g}}"{{end}}{{end}}]'
+```
+
+If using `Values` templating, value should be a valid string of JSON array with only strings as values. Each value is mapped to an individual header.
+It can be used to pass multiple headers with the same name, for example, for a Kubernetes impersonation request:
+
+```yml
+Headers:
+  - Name: "Authorization"
+    Value: "Bearer {{ .accessToken }}"
+  - Name: "Impersonate-User"
+    Value: "prefix:{{ .claims.preferred_username }}"
+  - Name: "Impersonate-Group"
+    Values: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js (printf "prefix:%s" $g)}}"{{end}}{{end}}]'
 ```
 :::
 
