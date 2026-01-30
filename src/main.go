@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -228,6 +229,41 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, renderedValue.String())
 				} else {
 					req.Header.Set(header.Name, err.Error())
+				}
+			} else if header.Values != "" {
+				if header.template == nil {
+					tpl, err := template.New("").Parse(header.Values)
+
+					if err != nil {
+						return err
+					}
+
+					header.template = tpl
+				}
+
+				var renderedValue bytes.Buffer
+				err := header.template.Execute(&renderedValue, evalContext)
+
+				if err != nil {
+					req.Header.Set(header.Name, err.Error())
+				}
+
+				var values []string
+				err = json.Unmarshal(renderedValue.Bytes(), &values)
+				if err != nil {
+					req.Header.Set(header.Name, err.Error())
+				}
+
+				if len(values) > 0 {
+					for i, value := range values {
+						if i == 0 {
+							req.Header.Set(header.Name, value)
+						} else {
+							req.Header.Add(header.Name, value)
+						}
+					}
+				} else {
+					req.Header.Del(header.Name)
 				}
 			} else {
 				req.Header.Set(header.Name, "")

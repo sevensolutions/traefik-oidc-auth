@@ -128,8 +128,9 @@ type ClaimAssertion struct {
 }
 
 type HeaderConfig struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	Values string `json:"values"`
 
 	// A reference to the parsed Value-template
 	template *template.Template
@@ -345,6 +346,13 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 			logger.Log(logging.LevelWarn, "Failed to append CA bundle. Using system certificates only.")
 		}
 
+	}
+
+	for _, header := range config.Headers {
+		if header.Value != "" && header.Values != "" {
+			logger.Log(logging.LevelError, "Invalid Header: you can only use one of Value or Values, not both")
+			return nil, errors.New("invalid Header")
+		}
 	}
 
 	httpTransport := &http.Transport{
