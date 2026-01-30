@@ -40,7 +40,7 @@ http:
           #     - Name: some.nested.key
           #       AnyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
-          #LoginUri: "/login"
+          LoginUri: "/login"
           #ValidPostLoginRedirectUris: ["https://google.at"]
           #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"

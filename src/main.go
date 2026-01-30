@@ -258,7 +258,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			toa.logger.Log(logging.LevelWarn, "Code is missing.")
+			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
@@ -542,6 +542,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
 		"state":         {stateBase64},
+		"resource":      toa.Config.RequestedResources,
 	}
 
 	if prompt := req.URL.Query().Get("prompt"); prompt != "" {

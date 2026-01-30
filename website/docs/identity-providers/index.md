@@ -23,5 +23,6 @@ If you have tested a new Identity Provider, not mentioned here already, please s
 | [Authentik](./authentik.md) | ✅ | |
 | [Pocket ID](./pocket-id.md) | ✅ | |
 | [GitHub](https://github.com) | ❌ | GitHub doesn't seem to support OIDC, only plain OAuth. |
+| [Logto](./logto.md) | ✅ | |
 
 ✅ Supported | 🧐 Untested (See Notes) | ❌ Not Supported
