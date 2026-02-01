@@ -174,6 +174,14 @@ Headers:
     Value: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js $g}}"{{end}}{{end}}]'
 ```
 
+Some additional helper functions are available in the templates:
+
+| Name             | Description                                                                              |
+|------------------|------------------------------------------------------------------------------------------|
+| `withPrefix`     | Prefixes each value in the slice with a given string.                                    |
+| `withSuffix`     | Suffixes each value in the slice with a given string.                                    |
+| `mapToJsonArray` | Maps each value to a JSON array element, escaping any special characters in the process. |
+
 If using `Values` templating, value should be a valid string of JSON array with only strings as values. Each value is mapped to an individual header.
 It can be used to pass multiple headers with the same name, for example, for a Kubernetes impersonation request:
 
@@ -184,7 +192,7 @@ Headers:
   - Name: "Impersonate-User"
     Value: "prefix:{{ .claims.preferred_username }}"
   - Name: "Impersonate-Group"
-    Values: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js (printf "prefix:%s" $g)}}"{{end}}{{end}}]'
+    Values: '{{ .claims.groups | withPrefix "prefix:" | mapToJsonArray }}'
 ```
 :::
 

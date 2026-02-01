@@ -201,6 +201,32 @@ func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
 	}
 }
 
+func newTemplate() *template.Template {
+	return template.New("").Funcs(template.FuncMap{
+		"withPrefix": func(prefix string, values []string) []string {
+			var result []string
+			for _, value := range values {
+				result = append(result, prefix+value)
+			}
+			return result
+		},
+		"withSuffix": func(suffix string, values []string) []string {
+			var result []string
+			for _, value := range values {
+				result = append(result, value+suffix)
+			}
+			return result
+		},
+		"mapToJsonArray": func(values []string) string {
+			var result []string
+			for _, value := range values {
+				result = append(result, "\""+template.JSEscapeString(value)+"\"")
+			}
+			return "[" + strings.Join(result, ",") + "]"
+		},
+	})
+}
+
 func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.SessionState, claims map[string]interface{}) error {
 	if toa.Config.Headers != nil {
 		evalContext := make(map[string]interface{})
@@ -213,7 +239,7 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 		for _, header := range toa.Config.Headers {
 			if header.Value != "" {
 				if header.template == nil {
-					tpl, err := template.New("").Parse(header.Value)
+					tpl, err := newTemplate().Parse(header.Value)
 
 					if err != nil {
 						return err
@@ -232,7 +258,7 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 				}
 			} else if header.Values != "" {
 				if header.template == nil {
-					tpl, err := template.New("").Parse(header.Values)
+					tpl, err := newTemplate().Parse(header.Values)
 
 					if err != nil {
 						return err
