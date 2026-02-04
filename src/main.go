@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"text/template"
@@ -201,28 +202,46 @@ func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
 	}
 }
 
+func withSuffixPrefix(suffixPrefix string, values any, format string) any {
+	var result []string
+	var valueOf = reflect.ValueOf(values)
+	if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
+		for i := 0; i < valueOf.Len(); i++ {
+			result = append(result, fmt.Sprintf(format, valueOf.Index(i), suffixPrefix))
+		}
+		return result
+	}
+	return fmt.Sprintf(format, valueOf, suffixPrefix)
+}
+
 func newTemplate() *template.Template {
 	return template.New("").Funcs(template.FuncMap{
-		"withPrefix": func(prefix string, values []string) []string {
-			var result []string
-			for _, value := range values {
-				result = append(result, prefix+value)
-			}
-			return result
+		"withPrefix": func(prefix string, values any) any {
+			return withSuffixPrefix(prefix, values, "%[2]s%[1]s")
 		},
-		"withSuffix": func(suffix string, values []string) []string {
-			var result []string
-			for _, value := range values {
-				result = append(result, value+suffix)
-			}
-			return result
+		"withSuffix": func(suffix string, values any) any {
+			return withSuffixPrefix(suffix, values, "%[1]s%[2]s")
 		},
-		"mapToJsonArray": func(values []string) string {
-			var result []string
-			for _, value := range values {
-				result = append(result, "\""+template.JSEscapeString(value)+"\"")
+		"mapToJsonArray": func(values any) string {
+			var valueOf = reflect.ValueOf(values)
+			var builder strings.Builder
+			builder.WriteRune('[')
+			if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
+				for i := 0; i < valueOf.Len(); i++ {
+					if i > 0 {
+						builder.WriteRune(',')
+					}
+					builder.WriteRune('"')
+					template.JSEscape(&builder, []byte(fmt.Sprint(valueOf.Index(i))))
+					builder.WriteRune('"')
+				}
+			} else {
+				builder.WriteRune('"')
+				template.JSEscape(&builder, []byte(fmt.Sprint(valueOf)))
+				builder.WriteRune('"')
 			}
-			return "[" + strings.Join(result, ",") + "]"
+			builder.WriteRune(']')
+			return builder.String()
 		},
 	})
 }

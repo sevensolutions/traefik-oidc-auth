@@ -7,10 +7,10 @@ import (
 )
 
 func TestTemplate_mapToJsonArray(t *testing.T) {
-	evalContext := make(map[string]interface{})
-
-	evalContext["claims"] = map[string]interface{}{
-		"roles": []string{"admin", "user"},
+	evalContext := map[string]any{
+		"claims": map[string]any{
+			"roles": []any{"admin", "user"},
+		},
 	}
 
 	template, err := newTemplate().Parse("{{ .claims.roles | withPrefix \"prefix:\" | withSuffix \":suffix\" | mapToJsonArray }}")
@@ -38,6 +38,6 @@ func TestTemplate_mapToJsonArray(t *testing.T) {
 	}
 
 	if result[1] != "prefix:user:suffix" {
-		t.Errorf("Expected prefix:user:suffix at index 1, got %s", result[0])
+		t.Errorf("Expected prefix:user:suffix at index 1, got %s", result[1])
 	}
 }
