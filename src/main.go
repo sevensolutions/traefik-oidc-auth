@@ -207,11 +207,11 @@ func withSuffixPrefix(suffixPrefix string, values any, format string) any {
 	var valueOf = reflect.ValueOf(values)
 	if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
 		for i := 0; i < valueOf.Len(); i++ {
-			result = append(result, fmt.Sprintf(format, valueOf.Index(i), suffixPrefix))
+			result = append(result, fmt.Sprintf(format, fmt.Sprint(valueOf.Index(i)), suffixPrefix))
 		}
 		return result
 	}
-	return fmt.Sprintf(format, valueOf, suffixPrefix)
+	return fmt.Sprintf(format, fmt.Sprint(valueOf), suffixPrefix)
 }
 
 func newTemplate() *template.Template {
