@@ -183,7 +183,7 @@ func extractKeys(keys *JwksKeys) ([]*RsaKey, []*EcdsaKey, error) {
 	for i := 0; i < len(keys.Keys); i++ {
 		k := keys.Keys[i]
 
-		if k.Use == "sig" {
+		if k.Use == "sig" || k.Use == "" {
 			if k.Kty == "RSA" {
 				extracted, err := extractRsaKey(&k)
 
