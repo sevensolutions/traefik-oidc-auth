@@ -34,6 +34,7 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 | [Authentik](https://goauthentik.io/) | ✅ | |
 | [Pocket ID](https://github.com/stonith404/pocket-id) | ✅ | |
 | [GitHub](https://github.com) | ❌ | GitHub doesn't seem to support OIDC, only plain OAuth. |
+| [Logto](https://logto.io/) | ✅ | |
 
 ## 📚 Documentation
 

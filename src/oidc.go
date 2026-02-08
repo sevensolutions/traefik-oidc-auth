@@ -79,6 +79,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 		"client_id":    {oidcAuth.Config.Provider.ClientId},
 		"code":         {authCode},
 		"redirect_uri": {redirectUrl},
+		"resource":     oidcAuth.Config.RequestedResources,
 	}
 
 	if oidcAuth.Config.Provider.ClientSecret != "" {
@@ -246,6 +247,7 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResp
 		"client_id":     {toa.Config.Provider.ClientId},
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"refresh_token": {refreshToken},
+		"resources":     toa.Config.RequestedResources,
 	}
 
 	if toa.Config.Provider.ClientSecret != "" {

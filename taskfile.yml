@@ -23,6 +23,11 @@ tasks:
     dir: 'workspaces/zitadel'
     cmds:
       - docker compose up
+  run:logto:
+    desc: 'Start traefik with the logto identity provider'
+    dir: 'workspaces/logto'
+    cmds:
+      - docker compose up
 
   run:website:
     desc: 'Start the website in development mode'

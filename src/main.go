@@ -5,10 +5,12 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"text/template"
@@ -200,6 +202,50 @@ func (toa *TraefikOidcAuth) sanitizeForUpstream(req *http.Request) {
 	}
 }
 
+func withSuffixPrefix(suffixPrefix string, values any, format string) any {
+	var result []string
+	var valueOf = reflect.ValueOf(values)
+	if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
+		for i := 0; i < valueOf.Len(); i++ {
+			result = append(result, fmt.Sprintf(format, fmt.Sprint(valueOf.Index(i)), suffixPrefix))
+		}
+		return result
+	}
+	return fmt.Sprintf(format, fmt.Sprint(valueOf), suffixPrefix)
+}
+
+func newTemplate() *template.Template {
+	return template.New("").Funcs(template.FuncMap{
+		"withPrefix": func(prefix string, values any) any {
+			return withSuffixPrefix(prefix, values, "%[2]s%[1]s")
+		},
+		"withSuffix": func(suffix string, values any) any {
+			return withSuffixPrefix(suffix, values, "%[1]s%[2]s")
+		},
+		"mapToJsonArray": func(values any) string {
+			var valueOf = reflect.ValueOf(values)
+			var builder strings.Builder
+			builder.WriteRune('[')
+			if valueOf.Kind() == reflect.Array || valueOf.Kind() == reflect.Slice {
+				for i := 0; i < valueOf.Len(); i++ {
+					if i > 0 {
+						builder.WriteRune(',')
+					}
+					builder.WriteRune('"')
+					template.JSEscape(&builder, []byte(fmt.Sprint(valueOf.Index(i))))
+					builder.WriteRune('"')
+				}
+			} else {
+				builder.WriteRune('"')
+				template.JSEscape(&builder, []byte(fmt.Sprint(valueOf)))
+				builder.WriteRune('"')
+			}
+			builder.WriteRune(']')
+			return builder.String()
+		},
+	})
+}
+
 func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.SessionState, claims map[string]interface{}) error {
 	if toa.Config.Headers != nil {
 		evalContext := make(map[string]interface{})
@@ -212,7 +258,7 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 		for _, header := range toa.Config.Headers {
 			if header.Value != "" {
 				if header.template == nil {
-					tpl, err := template.New("").Parse(header.Value)
+					tpl, err := newTemplate().Parse(header.Value)
 
 					if err != nil {
 						return err
@@ -228,6 +274,41 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, renderedValue.String())
 				} else {
 					req.Header.Set(header.Name, err.Error())
+				}
+			} else if header.Values != "" {
+				if header.template == nil {
+					tpl, err := newTemplate().Parse(header.Values)
+
+					if err != nil {
+						return err
+					}
+
+					header.template = tpl
+				}
+
+				var renderedValue bytes.Buffer
+				err := header.template.Execute(&renderedValue, evalContext)
+
+				if err != nil {
+					req.Header.Set(header.Name, err.Error())
+				}
+
+				var values []string
+				err = json.Unmarshal(renderedValue.Bytes(), &values)
+				if err != nil {
+					req.Header.Set(header.Name, err.Error())
+				}
+
+				if len(values) > 0 {
+					for i, value := range values {
+						if i == 0 {
+							req.Header.Set(header.Name, value)
+						} else {
+							req.Header.Add(header.Name, value)
+						}
+					}
+				} else {
+					req.Header.Del(header.Name)
 				}
 			} else {
 				req.Header.Set(header.Name, "")
@@ -258,7 +339,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	if state.Action == "Login" {
 		authCode := req.URL.Query().Get("code")
 		if authCode == "" {
-			toa.logger.Log(logging.LevelWarn, "Code is missing.")
+			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
@@ -542,6 +623,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
 		"state":         {stateBase64},
+		"resource":      toa.Config.RequestedResources,
 	}
 
 	if prompt := req.URL.Query().Get("prompt"); prompt != "" {
