@@ -45,6 +45,9 @@ type Config struct {
 	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
 	UnauthorizedBehavior string                     `json:"unauthorized_behavior"`
 
+	UnauthorizedPassthrough     string `json:"unauthorized_passthrough"`
+	UnauthorizedPassthroughBool bool   `json:"unauthorized_passthrough_bool"`
+
 	Authorization *AuthorizationConfig `json:"authorization"`
 
 	Headers []HeaderConfig `json:"headers"`

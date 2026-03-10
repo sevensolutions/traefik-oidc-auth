@@ -445,6 +445,55 @@ http:
   expect(response?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
 });
 
+test("access app with unauthorized passthrough", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          UnauthorizedPassthrough: true
+          LoginUri: "/login"
+          Headers:
+            - Name: "Authorization"
+              Value: "{{\`Bearer: {{ .accessToken }}\`}}"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  // The first test: unauthenticated request should pass through directly to the whoami page.
+  const unauthResponse = await page.goto("http://localhost:9080/test1");
+
+  // Unauthenticated request passes through with a 200 response and no Authorization header attached.
+  expect(unauthResponse?.status()).toBe(200);
+  const unauthAuthHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(unauthAuthHeaderExists).toBeFalsy();
+
+  // The second test: authenticated user should pass through with the Authorization header set.
+  await expectGotoOkay(page, "http://localhost:9080/login");
+  await login(page, "admin", "admin", "http://localhost:9080");
+
+  const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(authHeaderExists).toBeTruthy();
+});
+
 test("external authentication", async ({ page }) => {
   await configureTraefik(`
     http:
