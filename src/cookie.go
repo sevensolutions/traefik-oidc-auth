@@ -6,10 +6,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
-func setChunkedCookies(config *Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
+func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
 	cookieChunks := utils.ChunkString(cookieValue, 3072)
 
 	baseCookie := createSessionCookie(config)
@@ -90,7 +91,7 @@ func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]str
 	}
 	return cookieNames, nil
 }
-func clearChunkedCookie(config *Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
+func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {
 		return err
@@ -136,12 +137,12 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 	return cookie
 }
 
-func getCodeVerifierCookieName(config *Config) string {
+func getCodeVerifierCookieName(config *config.Config) string {
 	return makeCookieName(config, "CodeVerifier")
 }
-func getSessionCookieName(config *Config) string {
+func getSessionCookieName(config *config.Config) string {
 	return makeCookieName(config, "Session")
 }
-func makeCookieName(config *Config, name string) string {
+func makeCookieName(config *config.Config, name string) string {
 	return fmt.Sprintf("%s.%s", config.CookieNamePrefix, name)
 }

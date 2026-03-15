@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
 	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
@@ -97,7 +98,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 		return nil, nil, nil, err
 	}
 
-	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
+	session, err := toa.SessionStorage.TryGetSession(toa.logger, toa.Config, plainSessionTicket)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Reading session failed: %v", err.Error())
 		return nil, nil, nil, err
@@ -231,7 +232,7 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
-	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
+	sessionTicket, err := toa.SessionStorage.StoreSession(toa.logger, toa.Config, session.Id, session)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to store session: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -250,7 +251,7 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.Session
 	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
 }
 
-func createSessionCookie(config *Config) *http.Cookie {
+func createSessionCookie(config *config.Config) *http.Cookie {
 	return &http.Cookie{
 		Name:     getSessionCookieName(config),
 		Value:    "",

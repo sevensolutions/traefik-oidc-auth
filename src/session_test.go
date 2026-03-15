@@ -4,16 +4,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
 )
 
 func TestSessionIdpTokenExpiration(t *testing.T) {
-	config := &Config{
-		Provider: &ProviderConfig{
+	config := &config.Config{
+		Provider: &config.ProviderConfig{
 			TokenRenewalThreshold: 0.5,
 		},
-		SessionCookie: &SessionCookieConfig{
+		SessionCookie: &config.SessionCookieConfig{
 			MaxAge: 0,
 		},
 	}

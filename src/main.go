@@ -16,6 +16,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/src/rules"
 
@@ -32,7 +33,7 @@ type TraefikOidcAuth struct {
 	ProviderURL              *url.URL
 	ClientJwtPrivateKey      *rsa.PrivateKey
 	CallbackURL              *url.URL
-	Config                   *Config
+	Config                   *config.Config
 	SessionStorage           session.SessionStorage
 	DiscoveryDocument        *oidc.OidcDiscovery
 	Jwks                     *oidc.JwksHandler
@@ -257,18 +258,18 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 
 		for _, header := range toa.Config.Headers {
 			if header.Value != "" {
-				if header.template == nil {
+				if header.Template == nil {
 					tpl, err := newTemplate().Parse(header.Value)
 
 					if err != nil {
 						return err
 					}
 
-					header.template = tpl
+					header.Template = tpl
 				}
 
 				var renderedValue bytes.Buffer
-				err := header.template.Execute(&renderedValue, evalContext)
+				err := header.Template.Execute(&renderedValue, evalContext)
 
 				if err == nil {
 					req.Header.Set(header.Name, renderedValue.String())
@@ -276,18 +277,18 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, err.Error())
 				}
 			} else if header.Values != "" {
-				if header.template == nil {
+				if header.Template == nil {
 					tpl, err := newTemplate().Parse(header.Values)
 
 					if err != nil {
 						return err
 					}
 
-					header.template = tpl
+					header.Template = tpl
 				}
 
 				var renderedValue bytes.Buffer
-				err := header.template.Execute(&renderedValue, evalContext)
+				err := header.Template.Execute(&renderedValue, evalContext)
 
 				if err != nil {
 					req.Header.Set(header.Name, err.Error())

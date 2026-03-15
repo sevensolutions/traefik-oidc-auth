@@ -5,12 +5,14 @@ import (
 	"math/rand"
 	"net/http"
 	"testing"
+
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 )
 
 func TestSetChunkedCookiesNonChunked(t *testing.T) {
-	config := &Config{
+	config := &config.Config{
 		CookieNamePrefix: "TraefikOidcAuth",
-		SessionCookie: &SessionCookieConfig{
+		SessionCookie: &config.SessionCookieConfig{
 			Path:     "/",
 			Domain:   "",
 			Secure:   true,
@@ -32,9 +34,9 @@ func TestSetChunkedCookiesNonChunked(t *testing.T) {
 }
 
 func TestSetChunkedCookiesChunked(t *testing.T) {
-	config := &Config{
+	config := &config.Config{
 		CookieNamePrefix: "TraefikOidcAuth",
-		SessionCookie: &SessionCookieConfig{
+		SessionCookie: &config.SessionCookieConfig{
 			Path:     "/",
 			Domain:   "",
 			Secure:   true,
