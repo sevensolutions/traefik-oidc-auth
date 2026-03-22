@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
-	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
@@ -90,14 +90,8 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 	return session, updatedSession != nil, claims, nil
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*session.SessionState, map[string]interface{}, *session.SessionState, error) {
-	plainSessionTicket, err := utils.Decrypt(encryptedTicket, toa.Config.Secret)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to decrypt session ticket: %v", err.Error())
-		return nil, nil, nil, err
-	}
-
-	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
+func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session.SessionState, map[string]interface{}, *session.SessionState, error) {
+	session, err := toa.SessionStorage.TryGetSession(toa.logger, toa.Config, sessionTicket)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Reading session failed: %v", err.Error())
 		return nil, nil, nil, err
@@ -231,7 +225,7 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
-	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
+	sessionTicket, err := toa.SessionStorage.StoreSession(toa.logger, toa.Config, session.Id, session)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to store session: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -240,17 +234,10 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.Session
 
 	toa.logger.Log(logging.LevelDebug, "Session stored. Id %s", session.Id)
 
-	encryptedSessionTicket, err := utils.Encrypt(sessionTicket, toa.Config.Secret)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to encrypt session ticket: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
+	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), sessionTicket)
 }
 
-func createSessionCookie(config *Config) *http.Cookie {
+func createSessionCookie(config *config.Config) *http.Cookie {
 	return &http.Cookie{
 		Name:     getSessionCookieName(config),
 		Value:    "",

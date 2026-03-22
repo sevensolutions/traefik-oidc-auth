@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 )
 
-func createAuthInstance(claims []ClaimAssertion) *AuthorizationConfig {
-	return &AuthorizationConfig{
+func createAuthInstance(claims []config.ClaimAssertion) *config.AuthorizationConfig {
+	return &config.AuthorizationConfig{
 		AssertClaims: claims,
 	}
 }
@@ -53,7 +54,7 @@ func getTestClaims() map[string]interface{} {
 func TestClaimNameExists(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 	claims := getTestClaims()
-	authorization := createAuthInstance([]ClaimAssertion{
+	authorization := createAuthInstance([]config.ClaimAssertion{
 		{Name: "name"},
 	})
 
@@ -61,7 +62,7 @@ func TestClaimNameExists(t *testing.T) {
 		t.Fatal("Should authorize as a claim with the provided name exists")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "names"},
 	})
 
@@ -73,7 +74,7 @@ func TestClaimNameExists(t *testing.T) {
 func TestSimpleAssertions(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 	claims := getTestClaims()
-	authorization := createAuthInstance([]ClaimAssertion{
+	authorization := createAuthInstance([]config.ClaimAssertion{
 		{Name: "name", AnyOf: []string{"Alice", "Bob", "Bruno"}},
 	})
 
@@ -81,7 +82,7 @@ func TestSimpleAssertions(t *testing.T) {
 		t.Fatal("Should authorize since value is any of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "name", AnyOf: []string{"Ben", "Joe", "Sam"}},
 	})
 
@@ -89,7 +90,7 @@ func TestSimpleAssertions(t *testing.T) {
 		t.Fatal("Should not authorize since value is none of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "name", AllOf: []string{"Alice"}},
 	})
 
@@ -97,7 +98,7 @@ func TestSimpleAssertions(t *testing.T) {
 		t.Fatal("Should authorize since the single value matches all of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "name", AllOf: []string{"Alice", "Bob", "Bruno"}},
 	})
 
@@ -106,7 +107,7 @@ func TestSimpleAssertions(t *testing.T) {
 	}
 
 	// We need to use ['my:zitadel:grants'] here to escape the colons in the jsonpath.
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "['my:zitadel:grants']", AllOf: []string{"abc", "def", "ghi"}},
 	})
 
@@ -118,7 +119,7 @@ func TestSimpleAssertions(t *testing.T) {
 func TestNestedAssertions(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 	claims := getTestClaims()
-	authorization := createAuthInstance([]ClaimAssertion{
+	authorization := createAuthInstance([]config.ClaimAssertion{
 		{Name: "address.street", AnyOf: []string{"Freedom Rd.", "Eagle St."}},
 	})
 
@@ -126,7 +127,7 @@ func TestNestedAssertions(t *testing.T) {
 		t.Fatal("Should authorize since nested value is any of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "address.street", AnyOf: []string{"Concrete HWY"}},
 	})
 
@@ -134,7 +135,7 @@ func TestNestedAssertions(t *testing.T) {
 		t.Fatal("Should not authorize since nested value is none of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "address.street", AllOf: []string{"Freedom Rd."}},
 	})
 
@@ -142,7 +143,7 @@ func TestNestedAssertions(t *testing.T) {
 		t.Fatal("Should authorize since the single value matches all of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "address.street", AllOf: []string{"Freedom Rd.", "Eagle St."}},
 	})
 
@@ -154,7 +155,7 @@ func TestNestedAssertions(t *testing.T) {
 func TestArrayAssertions(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 	claims := getTestClaims()
-	authorization := createAuthInstance([]ClaimAssertion{
+	authorization := createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Bob", "Sam"}},
 	})
 
@@ -162,7 +163,7 @@ func TestArrayAssertions(t *testing.T) {
 		t.Fatal("Should authorize since some of the values are part of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Sam", "Alex"}},
 	})
 
@@ -170,7 +171,7 @@ func TestArrayAssertions(t *testing.T) {
 		t.Fatal("Should not authorize since values are none of the provided values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AllOf: []string{"Bob", "Eve"}},
 	})
 
@@ -178,7 +179,7 @@ func TestArrayAssertions(t *testing.T) {
 		t.Fatal("Should authorize since all of the provided values have a matching claim value")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AllOf: []string{"Bob", "Eve", "Alex"}},
 	})
 
@@ -190,7 +191,7 @@ func TestArrayAssertions(t *testing.T) {
 func TestCombinedAssertions(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 	claims := getTestClaims()
-	authorization := createAuthInstance([]ClaimAssertion{
+	authorization := createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Bob", "Sam"}, AllOf: []string{"Eve", "Bob"}},
 	})
 
@@ -198,7 +199,7 @@ func TestCombinedAssertions(t *testing.T) {
 		t.Fatal("Should authorize since both assertion quantifiers have matching values")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Bob", "Sam"}, AllOf: []string{"Eve", "Bob", "Alex"}},
 	})
 
@@ -206,7 +207,7 @@ func TestCombinedAssertions(t *testing.T) {
 		t.Fatal("Should not authorize since not all values of the allOf quantifier are matched")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Sam"}, AllOf: []string{"Eve", "Bob"}},
 	})
 
@@ -218,7 +219,7 @@ func TestCombinedAssertions(t *testing.T) {
 func TestMultipleAssertions(t *testing.T) {
 	logger := logging.CreateLogger(logging.LevelDebug)
 	claims := getTestClaims()
-	authorization := createAuthInstance([]ClaimAssertion{
+	authorization := createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Bob", "Sam"}, AllOf: []string{"Eve", "Bob"}},
 		{Name: "name", AnyOf: []string{"Alice", "Alex"}},
 	})
@@ -227,7 +228,7 @@ func TestMultipleAssertions(t *testing.T) {
 		t.Fatal("Should authorize since both assertions hold against the provided claims")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Bob", "Sam"}, AllOf: []string{"Eve", "Bob", "Alex"}},
 		{Name: "name", AnyOf: []string{"Alice", "Alex"}},
 	})
@@ -236,7 +237,7 @@ func TestMultipleAssertions(t *testing.T) {
 		t.Fatal("Should not authorize since one of the assertions does not hold")
 	}
 
-	authorization = createAuthInstance([]ClaimAssertion{
+	authorization = createAuthInstance([]config.ClaimAssertion{
 		{Name: "children[*].name", AnyOf: []string{"Joe", "Bob", "Sam"}, AllOf: []string{"Eve", "Bob", "Alex"}},
 		{Name: "name", AnyOf: []string{"Alex", "Ben"}},
 	})
