@@ -158,6 +158,13 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 	_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 	if err != nil {
+		// If the token is expired, reloading JWKS won't help — skip the retry.
+		if isTokenExpiredError(err) {
+			toa.logger.Log(logging.LevelInfo, "The token is expired.")
+			return false, nil, err
+		}
+
+		// For other errors (e.g. unknown kid after key rotation), force-reload JWKS and retry.
 		err := toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, true)
 		if err != nil {
 			return false, nil, err
@@ -166,7 +173,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 		if err != nil {
-			if errors.Is(err, jwt.ErrTokenExpired) || err.Error() == "token has invalid claims: token is expired" {
+			if isTokenExpiredError(err) {
 				toa.logger.Log(logging.LevelInfo, "The token is expired.")
 			} else {
 				toa.logger.Log(logging.LevelError, "Failed to parse token: %v", err)
@@ -177,6 +184,14 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 	}
 
 	return true, claims, nil
+}
+
+// isTokenExpiredError checks whether the error indicates the JWT token is expired.
+// We use a string-based check because Traefik compiles plugins via Yaegi (Go interpreter),
+// which may not fully support Go 1.20's multi-error unwrapping needed for errors.Is
+// to traverse the joinedError wrapper used by golang-jwt/v5.
+func isTokenExpiredError(err error) bool {
+	return strings.Contains(err.Error(), jwt.ErrTokenExpired.Error())
 }
 
 func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]interface{}, error) {
@@ -353,6 +368,12 @@ func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject strin
 		_, err = parser.ParseWithClaims(tokenString, claims, toa.Jwks.Keyfunc)
 
 		if err != nil {
+			// If the token is expired, reloading JWKS won't help — skip the retry.
+			if isTokenExpiredError(err) {
+				toa.logger.Log(logging.LevelError, "Userinfo token is expired: %v", err)
+				return nil, err
+			}
+
 			err := toa.Jwks.EnsureLoaded(toa.logger, toa.httpClient, true)
 			if err != nil {
 				return nil, err
