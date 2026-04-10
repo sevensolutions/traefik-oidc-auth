@@ -155,21 +155,21 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
 		}
 
-		if !session.IsAuthorized {
+		if !session.IsAuthorized && !toa.Config.UnauthorizedPassthroughBool {
 			toa.handleUnauthorized(rw, req)
 			return
-		}
+		} else if session.IsAuthorized {
+			// Attach upstream headers
+			err = toa.attachHeaders(req, session, claims)
+			if err != nil {
+				toa.logger.Log(logging.LevelError, "Error while attaching headers: %s", err.Error())
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
-		// Attach upstream headers
-		err = toa.attachHeaders(req, session, claims)
-		if err != nil {
-			toa.logger.Log(logging.LevelError, "Error while attaching headers: %s", err.Error())
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if updateSession {
-			toa.storeSessionAndAttachCookie(session, rw)
+			if updateSession {
+				toa.storeSessionAndAttachCookie(session, rw)
+			}
 		}
 
 		// Forward the request
@@ -182,6 +182,13 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 
 	// Clear the session cookie
 	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+
+	if toa.Config.UnauthorizedPassthroughBool {
+		// Forward the request
+		toa.sanitizeForUpstream(req)
+		toa.next.ServeHTTP(rw, req)
+		return
+	}
 
 	toa.handleUnauthenticated(rw, req)
 }

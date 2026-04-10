@@ -54,6 +54,7 @@ func CreateConfig() *config.Config {
 		AuthorizationHeader:  &config.AuthorizationHeaderConfig{},
 		AuthorizationCookie:  &config.AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Auto",
+		UnauthorizedPassthroughBool: false,
 		Authorization: &config.AuthorizationConfig{
 			CheckOnEveryRequest: false,
 		},
@@ -93,6 +94,10 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	cfg.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(cfg.PostLogoutRedirectUri)
 	cfg.CookieNamePrefix = utils.ExpandEnvironmentVariableString(cfg.CookieNamePrefix)
 	cfg.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(cfg.UnauthorizedBehavior)
+	cfg.UnauthorizedPassthroughBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.UnauthorizedPassthrough, cfg.UnauthorizedPassthroughBool)
+	if err != nil {
+		return nil, err
+	}
 	cfg.BypassAuthenticationRule = utils.ExpandEnvironmentVariableString(cfg.BypassAuthenticationRule)
 	cfg.Provider.Url = utils.ExpandEnvironmentVariableString(cfg.Provider.Url)
 	cfg.Provider.ClientId = utils.ExpandEnvironmentVariableString(cfg.Provider.ClientId)
