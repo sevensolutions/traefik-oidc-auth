@@ -3,19 +3,175 @@
  * and scoped locally.
  */
 
- .container {
-	width: 100dvw;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	padding-top: 10em;
-}
-
+/* ── Logo ─────────────────────────────────────────────────────── */
 .logo {
-  width: 20em;
-  content:url("~/img/logo.svg")
+  width: 10em;
+  content: url('~/img/logo.svg');
 }
 [data-theme='dark'] .logo {
-	content:url("~/img/logo-dark.svg")
+  content: url('~/img/logo-dark.svg');
+}
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 4rem 1.5rem 3rem;
+}
+
+.heroTitle {
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-weight: 800;
+  margin: 1rem 0 0.5rem;
+}
+
+.heroSubtitle {
+  font-size: 1.15rem;
+  max-width: 640px;
+  color: var(--ifm-color-content-secondary);
+  margin-bottom: 2rem;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.sponsorWrapper {
+  margin-top: 0.5rem;
+}
+
+/* ── Generic section layout ───────────────────────────────────── */
+.section {
+  padding: 3.5rem 1.5rem;
+}
+
+.sectionAlt {
+  padding: 3.5rem 1.5rem;
+  background-color: var(--ifm-background-surface-color);
+}
+
+.sectionInner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.sectionSubtitle {
+  color: var(--ifm-color-content-secondary);
+  margin-bottom: 2rem;
+  text-align: center;
+  max-width: 640px;
+}
+
+.sectionLink {
+  margin-top: 1.5rem;
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+  text-decoration: none;
+}
+.sectionLink:hover {
+  text-decoration: underline;
+}
+
+/* ── Feature grid ─────────────────────────────────────────────── */
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.featureCard {
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 12px;
+  padding: 1.5rem 1.25rem;
+  background: var(--ifm-card-background-color, var(--ifm-background-color));
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.featureCard:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.featureIconWrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.featureTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.featureDescription {
+  font-size: 0.9rem;
+  color: var(--ifm-color-content-secondary);
+  margin: 0;
+}
+
+/* ── Identity provider badges ─────────────────────────────────── */
+.providerList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.providerBadge {
+  border: 1.5px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  border-radius: 999px;
+  padding: 0.3rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ── CTA banner ───────────────────────────────────────────────── */
+.ctaBanner {
+  width: 100%;
+  border: 1.5px solid var(--ifm-color-primary);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--ifm-background-surface-color);
+}
+
+.ctaTitle {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ctaSubtitle {
+  font-size: 1rem;
+  color: var(--ifm-color-content-secondary);
+  max-width: 520px;
+  margin: 0;
 }
