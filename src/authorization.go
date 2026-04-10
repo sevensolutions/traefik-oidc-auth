@@ -6,11 +6,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/spyzhov/ajson"
 )
 
-func isAuthorized(logger *logging.Logger, authorization *AuthorizationConfig, claims map[string]interface{}) bool {
+func isAuthorized(logger *logging.Logger, authorization *config.AuthorizationConfig, claims map[string]interface{}) bool {
 	if authorization.AssertClaims != nil && len(authorization.AssertClaims) > 0 {
 		parsed, err := json.Marshal(claims)
 		if err != nil {

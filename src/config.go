@@ -11,10 +11,10 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"text/template"
 
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/rules"
@@ -22,126 +22,12 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
-const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
-
-type Config struct {
-	LogLevel string `json:"log_level"`
-
-	Secret string `json:"secret"`
-
-	Provider *ProviderConfig `json:"provider"`
-	Scopes   []string        `json:"scopes"`
-
-	// Can be a relative path or a full URL.
-	// If a relative path is used, the scheme and domain will be taken from the incoming request.
-	// In this case, the callback path will overlay all hostnames behind the middleware.
-	// If a full URL is used, all callbacks are sent there.  It is the user's responsibility to ensure
-	// that the callback URL is also routed to this middleware plugin.
-	CallbackUri string `json:"callback_uri"`
-
-	// The URL used to start authorization when needed.
-	// All other requests that are not already authorized will return a 401 Unauthorized.
-	// When left empty, all requests can start authorization.
-	LoginUri                    string   `json:"login_uri"`
-	PostLoginRedirectUri        string   `json:"post_login_redirect_uri"`
-	ValidPostLoginRedirectUris  []string `json:"valid_post_login_redirect_uris"`
-	LogoutUri                   string   `json:"logout_uri"`
-	PostLogoutRedirectUri       string   `json:"post_logout_redirect_uri"`
-	ValidPostLogoutRedirectUris []string `json:"valid_post_logout_redirect_uris"`
-
-	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
-	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
-	AuthorizationHeader  *AuthorizationHeaderConfig `json:"authorization_header"`
-	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
-	UnauthorizedBehavior string                     `json:"unauthorized_behavior"`
-
-	Authorization *AuthorizationConfig `json:"authorization"`
-
-	Headers []HeaderConfig `json:"headers"`
-
-	BypassAuthenticationRule string `json:"bypass_authentication_rule"`
-
-	ErrorPages *errorPages.ErrorPagesConfig `json:"error_pages"`
-
-	RequestedResources []string `json:"requested_resources"`
-}
-
-type ProviderConfig struct {
-	Url string `json:"url"`
-
-	InsecureSkipVerify     string `json:"insecure_skip_verify"`
-	InsecureSkipVerifyBool bool   `json:"insecure_skip_verify_bool"`
-
-	CABundle     string `json:"ca_bundle"`
-	CABundleFile string `json:"ca_bundle_file"`
-
-	ClientId              string `json:"client_id"`
-	ClientSecret          string `json:"client_secret"`
-	ClientJwtPrivateKey   string `json:"client_jwt_private_key"`
-	ClientJwtPrivateKeyId string `json:"client_jwt_private_key_id"`
-
-	UsePkce     string `json:"use_pkce"`
-	UsePkceBool bool   `json:"use_pkce_bool"`
-
-	ValidateAudience     string `json:"validate_audience"`
-	ValidateAudienceBool bool   `json:"validate_audience_bool"`
-	ValidAudience        string `json:"valid_audience"`
-
-	ValidateIssuer     string `json:"validate_issuer"`
-	ValidateIssuerBool bool   `json:"validate_issuer_bool"`
-	ValidIssuer        string `json:"valid_issuer"`
-
-	// AccessToken or IdToken or Introspection
-	TokenValidation string `json:"verification_token"`
-
-	TokenRenewalThreshold float64 `json:"token_renewal_threshold"`
-
-	UseClaimsFromUserInfo     string `json:"use_claims_from_user_info"`
-	UseClaimsFromUserInfoBool bool   `json:"use_claims_from_user_info_bool"`
-}
-
-type SessionCookieConfig struct {
-	Path     string `json:"path"`
-	Domain   string `json:"domain"`
-	Secure   bool   `json:"secure"`
-	HttpOnly bool   `json:"http_only"`
-	SameSite string `json:"same_site"`
-	MaxAge   int    `json:"max_age"`
-}
-
-type AuthorizationHeaderConfig struct {
-	Name string `json:"name"`
-}
-type AuthorizationCookieConfig struct {
-	Name string `json:"name"`
-}
-
-type AuthorizationConfig struct {
-	AssertClaims        []ClaimAssertion `json:"assert_claims"`
-	CheckOnEveryRequest bool             `json:"check_on_every_request"`
-}
-
-type ClaimAssertion struct {
-	Name  string   `json:"name"`
-	AnyOf []string `json:"anyOf"`
-	AllOf []string `json:"allOf"`
-}
-
-type HeaderConfig struct {
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	Values string `json:"values"`
-
-	// A reference to the parsed Value-template
-	template *template.Template
-}
-
 // Will be called by traefik
-func CreateConfig() *Config {
-	return &Config{
+func CreateConfig() *config.Config {
+	return &config.Config{
 		LogLevel: logging.LevelWarn,
-		Secret:   DefaultSecret,
-		Provider: &ProviderConfig{
+		Secret:   config.DefaultSecret,
+		Provider: &config.ProviderConfig{
 			UsePkceBool:               false,
 			InsecureSkipVerifyBool:    false,
 			ValidateIssuerBool:        true,
@@ -157,7 +43,7 @@ func CreateConfig() *Config {
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
 		CookieNamePrefix:      "TraefikOidcAuth",
-		SessionCookie: &SessionCookieConfig{
+		SessionCookie: &config.SessionCookieConfig{
 			Path:     "/",
 			Domain:   "",
 			Secure:   true,
@@ -165,10 +51,10 @@ func CreateConfig() *Config {
 			SameSite: "default",
 			MaxAge:   0,
 		},
-		AuthorizationHeader:  &AuthorizationHeaderConfig{},
-		AuthorizationCookie:  &AuthorizationCookieConfig{},
+		AuthorizationHeader:  &config.AuthorizationHeaderConfig{},
+		AuthorizationCookie:  &config.AuthorizationCookieConfig{},
 		UnauthorizedBehavior: "Auto",
-		Authorization: &AuthorizationConfig{
+		Authorization: &config.AuthorizationConfig{
 			CheckOnEveryRequest: false,
 		},
 		ErrorPages: &errorPages.ErrorPagesConfig{
@@ -179,19 +65,19 @@ func CreateConfig() *Config {
 }
 
 // Will be called by traefik
-func New(uctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	config.LogLevel = utils.ExpandEnvironmentVariableString(config.LogLevel)
+func New(uctx context.Context, next http.Handler, cfg *config.Config, name string) (http.Handler, error) {
+	cfg.LogLevel = utils.ExpandEnvironmentVariableString(cfg.LogLevel)
 
-	logger := logging.CreateLogger(config.LogLevel)
+	logger := logging.CreateLogger(cfg.LogLevel)
 
 	logger.Log(logging.LevelInfo, "Loading Configuration...")
 
-	if config.Provider == nil {
+	if cfg.Provider == nil {
 		return nil, errors.New("missing provider configuration")
 	}
 
 	// Hack: Trick the traefik plugin catalog to successfully execute this method with the testData from .traefik.yml.
-	if config.Provider.Url == "https://..." {
+	if cfg.Provider.Url == "https://..." {
 		return &TraefikOidcAuth{
 			next: next,
 		}, nil
@@ -199,87 +85,87 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	var err error
 
-	config.Secret = utils.ExpandEnvironmentVariableString(config.Secret)
-	config.CallbackUri = utils.ExpandEnvironmentVariableString(config.CallbackUri)
-	config.LoginUri = utils.ExpandEnvironmentVariableString(config.LoginUri)
-	config.PostLoginRedirectUri = utils.ExpandEnvironmentVariableString(config.PostLoginRedirectUri)
-	config.LogoutUri = utils.ExpandEnvironmentVariableString(config.LogoutUri)
-	config.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(config.PostLogoutRedirectUri)
-	config.CookieNamePrefix = utils.ExpandEnvironmentVariableString(config.CookieNamePrefix)
-	config.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(config.UnauthorizedBehavior)
-	config.BypassAuthenticationRule = utils.ExpandEnvironmentVariableString(config.BypassAuthenticationRule)
-	config.Provider.Url = utils.ExpandEnvironmentVariableString(config.Provider.Url)
-	config.Provider.ClientId = utils.ExpandEnvironmentVariableString(config.Provider.ClientId)
-	config.Provider.ClientSecret = utils.ExpandEnvironmentVariableString(config.Provider.ClientSecret)
-	config.Provider.ClientJwtPrivateKeyId = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKeyId)
-	config.Provider.ClientJwtPrivateKey = utils.ExpandEnvironmentVariableString(config.Provider.ClientJwtPrivateKey)
-	config.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UsePkce, config.Provider.UsePkceBool)
+	cfg.Secret = utils.ExpandEnvironmentVariableString(cfg.Secret)
+	cfg.CallbackUri = utils.ExpandEnvironmentVariableString(cfg.CallbackUri)
+	cfg.LoginUri = utils.ExpandEnvironmentVariableString(cfg.LoginUri)
+	cfg.PostLoginRedirectUri = utils.ExpandEnvironmentVariableString(cfg.PostLoginRedirectUri)
+	cfg.LogoutUri = utils.ExpandEnvironmentVariableString(cfg.LogoutUri)
+	cfg.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(cfg.PostLogoutRedirectUri)
+	cfg.CookieNamePrefix = utils.ExpandEnvironmentVariableString(cfg.CookieNamePrefix)
+	cfg.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(cfg.UnauthorizedBehavior)
+	cfg.BypassAuthenticationRule = utils.ExpandEnvironmentVariableString(cfg.BypassAuthenticationRule)
+	cfg.Provider.Url = utils.ExpandEnvironmentVariableString(cfg.Provider.Url)
+	cfg.Provider.ClientId = utils.ExpandEnvironmentVariableString(cfg.Provider.ClientId)
+	cfg.Provider.ClientSecret = utils.ExpandEnvironmentVariableString(cfg.Provider.ClientSecret)
+	cfg.Provider.ClientJwtPrivateKeyId = utils.ExpandEnvironmentVariableString(cfg.Provider.ClientJwtPrivateKeyId)
+	cfg.Provider.ClientJwtPrivateKey = utils.ExpandEnvironmentVariableString(cfg.Provider.ClientJwtPrivateKey)
+	cfg.Provider.UsePkceBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.UsePkce, cfg.Provider.UsePkceBool)
 	if err != nil {
 		return nil, err
 	}
-	config.Provider.UseClaimsFromUserInfoBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.UseClaimsFromUserInfo, config.Provider.UseClaimsFromUserInfoBool)
+	cfg.Provider.UseClaimsFromUserInfoBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.UseClaimsFromUserInfo, cfg.Provider.UseClaimsFromUserInfoBool)
 	if err != nil {
 		return nil, err
 	}
-	config.Provider.ValidateIssuerBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.ValidateIssuer, config.Provider.ValidateIssuerBool)
+	cfg.Provider.ValidateIssuerBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.ValidateIssuer, cfg.Provider.ValidateIssuerBool)
 	if err != nil {
 		return nil, err
 	}
-	config.Provider.ValidIssuer = utils.ExpandEnvironmentVariableString(config.Provider.ValidIssuer)
-	config.Provider.ValidateAudienceBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.ValidateAudience, config.Provider.ValidateAudienceBool)
+	cfg.Provider.ValidIssuer = utils.ExpandEnvironmentVariableString(cfg.Provider.ValidIssuer)
+	cfg.Provider.ValidateAudienceBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.ValidateAudience, cfg.Provider.ValidateAudienceBool)
 	if err != nil {
 		return nil, err
 	}
-	config.Provider.ValidAudience = utils.ExpandEnvironmentVariableString(config.Provider.ValidAudience)
-	config.Provider.InsecureSkipVerifyBool, err = utils.ExpandEnvironmentVariableBoolean(config.Provider.InsecureSkipVerify, config.Provider.InsecureSkipVerifyBool)
+	cfg.Provider.ValidAudience = utils.ExpandEnvironmentVariableString(cfg.Provider.ValidAudience)
+	cfg.Provider.InsecureSkipVerifyBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Provider.InsecureSkipVerify, cfg.Provider.InsecureSkipVerifyBool)
 	if err != nil {
 		return nil, err
 	}
 
 	var clientAssertionPrivateKey *rsa.PrivateKey
-	if config.Provider.ClientJwtPrivateKey != "" && config.Provider.ClientJwtPrivateKeyId != "" {
-		clientAssertionPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(config.Provider.ClientJwtPrivateKey))
+	if cfg.Provider.ClientJwtPrivateKey != "" && cfg.Provider.ClientJwtPrivateKeyId != "" {
+		clientAssertionPrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM([]byte(cfg.Provider.ClientJwtPrivateKey))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	config.Provider.CABundle = utils.ExpandEnvironmentVariableString(config.Provider.CABundle)
-	config.Provider.CABundleFile = utils.ExpandEnvironmentVariableString(config.Provider.CABundleFile)
-	config.Provider.TokenValidation = utils.ExpandEnvironmentVariableString(config.Provider.TokenValidation)
+	cfg.Provider.CABundle = utils.ExpandEnvironmentVariableString(cfg.Provider.CABundle)
+	cfg.Provider.CABundleFile = utils.ExpandEnvironmentVariableString(cfg.Provider.CABundleFile)
+	cfg.Provider.TokenValidation = utils.ExpandEnvironmentVariableString(cfg.Provider.TokenValidation)
 
-	config.ErrorPages.Unauthenticated.FilePath = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthenticated.FilePath)
-	config.ErrorPages.Unauthenticated.RedirectTo = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthenticated.RedirectTo)
-	config.ErrorPages.Unauthorized.FilePath = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthorized.FilePath)
-	config.ErrorPages.Unauthorized.RedirectTo = utils.ExpandEnvironmentVariableString(config.ErrorPages.Unauthorized.RedirectTo)
+	cfg.ErrorPages.Unauthenticated.FilePath = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthenticated.FilePath)
+	cfg.ErrorPages.Unauthenticated.RedirectTo = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthenticated.RedirectTo)
+	cfg.ErrorPages.Unauthorized.FilePath = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthorized.FilePath)
+	cfg.ErrorPages.Unauthorized.RedirectTo = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthorized.RedirectTo)
 
-	if config.Secret == DefaultSecret {
+	if cfg.Secret == config.DefaultSecret {
 		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
 	}
 
-	secret := []byte(config.Secret)
+	secret := []byte(cfg.Secret)
 	if len(secret) != 32 {
 		logger.Log(logging.LevelError, "Invalid secret provided. Secret must be exactly 32 characters in length. The provided secret has %d characters.", len(secret))
 		return nil, errors.New("invalid secret")
 	}
 
-	if config.Provider.CABundle != "" && config.Provider.CABundleFile != "" {
+	if cfg.Provider.CABundle != "" && cfg.Provider.CABundleFile != "" {
 		logger.Log(logging.LevelError, "You can only use an inline CABundle OR CABundleFile, not both.")
 		return nil, errors.New("you can only use an inline CABundle OR CABundleFile, not both.")
 	}
 
 	// Specify default scopes if not provided
-	if config.Scopes == nil || len(config.Scopes) == 0 {
-		config.Scopes = []string{"openid", "profile", "email"}
+	if cfg.Scopes == nil || len(cfg.Scopes) == 0 {
+		cfg.Scopes = []string{"openid", "profile", "email"}
 	}
 
-	parsedURL, err := utils.ParseUrl(config.Provider.Url)
+	parsedURL, err := utils.ParseUrl(cfg.Provider.Url)
 	if err != nil {
 		logger.Log(logging.LevelError, "Error while parsing Provider.Url: %s", err.Error())
 		return nil, err
 	}
 
-	parsedCallbackURL, err := url.Parse(config.CallbackUri)
+	parsedCallbackURL, err := url.Parse(cfg.CallbackUri)
 	if err != nil {
 		logger.Log(logging.LevelError, "Error while parsing CallbackUri: %s", err.Error())
 		return nil, err
@@ -292,17 +178,17 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 	} else {
 		logger.Log(logging.LevelInfo, "Callback URL is relative, will overlay any wrapped host")
 	}
-	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(config.Scopes, ", "))
-	logger.Log(logging.LevelDebug, "SessionCookie: %v", config.SessionCookie)
+	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(cfg.Scopes, ", "))
+	logger.Log(logging.LevelDebug, "SessionCookie: %v", cfg.SessionCookie)
 
-	if config.Provider.TokenRenewalThreshold < 0.5 || config.Provider.TokenRenewalThreshold > 1.0 {
+	if cfg.Provider.TokenRenewalThreshold < 0.5 || cfg.Provider.TokenRenewalThreshold > 1.0 {
 		logger.Log(logging.LevelError, "Invalid TokenRenewalThreshold. The value must be >= 0.5 and <= 1.0.")
 		return nil, errors.New("invalid TokenRenewalThreshold")
 	}
 
 	var conditionalAuth *rules.RequestCondition
-	if config.BypassAuthenticationRule != "" {
-		ca, err := rules.ParseRequestCondition(config.BypassAuthenticationRule)
+	if cfg.BypassAuthenticationRule != "" {
+		ca, err := rules.ParseRequestCondition(cfg.BypassAuthenticationRule)
 
 		if err != nil {
 			return nil, err
@@ -318,26 +204,26 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	var caBundleData []byte
 
-	if config.Provider.CABundle != "" {
-		if strings.HasPrefix(config.Provider.CABundle, "base64:") {
-			caBundleData, err = base64.StdEncoding.DecodeString(strings.TrimPrefix(config.Provider.CABundle, "base64:"))
+	if cfg.Provider.CABundle != "" {
+		if strings.HasPrefix(cfg.Provider.CABundle, "base64:") {
+			caBundleData, err = base64.StdEncoding.DecodeString(strings.TrimPrefix(cfg.Provider.CABundle, "base64:"))
 			if err != nil {
 				logger.Log(logging.LevelInfo, "Failed to base64-decode the inline CA bundle")
 				return nil, err
 			}
 		} else {
-			caBundleData = []byte(config.Provider.CABundle)
+			caBundleData = []byte(cfg.Provider.CABundle)
 		}
 
 		logger.Log(logging.LevelDebug, "Loaded CA bundle provided inline")
-	} else if config.Provider.CABundleFile != "" {
-		caBundleData, err = os.ReadFile(config.Provider.CABundleFile)
+	} else if cfg.Provider.CABundleFile != "" {
+		caBundleData, err = os.ReadFile(cfg.Provider.CABundleFile)
 		if err != nil {
-			logger.Log(logging.LevelInfo, "Failed to load CA bundle from %v: %v", config.Provider.CABundleFile, err)
+			logger.Log(logging.LevelInfo, "Failed to load CA bundle from %v: %v", cfg.Provider.CABundleFile, err)
 			return nil, err
 		}
 
-		logger.Log(logging.LevelDebug, "Loaded CA bundle from %v", config.Provider.CABundleFile)
+		logger.Log(logging.LevelDebug, "Loaded CA bundle from %v", cfg.Provider.CABundleFile)
 	}
 
 	if caBundleData != nil {
@@ -348,7 +234,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 
 	}
 
-	for _, header := range config.Headers {
+	for _, header := range cfg.Headers {
 		if header.Value != "" && header.Values != "" {
 			logger.Log(logging.LevelError, "Invalid Header: you can only use one of Value or Values, not both")
 			return nil, errors.New("invalid Header")
@@ -360,7 +246,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		// IdleConnTimeout: 30 * time.Second,
 		Proxy: http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: config.Provider.InsecureSkipVerifyBool,
+			InsecureSkipVerify: cfg.Provider.InsecureSkipVerifyBool,
 			RootCAs:            rootCAs,
 		},
 	}
@@ -378,7 +264,7 @@ func New(uctx context.Context, next http.Handler, config *Config, name string) (
 		ProviderURL:              parsedURL,
 		ClientJwtPrivateKey:      clientAssertionPrivateKey,
 		CallbackURL:              parsedCallbackURL,
-		Config:                   config,
+		Config:                   cfg,
 		SessionStorage:           session.CreateCookieSessionStorage(),
 		BypassAuthenticationRule: conditionalAuth,
 	}, nil

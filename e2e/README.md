@@ -5,24 +5,26 @@ The test infrastructure is set up by [*docker compose*](https://docs.docker.com/
 
 Test files are located in the *./tests*-folder within subfolders for different configurations or IDPs.
 
+We're using *bun* which can be installed by following the [official instructions](https://bun.com/docs/installation).
+
 ## First-time setup
 ```
-npm install
-npx playwright install
+bun install
+bunx playwright install
 ```
 
 ## How to run the tests
 ```
-npx playwright test
+bunx playwright test
 ```
 
 You can also run the tests and watch the browser, or use the interactive UI mode:
 
 ```
-npx playwright test --headed
+bunx playwright test --headed
 ```
 ```
-npx playwright test --ui
+bunx playwright test --ui
 ```
 
 ## How to update keycloak master-realm.json

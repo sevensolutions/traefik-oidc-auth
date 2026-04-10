@@ -4,11 +4,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
+	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 )
 
 type SessionStorage interface {
-	StoreSession(sessionId string, state *SessionState) (string, error)
-	TryGetSession(sessionTicket string) (*SessionState, error)
+	StoreSession(logger *logging.Logger, config *config.Config, sessionId string, state *SessionState) (string, error)
+	TryGetSession(logger *logging.Logger, config *config.Config, sessionTicket string) (*SessionState, error)
 }
 
 type SessionState struct {
