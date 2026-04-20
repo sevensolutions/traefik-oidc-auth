@@ -108,14 +108,11 @@ func (toa *TraefikOidcAuth) isCallbackRequest(req *http.Request) bool {
 }
 
 func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	isPublic := false
 	if toa.BypassAuthenticationRule != nil {
 		if toa.BypassAuthenticationRule.Match(toa.logger, req) {
 			toa.logger.Log(logging.LevelDebug, "BypassAuthenticationRule matched. Forwarding request without authentication.")
-
-			// Forward the request
-			toa.sanitizeForUpstream(req)
-			toa.next.ServeHTTP(rw, req)
-			return
+			isPublic = true
 		} else {
 			toa.logger.Log(logging.LevelDebug, "BypassAuthenticationRule not matched. Requiring authentication.")
 		}
@@ -155,39 +152,36 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 			session.IsAuthorized = isAuthorized(toa.logger, toa.Config.Authorization, claims)
 		}
 
-		if !session.IsAuthorized && !toa.Config.UnauthorizedPassthroughBool {
+		if !session.IsAuthorized && toa.Config.UnauthorizedBehavior != "Forward" {
 			toa.handleUnauthorized(rw, req)
 			return
-		} else if session.IsAuthorized {
-			// Attach upstream headers
-			err = toa.attachHeaders(req, session, claims)
-			if err != nil {
-				toa.logger.Log(logging.LevelError, "Error while attaching headers: %s", err.Error())
-				http.Error(rw, err.Error(), http.StatusInternalServerError)
-				return
-			}
+		}
 
-			if updateSession {
-				toa.storeSessionAndAttachCookie(session, rw)
-			}
+		// Attach upstream headers
+		err = toa.attachHeaders(req, session, claims, isPublic, session.IsAuthorized)
+		if err != nil {
+			toa.logger.Log(logging.LevelError, "Error while attaching headers: %s", err.Error())
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if updateSession {
+			toa.storeSessionAndAttachCookie(session, rw)
 		}
 
 		// Forward the request
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 		return
-	} else {
-		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
-	}
-
-	// Clear the session cookie
-	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
-
-	if toa.Config.UnauthorizedPassthroughBool {
-		// Forward the request
+	} else if isPublic {
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 		return
+	} else {
+		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+
+		// Clear the session cookie
+		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 	}
 
 	toa.handleUnauthenticated(rw, req)
@@ -254,7 +248,7 @@ func newTemplate() *template.Template {
 	})
 }
 
-func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.SessionState, claims map[string]interface{}) error {
+func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.SessionState, claims map[string]interface{}, isPublicRoute bool, isAuthorized bool) error {
 	if toa.Config.Headers != nil {
 		evalContext := make(map[string]interface{})
 
@@ -264,6 +258,14 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 		evalContext["refreshToken"] = session.RefreshToken
 
 		for _, header := range toa.Config.Headers {
+			if isPublicRoute && header.IncludeWhen != "Always" && header.IncludeWhen != "Public" {
+				continue
+			}
+
+			if !isAuthorized && header.IncludeWhen != "Always" && header.IncludeWhen != "Forward" {
+				continue
+			}
+
 			if header.Value != "" {
 				if header.Template == nil {
 					tpl, err := newTemplate().Parse(header.Value)
@@ -526,6 +528,10 @@ func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *h
 	case "Unauthorized":
 		// Respond with 401 Unauthorized
 		toa.writeUnauthenticatedError(rw, req)
+	case "Forward":
+		// Forward request
+		toa.sanitizeForUpstream(req)
+		toa.next.ServeHTTP(rw, req)
 	case "Auto":
 		if utils.IsHtmlRequest(req) {
 			// Handle login for HTML requests

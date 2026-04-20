@@ -25,13 +25,13 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
+              # IncludeWhen: "Public"
             - Name: "IdToken"
               Value: "{{`Bearer {{ .idToken }}`}}"
           AuthorizationHeader:
             Name: "CustomAuth"
           AuthorizationCookie:
             Name: "CustomAuth"
-          #UnauthorizedPassthrough: true
           #BypassAuthenticationRule: "Header(`cache-control`, `no-cache`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
           #UnauthorizedBehavior: "Unauthorized"
           # Authorization:

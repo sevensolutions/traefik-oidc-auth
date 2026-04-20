@@ -45,9 +45,6 @@ type Config struct {
 	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
 	UnauthorizedBehavior string                     `json:"unauthorized_behavior"`
 
-	UnauthorizedPassthrough     string `json:"unauthorized_passthrough"`
-	UnauthorizedPassthroughBool bool   `json:"unauthorized_passthrough_bool"`
-
 	Authorization *AuthorizationConfig `json:"authorization"`
 
 	Headers []HeaderConfig `json:"headers"`
@@ -121,9 +118,10 @@ type ClaimAssertion struct {
 }
 
 type HeaderConfig struct {
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	Values string `json:"values"`
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Values      string `json:"values"`
+	IncludeWhen string `json:"include_when"`
 
 	// A reference to the parsed Value-template
 	Template *template.Template
