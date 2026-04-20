@@ -45,5 +45,6 @@ The following rules are available:
 | <code>QueryRegexp(&#96;apikey&#96;, &#96;^[0-9]+$&#96;)</code> | Match the specified query parameter against the given regex. |
 
 :::note
-When authentication is bypassed, no headers etc. will be forwarded to the upstream service, even if an existing session is present.
+In order to forward headers to the upstream service when authentication is bypassed the `IncludeWhen` option of that header needs to be set to `Always` or `Public`. 
+Otherwise the header will not be set, even if an existing session is present.
 :::
