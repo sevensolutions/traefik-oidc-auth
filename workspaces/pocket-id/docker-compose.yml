@@ -1,11 +1,12 @@
 services:
   pocketId:
-    image: ghcr.io/pocket-id/pocket-id:v1.2.0
+    image: ghcr.io/pocket-id/pocket-id:v2.6.2
     restart: unless-stopped
     ports:
       - 1411:1411
     environment:
       APP_URL: http://localhost:1411
+      ENCRYPTION_KEY: "r9aDyKPkyD+NtLQB7V/YXdKsWKfgqYIxnI8IOJnGpT8="
     volumes:
       - "pocketId_data:/app/data"
 
