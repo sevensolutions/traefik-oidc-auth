@@ -6,8 +6,11 @@ import (
 )
 
 type OidcState struct {
-	Action      string `json:"action"`
-	RedirectUrl string `json:"redirect_url"`
+	Action          string `json:"action"`
+	RedirectUrl     string `json:"redirect_url"`
+	// CodeVerifierKey is a random nonce used to name the PKCE code verifier cookie,
+	// so parallel authorization requests don't overwrite each other's verifier.
+	CodeVerifierKey string `json:"cvk,omitempty"`
 }
 
 func EncodeState(state *OidcState) (string, error) {

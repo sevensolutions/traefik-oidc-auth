@@ -137,8 +137,8 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 	return cookie
 }
 
-func getCodeVerifierCookieName(config *config.Config) string {
-	return makeCookieName(config, "CodeVerifier")
+func getCodeVerifierCookieName(config *config.Config, nonce string) string {
+	return makeCookieName(config, "CodeVerifier."+nonce)
 }
 func getSessionCookieName(config *config.Config) string {
 	return makeCookieName(config, "Session")

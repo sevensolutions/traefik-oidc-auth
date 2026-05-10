@@ -71,7 +71,7 @@ func randomBytesInHex(count int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string) (*oidc.OidcTokenResponse, error) {
+func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode string, codeVerifierKey string) (*oidc.OidcTokenResponse, error) {
 	redirectUrl := oidcAuth.GetAbsoluteCallbackURL(req).String()
 
 	urlValues := url.Values{
@@ -97,7 +97,7 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	}
 
 	if oidcAuth.Config.Provider.UsePkceBool {
-		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config))
+		codeVerifierCookie, err := req.Cookie(getCodeVerifierCookieName(oidcAuth.Config, codeVerifierKey))
 		if err != nil {
 			return nil, err
 		}

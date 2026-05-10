@@ -354,7 +354,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
-		token, err := exchangeAuthCode(toa, req, authCode)
+		token, err := exchangeAuthCode(toa, req, authCode, state.CodeVerifierKey)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
@@ -428,14 +428,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		toa.storeSessionAndAttachCookie(session, rw)
 
 		http.SetCookie(rw, &http.Cookie{
-			Name:     getCodeVerifierCookieName(toa.Config),
+			Name:     getCodeVerifierCookieName(toa.Config, state.CodeVerifierKey),
 			Value:    "",
 			Expires:  time.Now().Add(-24 * time.Hour),
 			MaxAge:   -1,
 			Secure:   true,
 			HttpOnly: true,
 			Path:     toa.CallbackURL.Path,
-			Domain:   toa.CallbackURL.Host,
+			Domain:   toa.CallbackURL.Hostname(),
 			SameSite: http.SameSiteDefaultMode,
 		})
 
@@ -640,13 +640,6 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		RedirectUrl: redirectUrl,
 	}
 
-	stateBase64, err := oidc.EncodeState(&state)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
 
 	authorizationEndpointUrl, err := url.Parse(toa.DiscoveryDocument.AuthorizationEndpoint)
@@ -661,7 +654,6 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
-		"state":         {stateBase64},
 		"resource":      toa.Config.RequestedResources,
 	}
 
@@ -692,18 +684,35 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 			return
 		}
 
-		// TODO: Make configurable
-		// TODO does this need domain tweaks?  it is in the login flow
+		// Generate a nonce to uniquely identify this authorization request's code verifier.
+		// Each parallel login flow gets its own cookie, preventing race conditions where
+		// concurrent requests overwrite a shared cookie causing "Invalid code verifier" errors.
+		nonce, err := randomBytesInHex(8)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		state.CodeVerifierKey = nonce
+
 		http.SetCookie(rw, &http.Cookie{
-			Name:     getCodeVerifierCookieName(toa.Config),
+			Name:     getCodeVerifierCookieName(toa.Config, nonce),
 			Value:    encryptedCodeVerifier,
+			MaxAge:   600, // 10 minutes; enough time to complete the auth flow
 			Secure:   true,
 			HttpOnly: true,
 			Path:     toa.CallbackURL.Path,
-			Domain:   toa.CallbackURL.Host,
+			Domain:   toa.CallbackURL.Hostname(),
 			SameSite: http.SameSiteDefaultMode,
 		})
 	}
+
+	stateBase64, err := oidc.EncodeState(&state)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	urlValues.Add("state", stateBase64)
 
 	authorizationEndpointUrl.RawQuery = urlValues.Encode()
 
