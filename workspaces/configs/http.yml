@@ -25,6 +25,7 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
+              # IncludeWhen: "Public"
             - Name: "IdToken"
               Value: "{{`Bearer {{ .idToken }}`}}"
           AuthorizationHeader:

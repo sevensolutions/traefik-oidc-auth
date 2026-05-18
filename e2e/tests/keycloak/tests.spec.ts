@@ -405,6 +405,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          LoginUri: "/login"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -432,7 +433,16 @@ http:
 
   await expect(page.getByText(/My-Header: 123/i)).toBeVisible();
 
-  // The second test should return a redirect to the IDP, because the header doesn't match.
+  // The second test: authenticated user should not have authentication headers set
+  await expectGotoOkay(page, "http://localhost:9080/login");
+  await login(page, "admin", "admin", "http://localhost:9080");
+
+  const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(authHeaderExists).toBeFalsy();
+
+  await page.goto("http://localhost:9080/logout");
+
+  // The third test should return a redirect to the IDP, because the header doesn't match.
   await page.route("http://localhost:9080/**/*", route => {
     const headers = route.request().headers();
     headers["MY-HEADER"] = "456";
@@ -443,6 +453,57 @@ http:
   const response = await page.goto("http://localhost:9080/test2");
 
   expect(response?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
+});
+
+test("access app with bypass rule and unauthenticated forward", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          BypassAuthenticationRule: "Path(\`/test1\`)"
+          UnauthorizedBehavior: Forward
+          LoginUri: "/login"
+          Headers:
+            - Name: "Authorization"
+              Value: "{{\`Bearer: {{ .accessToken }}\`}}"
+              IncludeWhen: "Public"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  // The first test: unauthenticated request should pass through directly to the whoami page.
+  const unauthResponse = await page.goto("http://localhost:9080/test1");
+
+  // Unauthenticated request passes through with a 200 response and no Authorization header attached.
+  expect(unauthResponse?.status()).toBe(200);
+  const unauthAuthHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(unauthAuthHeaderExists).toBeFalsy();
+
+  // The second test: authenticated user should pass through with the Authorization header set.
+  await expectGotoOkay(page, "http://localhost:9080/login");
+  await login(page, "admin", "admin", "http://localhost:9080");
+
+  const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(authHeaderExists).toBeTruthy();
 });
 
 test("external authentication", async ({ page }) => {

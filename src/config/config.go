@@ -118,9 +118,10 @@ type ClaimAssertion struct {
 }
 
 type HeaderConfig struct {
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	Values string `json:"values"`
+	Name        string `json:"name"`
+	Value       string `json:"value"`
+	Values      string `json:"values"`
+	IncludeWhen string `json:"include_when"`
 
 	// A reference to the parsed Value-template
 	Template *template.Template
