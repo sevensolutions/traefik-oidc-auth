@@ -115,7 +115,12 @@ func (h *JwksHandler) loadKeys(httpClient *http.Client) error {
 
 func (h *JwksHandler) Keyfunc(token *jwt.Token) (any, error) {
 	if strings.HasPrefix(token.Method.Alg(), "RS") {
-		k, err := h.getRsaKey(token.Header["kid"].(string))
+		kid, ok := token.Header["kid"].(string)
+		if !ok || kid == "" {
+			return nil, errors.New("missing or invalid kid in token header")
+		}
+
+		k, err := h.getRsaKey(kid)
 
 		if err != nil {
 			return nil, err
@@ -126,7 +131,12 @@ func (h *JwksHandler) Keyfunc(token *jwt.Token) (any, error) {
 
 	if strings.HasPrefix(token.Method.Alg(), "EC") ||
 		strings.HasPrefix(token.Method.Alg(), "ES") {
-		k, err := h.getEcdsaKey(token.Header["kid"].(string))
+		kid, ok := token.Header["kid"].(string)
+		if !ok || kid == "" {
+			return nil, errors.New("missing or invalid kid in token header")
+		}
+
+		k, err := h.getEcdsaKey(kid)
 
 		if err != nil {
 			return nil, err
