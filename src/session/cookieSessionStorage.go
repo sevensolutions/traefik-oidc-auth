@@ -21,7 +21,7 @@ func (storage *CookieSessionStorage) StoreSession(logger *logging.Logger, config
 
 	encryptedSessionTicket, err := utils.Encrypt(string(stateJson), config.Secret)
 	if err != nil {
-		logger.Log(config.LogLevel, logging.LevelError, "Failed to encrypt session state: %s", err.Error())
+		logger.Log(logging.LevelError, "Failed to encrypt session state: %s", err.Error())
 		return "", err
 	}
 
@@ -31,7 +31,7 @@ func (storage *CookieSessionStorage) StoreSession(logger *logging.Logger, config
 func (storage *CookieSessionStorage) TryGetSession(logger *logging.Logger, config *config.Config, sessionTicket string) (*SessionState, error) {
 	plainSessionTicket, err := utils.Decrypt(sessionTicket, config.Secret)
 	if err != nil {
-		logger.Log(config.LogLevel, logging.LevelError, "Failed to decrypt session ticket: %v", err.Error())
+		logger.Log(logging.LevelError, "Failed to decrypt session ticket: %v", err.Error())
 		return nil, err
 	}
 
