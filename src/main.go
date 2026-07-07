@@ -562,10 +562,6 @@ func (toa *TraefikOidcAuth) writeUnauthenticatedError(rw http.ResponseWriter, re
 	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
 }
 
-// isPostLoginAttempt indicates the caller already went through a login/step-up attempt for this
-// request (i.e. we're being called from the OIDC callback). Re-authenticating the same user won't
-// change the outcome of the authorization check, so Challenge/Auto must not redirect to login again -
-// doing so would create an infinite redirect loop between the app and the identity provider.
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, isPostLoginAttempt bool) {
 	switch toa.Config.UnauthorizedBehavior {
 	case "Challenge":
