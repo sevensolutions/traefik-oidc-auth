@@ -87,6 +87,14 @@ So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 If the user is not authorized, all claims, contained in the token, are printed in the console if the [`LogLevel`](./middleware-configuration.md) is set to `DEBUG`. This may help you to know which claims exist in your token.
 :::
 
+### When is authorization checked?
+
+By default, `AssertClaims` is only evaluated **once**, when the user logs in and the session is created. For every subsequent request on that session, the previously computed result is simply reused - it is *not* re-evaluated, even if the underlying claims would now produce a different result (e.g. after a silent token refresh). Set [`CheckOnEveryRequest`](./middleware-configuration.md#authorization) to `true` if you need the assertion to be re-evaluated on every request - for example when you're checking an `acr`/`amr` claim to enforce step-up authentication for specific routes, or when the required claims could change without the user going through a full login again. When using [`AuthorizationHeader`](./middleware-configuration.md#authorization-header) or [`AuthorizationCookie`](./middleware-configuration.md#authorization-cookie), this is always treated as `true`, since there is no persistent session to cache the result in.
+
+:::important
+If the initial check at login fails, that *unauthorized* result stays cached in the session regardless of `CheckOnEveryRequest`. Depending on [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block), this means every following request to a protected route will either get a 403 again, or - with `Challenge`/`Auto` - bounce through the IDP once before landing on the 403 page, until the user obtains a new session that actually passes the check.
+:::
+
 Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.  
 As you can see, the name selects the `roles` claim from the token and checks if the value matches *AnyOf* the given values.
 
