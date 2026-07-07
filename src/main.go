@@ -153,7 +153,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !session.IsAuthorized && toa.Config.UnauthorizedBehavior != "Forward" {
-			toa.handleUnauthorized(rw, req)
+			toa.handleUnauthorized(rw, req, false)
 			return
 		}
 
@@ -446,7 +446,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		if !isAuthorized {
-			toa.handleUnauthorized(rw, req)
+			toa.handleUnauthorized(rw, req, true)
 			return
 		}
 
@@ -521,12 +521,12 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 }
 
 func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *http.Request) {
-	switch toa.Config.UnauthorizedBehavior {
+	switch toa.Config.UnauthenticatedBehavior {
 	case "Challenge":
 		// Handle login
 		toa.handleLogin(rw, req)
 	case "Unauthorized":
-		// Respond with 401 Unauthorized
+		// Respond with 401 Unauthenticated
 		toa.writeUnauthenticatedError(rw, req)
 	case "Forward":
 		// Forward request
@@ -537,11 +537,11 @@ func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *h
 			// Handle login for HTML requests
 			toa.handleLogin(rw, req)
 		} else {
-			// Respond with 401 Unauthorized for non-HTML requests
+			// Respond with 401 Unauthenticated for non-HTML requests
 			toa.writeUnauthenticatedError(rw, req)
 		}
 	default:
-		// Respond with 401 Unauthorized as a fallback
+		// Respond with 401 Unauthenticated as a fallback
 		toa.writeUnauthenticatedError(rw, req)
 	}
 }
@@ -562,8 +562,39 @@ func (toa *TraefikOidcAuth) writeUnauthenticatedError(rw http.ResponseWriter, re
 	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
 }
 
-func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request) {
-	toa.writeUnauthorizedError(rw, req)
+// isPostLoginAttempt indicates the caller already went through a login/step-up attempt for this
+// request (i.e. we're being called from the OIDC callback). Re-authenticating the same user won't
+// change the outcome of the authorization check, so Challenge/Auto must not redirect to login again -
+// doing so would create an infinite redirect loop between the app and the identity provider.
+func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, isPostLoginAttempt bool) {
+	switch toa.Config.UnauthorizedBehavior {
+	case "Challenge":
+		if isPostLoginAttempt {
+			// Already tried logging in and still unauthorized, stop here
+			toa.writeUnauthorizedError(rw, req)
+		} else {
+			// Handle login
+			toa.handleLogin(rw, req)
+		}
+	case "Unauthorized":
+		// Respond with 403 Unauthorized
+		toa.writeUnauthorizedError(rw, req)
+	case "Forward":
+		// Forward request
+		toa.sanitizeForUpstream(req)
+		toa.next.ServeHTTP(rw, req)
+	case "Auto":
+		if !isPostLoginAttempt && utils.IsHtmlRequest(req) {
+			// Handle login for HTML requests
+			toa.handleLogin(rw, req)
+		} else {
+			// Respond with 403 Unauthorized for non-HTML requests, or if we already tried logging in
+			toa.writeUnauthorizedError(rw, req)
+		}
+	default:
+		// Respond with 403 Unauthorized as a fallback
+		toa.writeUnauthorizedError(rw, req)
+	}
 }
 
 func (toa *TraefikOidcAuth) writeUnauthorizedError(rw http.ResponseWriter, req *http.Request) {

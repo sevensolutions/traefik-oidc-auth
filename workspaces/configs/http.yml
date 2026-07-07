@@ -33,6 +33,7 @@ http:
           AuthorizationCookie:
             Name: "CustomAuth"
           #BypassAuthenticationRule: "Header(`cache-control`, `no-cache`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
+          #UnauthenticatedBehavior: "Unauthorized"
           #UnauthorizedBehavior: "Unauthorized"
           # Authorization:
           #   AssertClaims:

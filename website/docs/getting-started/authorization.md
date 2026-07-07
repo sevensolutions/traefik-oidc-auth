@@ -228,7 +228,7 @@ Here are some more complex examples based on the following json structure. This 
 
 ## Custom Error Page
 
-If a user is authenticated but unauthorized, a default error page is showen and a status code 403 - Forbidden is returned.
+If a user is authenticated but unauthorized, the response depends on the [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block) setting. By default (`Auto`), HTML requests are first redirected back to the IDP once (e.g. to allow the user to switch accounts or satisfy a step-up authentication requirement); if the user is still unauthorized afterwards, or for non-HTML requests, a default error page is shown and a status code 403 - Forbidden is returned.
 You can customize this page by providing your own HTML-file as shown below:
 
 ```yml

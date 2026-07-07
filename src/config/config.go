@@ -39,11 +39,12 @@ type Config struct {
 
 	SessionStorageType string `json:"session_storage_type"`
 
-	CookieNamePrefix     string                     `json:"cookie_name_prefix"`
-	SessionCookie        *SessionCookieConfig       `json:"session_cookie"`
-	AuthorizationHeader  *AuthorizationHeaderConfig `json:"authorization_header"`
-	AuthorizationCookie  *AuthorizationCookieConfig `json:"authorization_cookie"`
-	UnauthorizedBehavior string                     `json:"unauthorized_behavior"`
+	CookieNamePrefix        string                     `json:"cookie_name_prefix"`
+	SessionCookie           *SessionCookieConfig       `json:"session_cookie"`
+	AuthorizationHeader     *AuthorizationHeaderConfig `json:"authorization_header"`
+	AuthorizationCookie     *AuthorizationCookieConfig `json:"authorization_cookie"`
+	UnauthenticatedBehavior string                     `json:"unauthenticated_behavior"`
+	UnauthorizedBehavior    string                     `json:"unauthorized_behavior"`
 
 	Authorization *AuthorizationConfig `json:"authorization"`
 

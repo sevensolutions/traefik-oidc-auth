@@ -31,7 +31,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `Provider` | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
 | `Scopes` | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
 | `CallbackUri`* | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
-| `LoginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthorizedBehavior`-configuration.  |
+| `LoginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthenticatedBehavior`/`UnauthorizedBehavior`-configuration.  |
 | `PostLoginRedirectUri`* | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
 | `ValidPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
 | `LogoutUri`* | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
@@ -41,7 +41,8 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
 | `AuthorizationCookie` | no | [`AuthorizationCookie`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookie* block. |
-| `UnauthorizedBehavior`* | no | `string` | `Auto` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, `Unauthorized` will return a 401 status response, `Forward` will send the request as unauthenticated to the upstream service, and `Auto` will automatically choose based on request type (HTML requests get redirected, AJAX requests get 401). |
+| `UnauthenticatedBehavior`* | no | `string` | `Auto` | Defines the behavior for unauthenticated requests, i.e. requests without a valid session. `Challenge` means the user will be redirected to the IDP's login page, `Unauthorized` will return a 401 status response, `Forward` will send the request as unauthenticated to the upstream service, and `Auto` will automatically choose based on request type (HTML requests get redirected, AJAX requests get 401). |
+| `UnauthorizedBehavior`* | no | `string` | `Auto` | Defines the behavior for unauthorized requests, i.e. requests with a valid session that don't pass the `Authorization` rules. `Challenge` means the user will be redirected to the IDP's login page to try and satisfy the authorization requirements (e.g. step-up authentication); if the user is still not authorized afterwards, a 403 response is returned instead of redirecting again. `Unauthorized` will return a 403 status response, `Forward` will send the request as unauthorized to the upstream service, and `Auto` will automatically choose based on request type (HTML requests get the `Challenge` behavior, AJAX requests get 403). |
 | `Authorization` | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
 | `Headers` | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 | `BypassAuthenticationRule`* | no | `string` | *none* | Specifies an optional rule to bypass authentication. See [Bypass Authentication Rule](./bypass-authentication-rule.md) for more details. |
@@ -93,7 +94,7 @@ When `CheckOnEveryRequest` is enabled, this will greatly increase the hit rate o
 ## AuthorizationHeader Block {#authorization-header}
 
 By specifying this configuration, a request can send an externally generated access token via this header to authenticate the request.
-In this case no session will be created by the middleware. You may also want to set `UnauthorizedBehavior` to `Unauthorized`.
+In this case no session will be created by the middleware. Since these requests are usually made by non-browser clients, you may also want to set `UnauthenticatedBehavior` and `UnauthorizedBehavior` to `Unauthorized`, so a missing/invalid token results in a plain 401/403 response instead of a redirect to the IDP's login page.
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
