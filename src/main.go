@@ -576,7 +576,9 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 		// Respond with 403 Unauthorized
 		toa.writeUnauthorizedError(rw, req)
 	case "Forward":
-		// Forward request
+		// Unreachable from the main request path (ServeHTTP already forwards there without
+		// calling handleUnauthorized when UnauthorizedBehavior is "Forward"), but still hit
+		// right after a fresh login (isPostLoginAttempt) since that call has no such guard.
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 	case "Auto":
