@@ -92,7 +92,7 @@ If the user is not authorized, all claims, contained in the token, are printed i
 By default, `AssertClaims` is only evaluated **once**, when the user logs in and the session is created. For every subsequent request on that session, the previously computed result is simply reused - it is *not* re-evaluated, even if the underlying claims would now produce a different result (e.g. after a silent token refresh). Set [`CheckOnEveryRequest`](./middleware-configuration.md#authorization) to `true` if you need the assertion to be re-evaluated on every request - for example when you're checking an `acr`/`amr` claim to enforce step-up authentication for specific routes, or when the required claims could change without the user going through a full login again. When using [`AuthorizationHeader`](./middleware-configuration.md#authorization-header) or [`AuthorizationCookie`](./middleware-configuration.md#authorization-cookie), this is always treated as `true`, since there is no persistent session to cache the result in.
 
 :::important
-If the initial check at login fails, that *unauthorized* result stays cached in the session regardless of `CheckOnEveryRequest`. Depending on [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block), this means every following request to a protected route will either get a 403 again, or - with `Challenge`/`Auto` - bounce through the IDP once before landing on the 403 page, until the user obtains a new session that actually passes the check.
+If the initial check at login fails, that *unauthorized* result stays cached in the session regardless of `CheckOnEveryRequest`. Depending on [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block), this means every following request to a protected route will either get a 403 again, or - with `Challenge` explicitly configured - bounce through the IDP once before landing on the 403 page, until the user obtains a new session that actually passes the check.
 :::
 
 Here is a commonly used example configuration on how to only allow *admin* or *media* users, based on the `roles` claim.  
@@ -236,7 +236,7 @@ Here are some more complex examples based on the following json structure. This 
 
 ## Custom Error Page
 
-If a user is authenticated but unauthorized, the response depends on the [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block) setting. By default (`Auto`), HTML requests are first redirected back to the IDP once (e.g. to allow the user to switch accounts or satisfy a step-up authentication requirement); if the user is still unauthorized afterwards, or for non-HTML requests, a default error page is shown and a status code 403 - Forbidden is returned.
+If a user is authenticated but unauthorized, the response depends on the [`UnauthorizedBehavior`](./middleware-configuration.md#plugin-config-block) setting. By default (`Unauthorized`), a default error page is shown and a status code 403 - Forbidden is returned. If `UnauthorizedBehavior` is explicitly set to `Challenge`, HTML requests are first redirected back to the IDP once (e.g. to allow the user to switch accounts or satisfy a step-up authentication requirement); if the user is still unauthorized afterwards, or for non-HTML requests, the same 403 error page is shown instead.
 You can customize this page by providing your own HTML-file as shown below:
 
 ```yml

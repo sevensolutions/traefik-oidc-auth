@@ -565,12 +565,13 @@ func (toa *TraefikOidcAuth) writeUnauthenticatedError(rw http.ResponseWriter, re
 func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, isPostLoginAttempt bool) {
 	switch toa.Config.UnauthorizedBehavior {
 	case "Challenge":
-		if isPostLoginAttempt {
-			// Already tried logging in and still unauthorized, stop here
-			toa.writeUnauthorizedError(rw, req)
-		} else {
-			// Handle login
+		if !isPostLoginAttempt && utils.IsHtmlRequest(req) {
+			// Handle login for HTML requests
 			toa.handleLogin(rw, req)
+		} else {
+			// Already tried logging in and still unauthorized, or a non-HTML request that
+			// wouldn't follow the redirect anyway - stop here
+			toa.writeUnauthorizedError(rw, req)
 		}
 	case "Unauthorized":
 		// Respond with 403 Forbidden
@@ -581,16 +582,12 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 		// right after a fresh login (isPostLoginAttempt) since that call has no such guard.
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
-	case "Auto":
-		if !isPostLoginAttempt && utils.IsHtmlRequest(req) {
-			// Handle login for HTML requests
-			toa.handleLogin(rw, req)
-		} else {
-			// Respond with 403 Forbidden for non-HTML requests, or if we already tried logging in
-			toa.writeUnauthorizedError(rw, req)
-		}
 	default:
-		// Respond with 403 Forbidden as a fallback
+		// Respond with 403 Forbidden as a fallback. This also covers "Unauthorized", the default
+		// value: redirecting to the IDP here (like UnauthenticatedBehavior's Auto does) isn't safe
+		// by default, since silently re-authenticating via an existing IDP SSO session usually can't
+		// change the outcome of a failed claim check, which would turn this into an infinite redirect
+		// loop. Set UnauthorizedBehavior explicitly to Challenge to opt into that redirect instead.
 		toa.writeUnauthorizedError(rw, req)
 	}
 }

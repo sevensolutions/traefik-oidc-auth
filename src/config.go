@@ -54,7 +54,7 @@ func CreateConfig() *config.Config {
 		AuthorizationHeader:     &config.AuthorizationHeaderConfig{},
 		AuthorizationCookie:     &config.AuthorizationCookieConfig{},
 		UnauthenticatedBehavior: "Auto",
-		UnauthorizedBehavior:    "Auto",
+		UnauthorizedBehavior:    "Unauthorized",
 		Authorization: &config.AuthorizationConfig{
 			CheckOnEveryRequest: false,
 		},
