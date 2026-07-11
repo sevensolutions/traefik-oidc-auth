@@ -49,6 +49,14 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `ErrorPages` | no | [`ErrorPages`](#error-pages) | *none* | Allows you to customize some error pages. See *ErrorPages* block. |
 | `RequestedResources` | no | `string[]`| *none* | An array of resource URIs according to [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) for which the token should be requested. | 
 
+:::warning Upgrading from a single `UnauthorizedBehavior`
+If you're using a version where a single `UnauthorizedBehavior` option controlled the response for both unauthenticated requests (no/invalid session, HTTP 401) and unauthorized requests (valid session, but failing the `Authorization` rules, HTTP 403), note that this has been split into two separate options:
+
+- `UnauthenticatedBehavior` now controls the 401 case.
+- `UnauthorizedBehavior` now controls only the 403 case.
+
+If your old `UnauthorizedBehavior` was set to `Auto` (the default), no action is required. Otherwise, rename your existing `UnauthorizedBehavior` setting to `UnauthenticatedBehavior` to keep the exact same behavior as before. Then decide separately whether the new `UnauthorizedBehavior` should use the same value or a different one for the 403 case (for example, `Challenge` to enable step-up authentication, see [`AuthorizationParams`](#plugin-config-block) and [Authorization](./authorization.md)).
+:::
 
 ## Provider Block {#provider}
 

@@ -526,7 +526,7 @@ func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *h
 		// Handle login
 		toa.handleLogin(rw, req)
 	case "Unauthorized":
-		// Respond with 401 Unauthenticated
+		// Respond with 401 Unauthorized
 		toa.writeUnauthenticatedError(rw, req)
 	case "Forward":
 		// Forward request
@@ -537,11 +537,11 @@ func (toa *TraefikOidcAuth) handleUnauthenticated(rw http.ResponseWriter, req *h
 			// Handle login for HTML requests
 			toa.handleLogin(rw, req)
 		} else {
-			// Respond with 401 Unauthenticated for non-HTML requests
+			// Respond with 401 Unauthorized for non-HTML requests
 			toa.writeUnauthenticatedError(rw, req)
 		}
 	default:
-		// Respond with 401 Unauthenticated as a fallback
+		// Respond with 401 Unauthorized as a fallback
 		toa.writeUnauthenticatedError(rw, req)
 	}
 }
@@ -573,7 +573,7 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 			toa.handleLogin(rw, req)
 		}
 	case "Unauthorized":
-		// Respond with 403 Unauthorized
+		// Respond with 403 Forbidden
 		toa.writeUnauthorizedError(rw, req)
 	case "Forward":
 		// Unreachable from the main request path (ServeHTTP already forwards there without
@@ -586,11 +586,11 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 			// Handle login for HTML requests
 			toa.handleLogin(rw, req)
 		} else {
-			// Respond with 403 Unauthorized for non-HTML requests, or if we already tried logging in
+			// Respond with 403 Forbidden for non-HTML requests, or if we already tried logging in
 			toa.writeUnauthorizedError(rw, req)
 		}
 	default:
-		// Respond with 403 Unauthorized as a fallback
+		// Respond with 403 Forbidden as a fallback
 		toa.writeUnauthorizedError(rw, req)
 	}
 }
