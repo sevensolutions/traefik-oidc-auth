@@ -21,6 +21,11 @@ type SessionState struct {
 	RefreshToken   string    `json:"refresh_token"`
 	IsAuthorized   bool      `json:"is_authorized"`
 	TokenExpiresIn int       `json:"token_expires_in"`
+
+	// Set when this session was just (re-)established via a login that still didn't satisfy the
+	// Authorization rules. Used by UnauthorizedBehavior's Challenge to avoid redirecting to the IDP
+	// again for the same session, which would otherwise risk an infinite redirect loop.
+	ChallengeAttempted bool `json:"challenge_attempted"`
 }
 
 func GenerateSessionId() string {

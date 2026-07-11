@@ -153,7 +153,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		}
 
 		if !session.IsAuthorized && toa.Config.UnauthorizedBehavior != "Forward" {
-			toa.handleUnauthorized(rw, req, false)
+			toa.handleUnauthorized(rw, req, session)
 			return
 		}
 
@@ -416,13 +416,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		isAuthorized := isAuthorized(toa.logger, toa.Config.Authorization, claims)
 
 		session := &session.SessionState{
-			Id:             session.GenerateSessionId(),
-			RefreshedAt:    time.Now(),
-			AccessToken:    token.AccessToken,
-			IdToken:        token.IdToken,
-			RefreshToken:   token.RefreshToken,
-			IsAuthorized:   isAuthorized,
-			TokenExpiresIn: token.ExpiresIn,
+			Id:                 session.GenerateSessionId(),
+			RefreshedAt:        time.Now(),
+			AccessToken:        token.AccessToken,
+			IdToken:            token.IdToken,
+			RefreshToken:       token.RefreshToken,
+			IsAuthorized:       isAuthorized,
+			TokenExpiresIn:     token.ExpiresIn,
+			ChallengeAttempted: !isAuthorized,
 		}
 
 		toa.storeSessionAndAttachCookie(session, rw)
@@ -446,7 +447,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		}
 
 		if !isAuthorized {
-			toa.handleUnauthorized(rw, req, true)
+			toa.handleUnauthorized(rw, req, session)
 			return
 		}
 
@@ -562,15 +563,16 @@ func (toa *TraefikOidcAuth) writeUnauthenticatedError(rw http.ResponseWriter, re
 	errorPages.WriteError(toa.logger, toa.Config.ErrorPages.Unauthenticated, rw, req, data)
 }
 
-func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, isPostLoginAttempt bool) {
+func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http.Request, session *session.SessionState) {
 	switch toa.Config.UnauthorizedBehavior {
 	case "Challenge":
-		if !isPostLoginAttempt && utils.IsHtmlRequest(req) {
+		if !session.ChallengeAttempted && utils.IsHtmlRequest(req) {
 			// Handle login for HTML requests
 			toa.handleLogin(rw, req)
 		} else {
-			// Already tried logging in and still unauthorized, or a non-HTML request that
-			// wouldn't follow the redirect anyway - stop here
+			// Already redirected through the IDP for this session and it didn't help (across any
+			// middleware instance sharing this session, not just the immediate callback), or a
+			// non-HTML request that wouldn't follow the redirect anyway - stop here
 			toa.writeUnauthorizedError(rw, req)
 		}
 	case "Unauthorized":
@@ -579,7 +581,7 @@ func (toa *TraefikOidcAuth) handleUnauthorized(rw http.ResponseWriter, req *http
 	case "Forward":
 		// Unreachable from the main request path (ServeHTTP already forwards there without
 		// calling handleUnauthorized when UnauthorizedBehavior is "Forward"), but still hit
-		// right after a fresh login (isPostLoginAttempt) since that call has no such guard.
+		// right after a fresh login since that call has no such guard.
 		toa.sanitizeForUpstream(req)
 		toa.next.ServeHTTP(rw, req)
 	default:
