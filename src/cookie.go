@@ -3,7 +3,9 @@ package src
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/config"
@@ -140,9 +142,55 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 func getCodeVerifierCookieName(config *config.Config) string {
 	return makeCookieName(config, "CodeVerifier")
 }
+
 func getSessionCookieName(config *config.Config) string {
 	return makeCookieName(config, "Session")
 }
+
 func makeCookieName(config *config.Config, name string) string {
 	return fmt.Sprintf("%s.%s", config.CookieNamePrefix, name)
+}
+
+// clearLegacyCodeVerifierCookies expires shared and per-request PKCE cookies from older implementations.
+// Emits expire Set-Cookie for Hostname() and host-only (empty Domain).
+// Note: net/http rejects Domain values that include a port, so old builds that passed url.Host with a port
+// never actually persisted that Domain — those cookies were host-only and are covered by Domain="".
+func clearLegacyCodeVerifierCookies(config *config.Config, rw http.ResponseWriter, req *http.Request, callbackURL *url.URL) {
+	if callbackURL == nil {
+		return
+	}
+
+	prefix := getCodeVerifierCookieName(config)
+	seen := map[string]struct{}{}
+
+	expire := func(name string, cookieDomain string) {
+		key := name + "\x00" + cookieDomain
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		http.SetCookie(rw, makeCookieExpireImmediately(&http.Cookie{
+			Name:     name,
+			Value:    "",
+			Secure:   true,
+			HttpOnly: true,
+			Path:     callbackURL.Path,
+			Domain:   cookieDomain,
+			SameSite: http.SameSiteDefaultMode,
+		}))
+	}
+
+	expireVariants := func(name string) {
+		if host := callbackURL.Hostname(); host != "" {
+			expire(name, host)
+		}
+		expire(name, "")
+	}
+
+	expireVariants(prefix)
+	for _, c := range req.Cookies() {
+		if c.Name == prefix || strings.HasPrefix(c.Name, prefix+".") {
+			expireVariants(c.Name)
+		}
+	}
 }

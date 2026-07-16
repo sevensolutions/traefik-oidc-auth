@@ -25,13 +25,15 @@ Supporting material for this decision:
 
 ## Decision
 
-**Use Approach A:** put the AES-GCM-encrypted `code_verifier` on `OidcState` (JSON field `cve`), encode it with existing `EncodeState` (JSON → RawURL base64), and stop using a PKCE `CodeVerifier` cookie for the happy path.
+**Use Approach A:** put the PKCE `code_verifier` on `OidcState` (JSON field `cv`) and stop using a PKCE `CodeVerifier` cookie for the happy path.
 
-On callback, decrypt `state.cve` and send plaintext `code_verifier` to the token endpoint. Fail closed if PKCE is enabled and `cve` is missing or decrypt fails.
+Since [#284](https://github.com/sevensolutions/traefik-oidc-auth/pull/284) encrypts the **entire** OIDC state blob (`EncodeState` / `DecodeState` with plugin `Secret`), the verifier is stored as **plaintext inside state** — no nested second encryption.
+
+On callback, read `state.cv` and send it as `code_verifier` to the token endpoint. Fail closed if PKCE is enabled and `cv` is missing.
 
 Optionally expire legacy `CodeVerifier` / `CodeVerifier.*` cookies on redirect/callback so upgrades from shared-cookie or unique-cookie experiments do not leave jar junk.
 
-**Rejected for now:** Approach B (unique cookies + excess cleanup), unless a hard policy forbids even encrypted verifier material in authorize URLs / IdP logs.
+**Rejected for now:** Approach B (unique cookies + excess cleanup), unless a hard policy forbids even sealed verifier material in authorize URLs / IdP logs.
 
 ## Consequences
 
