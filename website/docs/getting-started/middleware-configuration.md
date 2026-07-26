@@ -73,10 +73,10 @@ Provider:
 ### Redirect Uri Wildcards {#redirect-uri-wildcards}
 
 :::caution
-Per the OIDC/OAuth2 spec, a redirect uri must match one of the registered ones exactly. Wildcard support below is an explicit, security-relevant opt-in: set the `TOA_ENABLE_REDIRECT_URI_WILDCARDS` environment variable (on the Traefik process, not a per-middleware config option) to `true` or `1`. Without it, every entry in `ValidPostLoginRedirectUris`/`ValidPostLogoutRedirectUris` -- including a bare `*` -- is matched as a literal string, so `*` only matches a *redirect_uri* that is literally `*`.
+Per the OIDC/OAuth2 spec, a redirect uri must match one of the registered ones exactly. Wildcard support below is an explicit, security-relevant opt-in: set the `TOA_ENABLE_REDIRECT_URI_WILDCARDS` environment variable (on the Traefik process, not a per-middleware config option) to `true` or `1`. Without it, every entry in `ValidPostLoginRedirectUris`/`ValidPostLogoutRedirectUris` -- including a bare `*` -- is matched as a literal string, so `*` only matches a *redirect_uri* that is literally `*`. If an entry contains `*` while the flag is off, a warning is logged at startup to flag the likely misconfiguration.
 :::
 
-Entries in `ValidPostLoginRedirectUris` and `ValidPostLogoutRedirectUris` can be either a full url (eg. `https://example.com/app`) or just a path (eg. `/app`), and each can contain wildcards once `TOA_ENABLE_REDIRECT_URI_WILDCARDS` is set:
+Entries in `ValidPostLoginRedirectUris` and `ValidPostLogoutRedirectUris` can be either a full url (eg. `https://example.com/app`) or just a path (eg. `/app`), and each can contain wildcards once `TOA_ENABLE_REDIRECT_URI_WILDCARDS` is set to `true` or `1`:
 
 - In the **host** part, `*` matches exactly one subdomain label and never crosses a `.` on its own. Eg. `https://*.example.com` matches `https://app.example.com`, but not `https://app.sub.example.com`.
 - In the **path** part, a `*` is only a wildcard when it's the very last character. It then matches everything below that point, no matter how many segments it spans. Eg. `/good/*` matches `/good/index.html` as well as `/good/something/else`, and also matches `/good` itself. The incoming uri's query string and fragment aren't considered when deciding whether it matches, but are otherwise preserved unchanged in the accepted value -- eg. an SPA's hash route (`/app/#/dashboard`) survives a redirect through `/app/*`. A `*` anywhere else in the path is matched literally.
