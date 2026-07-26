@@ -243,6 +243,28 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		}
 	}
 
+	// Per the OIDC/OAuth2 spec a redirect uri must match exactly. Wildcard matching is an
+	// explicit opt-in via this env var rather than a normal config option, since it's a
+	// security-relevant choice meant to be made once for the whole Traefik instance.
+	redirectUriWildcardsEnabled, err := utils.ExpandEnvironmentVariableBoolean(os.Getenv("TOA_ENABLE_REDIRECT_URI_WILDCARDS"), false)
+	if err != nil {
+		logger.Log(logging.LevelError, "Invalid TOA_ENABLE_REDIRECT_URI_WILDCARDS value: %s", err.Error())
+		return nil, err
+	}
+
+	if !redirectUriWildcardsEnabled {
+		for _, uri := range cfg.ValidPostLoginRedirectUris {
+			if strings.Contains(uri, "*") {
+				logger.Log(logging.LevelWarn, "ValidPostLoginRedirectUris contains %q, which looks like it's meant to be a wildcard, but TOA_ENABLE_REDIRECT_URI_WILDCARDS is not set -- it will only match this exact string.", uri)
+			}
+		}
+		for _, uri := range cfg.ValidPostLogoutRedirectUris {
+			if strings.Contains(uri, "*") {
+				logger.Log(logging.LevelWarn, "ValidPostLogoutRedirectUris contains %q, which looks like it's meant to be a wildcard, but TOA_ENABLE_REDIRECT_URI_WILDCARDS is not set -- it will only match this exact string.", uri)
+			}
+		}
+	}
+
 	httpTransport := &http.Transport{
 		// MaxIdleConns:    10,
 		// IdleConnTimeout: 30 * time.Second,
@@ -260,14 +282,15 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
-		logger:                   logger,
-		next:                     next,
-		httpClient:               httpClient,
-		ProviderURL:              parsedURL,
-		ClientJwtPrivateKey:      clientAssertionPrivateKey,
-		CallbackURL:              parsedCallbackURL,
-		Config:                   cfg,
-		SessionStorage:           session.CreateCookieSessionStorage(),
-		BypassAuthenticationRule: conditionalAuth,
+		logger:                      logger,
+		next:                        next,
+		httpClient:                  httpClient,
+		ProviderURL:                 parsedURL,
+		ClientJwtPrivateKey:         clientAssertionPrivateKey,
+		CallbackURL:                 parsedCallbackURL,
+		Config:                      cfg,
+		SessionStorage:              session.CreateCookieSessionStorage(),
+		BypassAuthenticationRule:    conditionalAuth,
+		RedirectUriWildcardsEnabled: redirectUriWildcardsEnabled,
 	}, nil
 }

@@ -242,46 +242,158 @@ func ChunkString(input string, chunkSize int) []string {
 	return chunks
 }
 
-func ValidateRedirectUri(redirectUri string, validUris []string) (string, error) {
+// ValidateRedirectUri checks redirectUri against validUris. Per the OIDC/OAuth2 spec, a
+// redirect uri must match one of the registered ones exactly -- wildcardsEnabled is an
+// explicit, operator-controlled opt-in (see the TOA_ENABLE_REDIRECT_URI_WILDCARDS env var)
+// to relax that into the pattern matching implemented by matchUriTemplate, including the
+// bare "*" entry that would otherwise accept anything.
+func ValidateRedirectUri(redirectUri string, validUris []string, wildcardsEnabled bool) (string, error) {
 	if redirectUri == "" {
 		return "", nil
 	}
 
-	if validUris != nil && len(validUris) > 0 {
-		for _, validUri := range validUris {
-			if matchUriTemplate(redirectUri, validUri) {
-				return redirectUri, nil
-			}
+	for _, validUri := range validUris {
+		if redirectUri == validUri {
+			return redirectUri, nil
+		}
+
+		if wildcardsEnabled && matchUriTemplate(redirectUri, validUri) {
+			return redirectUri, nil
 		}
 	}
 
 	return "", errors.New("invalid redirect uri")
 }
 
-func matchUriTemplate(value string, template string) bool {
-	// Match exactly
-	if value == template {
-		return true
-	}
+// unsafePathPattern matches any attempt to walk up the directory tree, including the
+// encoded and double-encoded variants of the separators and dots.
+var unsafePathPattern = regexp.MustCompile(`(?i)(/|%2f|%5c|\\)(%2e|%252e|\.){2}(/|%2f|%5c|\\|;|%3b|%09|%0a|%0d|%00|$)`)
 
-	// Match all
+func matchUriTemplate(value string, template string) bool {
 	if template == "*" {
 		return true
 	}
 
-	// Match wildcards
+	vScheme, vAuthority, vPathAndBeyond, vHasAuthority := splitSchemeAuthorityPath(value)
+
+	// Wildcards are only honored on a safe incoming uri: not a protocol-relative "//host"
+	// reference (which splitSchemeAuthorityPath, keying on "://", wouldn't otherwise flag as
+	// having an authority), and no directory-tree traversal in the path. Otherwise it has to
+	// match one of the valid uris exactly. User-info spoofing (eg. "good.example.com@evil.com")
+	// needs no check of its own -- matchAuthorityTemplate's anchored comparison rules it out.
+	if strings.HasPrefix(value, "//") ||
+		unsafePathPattern.MatchString(vPathAndBeyond) {
+		return false
+	}
+
+	tScheme, tAuthority, tPathAndBeyond, tHasAuthority := splitSchemeAuthorityPath(template)
+
+	// A template with a scheme/host (eg. "https://*.example.com/*") must not match a bare
+	// path, and vice versa.
+	if tHasAuthority != vHasAuthority {
+		return false
+	}
+
+	if tHasAuthority {
+		if tScheme != vScheme {
+			return false
+		}
+
+		// A "*" glued directly onto the end of the host, with nothing after it at all (eg.
+		// "https://example.com*" instead of "https://example.com/*"), is ambiguous -- almost
+		// certainly a missing "/" before an intended path wildcard rather than a deliberate
+		// host-label wildcard. Refuse it, unless it's actually a port wildcard (eg.
+		// "https://example.com:*"), which is unambiguous since a "/" wouldn't make sense there.
+		if tPathAndBeyond == "" && strings.HasSuffix(tAuthority, "*") {
+			if beforeStar := strings.TrimSuffix(tAuthority, "*"); beforeStar != "" && !strings.HasSuffix(beforeStar, ":") {
+				return false
+			}
+		}
+
+		// The host is matched label by label: "*" stands in for exactly one subdomain label
+		// and never crosses a "." on its own (eg. "*.example.com" doesn't match "a.b.example.com").
+		if !matchAuthorityTemplate(vAuthority, tAuthority) {
+			return false
+		}
+	}
+
+	return matchPathTemplate(vPathAndBeyond, tPathAndBeyond)
+}
+
+// splitSchemeAuthorityPath splits off the scheme and authority (host[:port]) of a uri.
+// pathAndBeyond is everything from there to the end of the string -- the path, and whatever
+// follows it (query, fragment) -- left bundled together rather than parsed further, since
+// that's matchPathTemplate's job.
+func splitSchemeAuthorityPath(value string) (scheme string, authority string, pathAndBeyond string, hasAuthority bool) {
+	schemeSeparatorIndex := strings.Index(value, "://")
+	if schemeSeparatorIndex == -1 {
+		return "", "", value, false
+	}
+
+	scheme = value[:schemeSeparatorIndex]
+	rest := value[schemeSeparatorIndex+3:]
+
+	if pathIndex := strings.IndexAny(rest, "/?#"); pathIndex != -1 {
+		authority = rest[:pathIndex]
+		pathAndBeyond = rest[pathIndex:]
+	} else {
+		authority = rest
+		pathAndBeyond = ""
+	}
+
+	return scheme, authority, pathAndBeyond, true
+}
+
+func matchPathTemplate(value string, template string) bool {
+	if value == template {
+		return true
+	}
+
+	// A "*" is only a wildcard at the very end of the path and only if the template itself
+	// carries no query or fragment. Everywhere else it is an ordinary character.
+	if !strings.HasSuffix(template, "*") || strings.ContainsAny(template, "?#") {
+		return false
+	}
+
+	// The query and the fragment of the incoming uri are not part of the comparison as
+	// soon as a wildcard is in play.
+	value = stripQueryAndFragment(value)
+
+	// Everything below the prefix is matched, no matter how many segments it spans
+	// (eg. "/app/*" matches "/app/index.html" as well as "/app/a/b").
+	prefix := strings.TrimSuffix(template, "*")
+	if strings.HasPrefix(value, prefix) {
+		return true
+	}
+
+	// A trailing wildcard also matches the prefix itself, so "/app/*" matches "/app".
+	return value == strings.TrimSuffix(prefix, "/")
+}
+
+func stripQueryAndFragment(value string) string {
+	if index := strings.IndexAny(value, "?#"); index != -1 {
+		return value[:index]
+	}
+
+	return value
+}
+
+func matchAuthorityTemplate(value string, template string) bool {
+	if value == template {
+		return true
+	}
+
+	// "*" stands in for exactly one host label: no "." (a label boundary), and no "@" (so a
+	// value with a different host hidden behind user-info can never satisfy the pattern).
 	escapedTemplate := regexp.QuoteMeta(template)
 	escapedTemplate = strings.ReplaceAll(escapedTemplate, "\\*", "[a-zA-Z0-9-_]+")
-	escapedTemplate = fmt.Sprintf("^%s$", escapedTemplate)
 
-	regex, err := regexp.Compile(escapedTemplate)
+	regex, err := regexp.Compile(fmt.Sprintf("^%s$", escapedTemplate))
 	if err != nil {
 		return false
 	}
 
-	result := regex.MatchString(value)
-
-	return result
+	return regex.MatchString(value)
 }
 
 func ParseAcceptType(raw string) AcceptType {
