@@ -1,7 +1,6 @@
 # Traefik OpenID Connect Middleware
 
 ![E2E Tests](https://img.shields.io/github/actions/workflow/status/sevensolutions/traefik-oidc-auth/.github%2Fworkflows%2Fe2e-tests.yml?logo=github&label=E2E%20Tests&color=green)
-[![Go Report Card](https://goreportcard.com/badge/github.com/sevensolutions/traefik-oidc-auth)](https://goreportcard.com/report/github.com/sevensolutions/traefik-oidc-auth)
 [![Release](https://img.shields.io/github/v/release/sevensolutions/traefik-oidc-auth?label=Release)](https://github.com/sevensolutions/traefik-oidc-auth/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/sevensolutions/traefik-oidc-auth/blob/main/LICENSE)
 
@@ -32,7 +31,7 @@ A traefik Plugin for securing the upstream service with OpenID Connect acting as
 | [Microsoft EntraID](https://learn.microsoft.com/de-de/entra/identity/) | ✅ | |
 | [HashiCorp Vault](https://www.vaultproject.io/) | ❌ | See [GH-13](https://github.com/sevensolutions/traefik-oidc-auth/issues/13) |
 | [Authentik](https://goauthentik.io/) | ✅ | |
-| [Pocket ID](https://github.com/stonith404/pocket-id) | ✅ | |
+| [Pocket ID](https://github.com/pocket-id/pocket-id) | ✅ | |
 | [GitHub](https://github.com) | ❌ | GitHub doesn't seem to support OIDC, only plain OAuth. |
 | [Logto](https://logto.io/) | ✅ | |
 
@@ -88,8 +87,3 @@ If you'd like to make a small donation, I'd be very grateful. Just click the but
 Thank You!
 
 [![](https://img.shields.io/static/v1?label=Sponsor&color=blue&message=%E2%9D%A4&logo=GitHub)](https://github.com/sponsors/sevensolutions)
-
-Are you looking for the right hosting provider?  
-Click the link below and get 20€ starting credit when you sign up via this link 😎.
-
-[![Hetzner](https://a11ybadges.com/badge?logo=hetzner)](https://hetzner.cloud/?ref=98cdlRHw6PL5)
