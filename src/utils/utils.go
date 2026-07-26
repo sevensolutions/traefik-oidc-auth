@@ -242,13 +242,22 @@ func ChunkString(input string, chunkSize int) []string {
 	return chunks
 }
 
-func ValidateRedirectUri(redirectUri string, validUris []string) (string, error) {
+// ValidateRedirectUri checks redirectUri against validUris. Per the OIDC/OAuth2 spec, a
+// redirect uri must match one of the registered ones exactly -- wildcardsEnabled is an
+// explicit, operator-controlled opt-in (see the TOA_ENABLE_REDIRECT_URI_WILDCARDS env var)
+// to relax that into the pattern matching implemented by matchUriTemplate, including the
+// bare "*" entry that would otherwise accept anything.
+func ValidateRedirectUri(redirectUri string, validUris []string, wildcardsEnabled bool) (string, error) {
 	if redirectUri == "" {
 		return "", nil
 	}
 
 	for _, validUri := range validUris {
-		if matchUriTemplate(redirectUri, validUri) {
+		if redirectUri == validUri {
+			return redirectUri, nil
+		}
+
+		if wildcardsEnabled && matchUriTemplate(redirectUri, validUri) {
 			return redirectUri, nil
 		}
 	}
@@ -261,10 +270,6 @@ func ValidateRedirectUri(redirectUri string, validUris []string) (string, error)
 var unsafePathPattern = regexp.MustCompile(`(?i)(/|%2f|%5c|\\)(%2e|%252e|\.){2}(/|%2f|%5c|\\|;|%3b|%09|%0a|%0d|%00|$)`)
 
 func matchUriTemplate(value string, template string) bool {
-	if value == template {
-		return true
-	}
-
 	if template == "*" {
 		return true
 	}

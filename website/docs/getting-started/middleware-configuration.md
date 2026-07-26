@@ -6,13 +6,14 @@ sidebar_position: 3
 
 ## Plugin Config Block
 
-:::warning Upgrading from a single `UnauthorizedBehavior`
-Starting with version `0.21.0`, the single `UnauthorizedBehavior` option that previously controlled the response for both unauthenticated requests (no/invalid session, HTTP 401) and unauthorized requests (valid session, but failing the `Authorization` rules, HTTP 403) has been split into two separate options:
+:::warning Breaking changes in `0.21.0`
+- The single `UnauthorizedBehavior` option that previously controlled the response for both unauthenticated requests (no/invalid session, HTTP 401) and unauthorized requests (valid session, but failing the `Authorization` rules, HTTP 403) has been split into two separate options:
+  - `UnauthenticatedBehavior` now controls the 401 case.
+  - `UnauthorizedBehavior` now controls only the 403 case.
 
-- `UnauthenticatedBehavior` now controls the 401 case.
-- `UnauthorizedBehavior` now controls only the 403 case.
+  If you're upgrading from a version prior to `0.21.0`, move your existing `UnauthorizedBehavior` value as-is to `UnauthenticatedBehavior` to keep the exact same behavior as before. No change is needed for the 403 case unless you want to opt into the new `Challenge` behavior there (e.g. to enable step-up authentication, see [`AuthorizationParams`](#plugin-config-block) and [Authorization](./authorization.md)).
 
-If you're upgrading from a version prior to `0.21.0`, move your existing `UnauthorizedBehavior` value as-is to `UnauthenticatedBehavior` to keep the exact same behavior as before. No change is needed for the 403 case unless you want to opt into the new `Challenge` behavior there (e.g. to enable step-up authentication, see [`AuthorizationParams`](#plugin-config-block) and [Authorization](./authorization.md)).
+- Wildcard matching in `ValidPostLoginRedirectUris`/`ValidPostLogoutRedirectUris` (including a bare `*`) now requires explicitly setting the `TOA_ENABLE_REDIRECT_URI_WILDCARDS` environment variable -- without it, every entry is matched as an exact string, per the OIDC/OAuth2 spec. See [Redirect Uri Wildcards](#redirect-uri-wildcards) below.
 :::
 
 :::caution
@@ -52,10 +53,10 @@ Provider:
 | `CallbackUri`* | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
 | `LoginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthenticatedBehavior`/`UnauthorizedBehavior`-configuration.  |
 | `PostLoginRedirectUri`* | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
-| `ValidPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. The uri has to match exactly, unless you use wildcards -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. You can also specify a single `*` which is a full wildcard but this is not recommended. |
+| `ValidPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. Per the OIDC/OAuth2 spec, the uri has to match exactly. Wildcards (including a single `*` matching anything) are an opt-in -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. |
 | `LogoutUri`* | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | `PostLogoutRedirectUri`* | no | `string` | `/` | The url where the user should be redirected after logout. |
-| `ValidPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. The uri has to match exactly, unless you use wildcards -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. You can also specify a single `*` which is a full wildcard but this is not recommended. |
+| `ValidPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. Per the OIDC/OAuth2 spec, the uri has to match exactly. Wildcards (including a single `*` matching anything) are an opt-in -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. |
 | `CookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookie* where the name can be set individually. |
 | `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
@@ -71,7 +72,11 @@ Provider:
 
 ### Redirect Uri Wildcards {#redirect-uri-wildcards}
 
-Entries in `ValidPostLoginRedirectUris` and `ValidPostLogoutRedirectUris` can be either a full url (eg. `https://example.com/app`) or just a path (eg. `/app`), and each can contain wildcards:
+:::caution
+Per the OIDC/OAuth2 spec, a redirect uri must match one of the registered ones exactly. Wildcard support below is an explicit, security-relevant opt-in: set the `TOA_ENABLE_REDIRECT_URI_WILDCARDS` environment variable (on the Traefik process, not a per-middleware config option) to `true` or `1`. Without it, every entry in `ValidPostLoginRedirectUris`/`ValidPostLogoutRedirectUris` -- including a bare `*` -- is matched as a literal string, so `*` only matches a *redirect_uri* that is literally `*`.
+:::
+
+Entries in `ValidPostLoginRedirectUris` and `ValidPostLogoutRedirectUris` can be either a full url (eg. `https://example.com/app`) or just a path (eg. `/app`), and each can contain wildcards once `TOA_ENABLE_REDIRECT_URI_WILDCARDS` is set:
 
 - In the **host** part, `*` matches exactly one subdomain label and never crosses a `.` on its own. Eg. `https://*.example.com` matches `https://app.example.com`, but not `https://app.sub.example.com`.
 - In the **path** part, a `*` is only a wildcard when it's the very last character. It then matches everything below that point, no matter how many segments it spans. Eg. `/good/*` matches `/good/index.html` as well as `/good/something/else`, and also matches `/good` itself. The incoming uri's query string and fragment aren't considered when deciding whether it matches, but are otherwise preserved unchanged in the accepted value -- eg. an SPA's hash route (`/app/#/dashboard`) survives a redirect through `/app/*`. A `*` anywhere else in the path is matched literally.
