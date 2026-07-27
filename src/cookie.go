@@ -151,46 +151,44 @@ func makeCookieName(config *config.Config, name string) string {
 	return fmt.Sprintf("%s.%s", config.CookieNamePrefix, name)
 }
 
-// clearLegacyCodeVerifierCookies expires shared and per-request PKCE cookies from older implementations.
-// Emits expire Set-Cookie for Hostname() and host-only (empty Domain).
-// Note: net/http rejects Domain values that include a port, so old builds that passed url.Host with a port
-// never actually persisted that Domain — those cookies were host-only and are covered by Domain="".
+// clearLegacyCodeVerifierCookies expires PKCE cookies left by older builds.
+// Temporary upgrade hygiene — safe to delete once those builds are gone.
+//
+// Browsers treat Domain=host and host-only (no Domain) as different cookies.
+// We expire both. See makeCookieExpireImmediately for MaxAge=-1 behavior.
 func clearLegacyCodeVerifierCookies(config *config.Config, rw http.ResponseWriter, req *http.Request, callbackURL *url.URL) {
 	if callbackURL == nil {
 		return
 	}
 
 	prefix := getCodeVerifierCookieName(config)
-	seen := map[string]struct{}{}
+	path := callbackURL.Path
+	// Hostname() strips any port. Domain with a port is invalid for Set-Cookie;
+	// older code used url.Host and often ended up with host-only cookies instead.
+	hostname := callbackURL.Hostname()
 
-	expire := func(name string, cookieDomain string) {
-		key := name + "\x00" + cookieDomain
-		if _, ok := seen[key]; ok {
-			return
-		}
-		seen[key] = struct{}{}
-		http.SetCookie(rw, makeCookieExpireImmediately(&http.Cookie{
-			Name:     name,
-			Value:    "",
-			Secure:   true,
-			HttpOnly: true,
-			Path:     callbackURL.Path,
-			Domain:   cookieDomain,
-			SameSite: http.SameSiteDefaultMode,
-		}))
-	}
-
-	expireVariants := func(name string) {
-		if host := callbackURL.Hostname(); host != "" {
-			expire(name, host)
-		}
-		expire(name, "")
-	}
-
-	expireVariants(prefix)
+	names := map[string]struct{}{prefix: {}}
 	for _, c := range req.Cookies() {
 		if c.Name == prefix || strings.HasPrefix(c.Name, prefix+".") {
-			expireVariants(c.Name)
+			names[c.Name] = struct{}{}
+		}
+	}
+
+	for name := range names {
+		domains := []string{""} // host-only
+		if hostname != "" {
+			domains = append(domains, hostname)
+		}
+		for _, domain := range domains {
+			http.SetCookie(rw, makeCookieExpireImmediately(&http.Cookie{
+				Name:     name,
+				Value:    "",
+				Secure:   true,
+				HttpOnly: true,
+				Path:     path,
+				Domain:   domain,
+				SameSite: http.SameSiteDefaultMode,
+			}))
 		}
 	}
 }

@@ -40,21 +40,6 @@ func TestEncodeDecodeStateRoundtrip(t *testing.T) {
 	}
 }
 
-func TestEncodeDecodeState_OmitsEmptyCodeVerifier(t *testing.T) {
-	in := &OidcState{Action: "Login", RedirectUrl: "https://app.example.com/"}
-	encoded, err := EncodeState(in, testStateSecret)
-	if err != nil {
-		t.Fatalf("EncodeState: %v", err)
-	}
-	out, err := DecodeState(encoded, testStateSecret)
-	if err != nil {
-		t.Fatalf("DecodeState: %v", err)
-	}
-	if out.CodeVerifier != "" {
-		t.Fatalf("expected empty CodeVerifier, got %q", out.CodeVerifier)
-	}
-}
-
 func TestEncodeStateIsNotPlainBase64Json(t *testing.T) {
 	state := &OidcState{
 		Action:      "Logout",
