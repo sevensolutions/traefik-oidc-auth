@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/config"
@@ -216,4 +218,44 @@ func randomFixedLengthString(n int) string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
+}
+
+func TestClearLegacyCodeVerifierCookies_ExpiresHostnameAndHostOnly(t *testing.T) {
+	cfg := &config.Config{CookieNamePrefix: "TraefikOidcAuth"}
+	callback, err := url.Parse("https://app.example.com:8443/oidc/callback")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rw := newMockResponseWriter()
+	req, err := http.NewRequest("GET", "https://app.example.com:8443/oidc/callback", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "legacy"})
+
+	clearLegacyCodeVerifierCookies(cfg, rw, req, callback)
+
+	headers := rw.HeaderMap.Values("Set-Cookie")
+	hasHostname := false
+	hasHostOnly := false
+	for _, raw := range headers {
+		if !strings.HasPrefix(raw, "TraefikOidcAuth.CodeVerifier=") {
+			continue
+		}
+		lower := strings.ToLower(raw)
+		// Go serializes MaxAge=-1 as Max-Age=0.
+		if !strings.Contains(lower, "max-age=0") && !strings.Contains(lower, "max-age=-1") {
+			t.Fatalf("expected expired cookie: %s", raw)
+		}
+		switch {
+		case strings.Contains(raw, "Domain=app.example.com"):
+			hasHostname = true
+		case !strings.Contains(lower, "domain="):
+			hasHostOnly = true
+		}
+	}
+	if !hasHostname || !hasHostOnly {
+		t.Fatalf("missing domain variants hostname=%v hostOnly=%v headers=%v",
+			hasHostname, hasHostOnly, headers)
+	}
 }

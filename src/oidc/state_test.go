@@ -10,9 +10,10 @@ const testStateSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 
 func TestEncodeDecodeStateRoundtrip(t *testing.T) {
 	original := &OidcState{
-		Action:      "Login",
-		RedirectUrl: "https://example.com/dashboard",
-		IsChallenge: true,
+		Action:       "Login",
+		RedirectUrl:  "https://example.com/dashboard",
+		CodeVerifier: "pkce-verifier-value",
+		IsChallenge:  true,
 	}
 
 	encoded, err := EncodeState(original, testStateSecret)
@@ -30,6 +31,9 @@ func TestEncodeDecodeStateRoundtrip(t *testing.T) {
 	}
 	if decoded.RedirectUrl != original.RedirectUrl {
 		t.Errorf("expected RedirectUrl %q, got %q", original.RedirectUrl, decoded.RedirectUrl)
+	}
+	if decoded.CodeVerifier != original.CodeVerifier {
+		t.Errorf("expected CodeVerifier %q, got %q", original.CodeVerifier, decoded.CodeVerifier)
 	}
 	if decoded.IsChallenge != original.IsChallenge {
 		t.Errorf("expected IsChallenge %v, got %v", original.IsChallenge, decoded.IsChallenge)
