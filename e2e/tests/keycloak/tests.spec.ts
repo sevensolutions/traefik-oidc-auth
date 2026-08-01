@@ -405,6 +405,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
+          LoginUri: "/login"
           Provider:
             Url: "\${PROVIDER_URL_HTTP}"
             ClientId: "\${CLIENT_ID}"
@@ -432,7 +433,16 @@ http:
 
   await expect(page.getByText(/My-Header: 123/i)).toBeVisible();
 
-  // The second test should return a redirect to the IDP, because the header doesn't match.
+  // The second test: authenticated user should not have authentication headers set
+  await expectGotoOkay(page, "http://localhost:9080/login");
+  await login(page, "admin", "admin", "http://localhost:9080");
+
+  const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(authHeaderExists).toBeFalsy();
+
+  await page.goto("http://localhost:9080/logout");
+
+  // The third test should return a redirect to the IDP, because the header doesn't match.
   await page.route("http://localhost:9080/**/*", route => {
     const headers = route.request().headers();
     headers["MY-HEADER"] = "456";
@@ -443,6 +453,57 @@ http:
   const response = await page.goto("http://localhost:9080/test2");
 
   expect(response?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
+});
+
+test("access app with bypass rule and unauthenticated forward", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          BypassAuthenticationRule: "Path(\`/test1\`)"
+          UnauthorizedBehavior: Forward
+          LoginUri: "/login"
+          Headers:
+            - Name: "Authorization"
+              Value: "{{\`Bearer: {{ .accessToken }}\`}}"
+              IncludeWhen: "Public"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  // The first test: unauthenticated request should pass through directly to the whoami page.
+  const unauthResponse = await page.goto("http://localhost:9080/test1");
+
+  // Unauthenticated request passes through with a 200 response and no Authorization header attached.
+  expect(unauthResponse?.status()).toBe(200);
+  const unauthAuthHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(unauthAuthHeaderExists).toBeFalsy();
+
+  // The second test: authenticated user should pass through with the Authorization header set.
+  await expectGotoOkay(page, "http://localhost:9080/login");
+  await login(page, "admin", "admin", "http://localhost:9080");
+
+  const authHeaderExists = await page.locator(`text=Authorization: Bearer: ey`).isVisible();
+  expect(authHeaderExists).toBeTruthy();
 });
 
 test("external authentication", async ({ page }) => {
@@ -753,6 +814,213 @@ http:
   const respBob = await page.goto("http://localhost:9080/bob");
   expect(respBob?.status()).toBe(403);
 
+});
+
+test("test UnauthorizedBehavior Challenge does not cause a redirect loop", async ({ page }) => {
+   await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["bob@example.com", "alice@example.com"]
+            CheckOnEveryRequest: true
+    auth-bob:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          UnauthorizedBehavior: Challenge
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["bob@example.com"]
+            CheckOnEveryRequest: true
+
+    auth-alice:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["alice@example.com"]
+            CheckOnEveryRequest: true
+
+  routers:
+    oidc-callback:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/oidc/callback\`)"
+      service: noop@internal
+      middlewares: ["auth"]
+
+    whoami-bob:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/bob\`)"
+      service: whoami
+      middlewares: ["auth-bob"]
+
+    whoami-alice:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/alice\`)"
+      middlewares: ["auth-alice"]
+      service: whoami
+`);
+  await expectGotoOkay(page, "http://localhost:9080/alice");
+
+  const response = await login(page, "alice@example.com", "alice123", "http://localhost:9080/alice");
+  expect(response.status()).toBe(200);
+
+  await expectGotoOkay(page, "http://localhost:9080/alice");
+
+  // auth-bob has UnauthorizedBehavior: Challenge, so this bounces alice through the IDP once to
+  // try to satisfy the bob-only claim requirement. Since /oidc/callback is handled by the more
+  // permissive "auth" middleware, that redirect "succeeds" and lands back on /bob, which would
+  // previously redirect again indefinitely (ERR_TOO_MANY_REDIRECTS) instead of eventually
+  // returning 403 once the session's ChallengeAttempted marker is set.
+  const respBob = await page.goto("http://localhost:9080/bob");
+  expect(respBob?.status()).toBe(403);
+
+});
+
+test("test UnauthorizedBehavior Challenge succeeds after switching accounts", async ({ page }) => {
+   await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          UnauthorizedBehavior: Challenge
+          AuthorizationParams:
+            prompt: login
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["alice@example.com"]
+            CheckOnEveryRequest: true
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["auth@file"]
+`);
+
+  await expectGotoOkay(page, "http://localhost:9080/");
+
+  // Log in as bob first, who doesn't satisfy the alice-only claim requirement. AuthorizationParams
+  // forces prompt=login on every authorization request, so the challenge redirect doesn't silently
+  // reuse bob's SSO session.
+  await page.locator("#username").fill("bob@example.com");
+  await page.locator("#password").fill("bob123");
+  await page.locator('#kc-login').click();
+
+  // Because bob still has an active Keycloak SSO session, prompt=login shows a "continue as bob"
+  // confirmation screen (with a read-only kc-attempted-username field) rather than a blank form.
+  // Click "Restart login" to get a full form and switch accounts.
+  await page.locator("#reset-login").click();
+
+  // Now on a fresh login form - switch to alice, who does satisfy the claim requirement. This
+  // should land back on the originally requested page, authorized.
+  const response = await login(page, "alice@example.com", "alice123", "http://localhost:9080/");
+
+  expect(response.status()).toBe(200);
+});
+
+test("test UnauthorizedBehavior Challenge returns to the originally requested path", async ({ page }) => {
+   await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          UnauthorizedBehavior: Challenge
+          AuthorizationParams:
+            prompt: login
+          Authorization:
+            AssertClaims:
+              - Name: email
+                AnyOf: ["alice@example.com"]
+            CheckOnEveryRequest: true
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["auth@file"]
+`);
+
+  // Unlike the sibling test which targets the site root, use a non-root path so we can assert the
+  // challenge round-trip returns the user to their *original* destination and not just any 200 page.
+  // The re-challenge is triggered from within the callback handler, whose request URI is the
+  // /oidc/callback URL - if that URI leaked into the redirect target, we'd loop back through the
+  // callback (with a spent code) instead of landing on /some/deep/path.
+  await expectGotoOkay(page, "http://localhost:9080/some/deep/path");
+
+  // Log in as bob first, who doesn't satisfy the alice-only claim requirement. prompt=login makes
+  // the challenge redirect show a "continue as bob" screen rather than silently reusing his session.
+  await page.locator("#username").fill("bob@example.com");
+  await page.locator("#password").fill("bob123");
+  await page.locator('#kc-login').click();
+
+  // Click "Restart login" to get a fresh form and switch accounts.
+  await page.locator("#reset-login").click();
+
+  // Switch to alice, who satisfies the claim requirement, and confirm we land back on the original path.
+  const response = await login(page, "alice@example.com", "alice123", "http://localhost:9080/some/deep/path");
+
+  expect(response.status()).toBe(200);
+  expect(new URL(response.url()).pathname).toBe("/some/deep/path");
 });
 
 //-----------------------------------------------------------------------------

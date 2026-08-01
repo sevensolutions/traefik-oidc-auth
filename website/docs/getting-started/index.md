@@ -16,7 +16,7 @@ experimental:
   plugins:
     traefik-oidc-auth:
       moduleName: "github.com/sevensolutions/traefik-oidc-auth"
-      version: "v0.16.0"
+      version: "v0.21.0"
 ```
 
 ## Configure Middleware
@@ -68,6 +68,16 @@ http:
 This is an example using [Kubernetes IngressRoute CRD](https://doc.traefik.io/traefik/providers/kubernetes-crd/) config
 
 ```yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oidc-secret
+  namespace: traefik
+type: Opaque
+stringData:
+  pluginSecret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
+  providerClientSecret: "<YourClientSecret>"
+---
 apiVersion: traefik.io/v1alpha1
 # highlight-next-line
 kind: Middleware
@@ -77,15 +87,15 @@ metadata:
 spec:
   # highlight-start
   plugin:
-    traefik-oidc-plugin:  # same key as in the static configuration
-      Secret: "urn:k8s:secret:oidc-secret:pluginSecret"
-      Provider:
+    traefik-oidc-auth: # same key as in the static configuration
+      secret: "urn:k8s:secret:oidc-secret:pluginSecret"
+      provider:
         # You could just write strings here for the values.
-        ClientId: "abcd-12345"
+        clientId: "abcd-12345"
         # Or you can reference a Secret in the same namespace as the Middleware.
         # This will resolve to the value of the providerClientSecret key
         # in the secret named oidc-secret.
-        ClientSecret: "urn:k8s:secret:oidc-secret:providerClientSecret"
+        clientSecret: "urn:k8s:secret:oidc-secret:providerClientSecret"
   # highlight-end
 ---
 apiVersion: traefik.io/v1alpha1

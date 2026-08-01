@@ -3,12 +3,14 @@ package src
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
-	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
@@ -70,25 +72,26 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 		return nil, false, nil, fmt.Errorf("no session cookie is present")
 	}
 
-	toa.logger.Log(logging.LevelDebug, "A session is present for the request and will be used.")
-
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
 
 	if err != nil {
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
 
+	if toa.logger.MinLevel == logging.LevelDebug {
+		tokenExpiresText := ""
+		if session.TokenExpiresIn > 0 {
+			tokenExpiresText = fmt.Sprintf("The IDP token expires in %ds.", int(math.Round(time.Until(session.RefreshedAt.Add(time.Duration(session.TokenExpiresIn)*time.Second)).Seconds())))
+		}
+
+		toa.logger.Log(logging.LevelDebug, "A session is present for the request. %s", tokenExpiresText)
+	}
+
 	return session, updatedSession != nil, claims, nil
 }
 
-func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*session.SessionState, map[string]interface{}, *session.SessionState, error) {
-	plainSessionTicket, err := utils.Decrypt(encryptedTicket, toa.Config.Secret)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to decrypt session ticket: %v", err.Error())
-		return nil, nil, nil, err
-	}
-
-	session, err := toa.SessionStorage.TryGetSession(plainSessionTicket)
+func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session.SessionState, map[string]interface{}, *session.SessionState, error) {
+	session, err := toa.SessionStorage.TryGetSession(toa.logger, toa.Config, sessionTicket)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Reading session failed: %v", err.Error())
 		return nil, nil, nil, err
@@ -100,9 +103,15 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 
 	success, claims, err := toa.validateToken(session)
 
-	if !success || err != nil {
+	// Check if the session or IDP token expires soon
+	idpTokenExpiresSoon := false
+	if success {
+		idpTokenExpiresSoon = checkIdpTokenExpiresSoon(toa, session)
+	}
+
+	if !success || err != nil || idpTokenExpiresSoon {
 		if session.RefreshToken != "" {
-			toa.logger.Log(logging.LevelInfo, "Trying to renew session...")
+			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
 			newTokens, err := toa.renewToken(session.RefreshToken)
 
@@ -111,7 +120,12 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 			}
 
 			session.AccessToken = newTokens.AccessToken
-			session.RefreshToken = newTokens.RefreshToken
+
+			if newTokens.RefreshToken != "" {
+				session.RefreshToken = newTokens.RefreshToken
+			} else {
+				toa.logger.Log(logging.LevelDebug, "The auth provider didn't return a new RefreshToken. Still keeping the old one.")
+			}
 
 			// We had some problems with some providers which didn't return a new IdToken when renewing the tokens.
 			// Thats why i'am logging this case specifically here.
@@ -132,15 +146,37 @@ func validateSessionTicket(toa *TraefikOidcAuth, encryptedTicket string) (*sessi
 				return nil, nil, session, err
 			}
 
+			// Update expirations
+			session.RefreshedAt = time.Now()
+			session.TokenExpiresIn = newTokens.ExpiresIn
+
 			toa.logger.Log(logging.LevelInfo, "Successfully renewed session")
 
 			return session, claims, session, err
 		} else {
+			if err == nil {
+				err = errors.New("no refresh_token available")
+			}
 			return nil, nil, nil, err
 		}
 	}
 
 	return session, claims, nil, nil
+}
+
+func checkIdpTokenExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {
+	if session.TokenExpiresIn > 0 {
+		pastDuration := time.Since(session.RefreshedAt)
+
+		halfMaxAge := float64(session.TokenExpiresIn) * toa.Config.Provider.TokenRenewalThreshold
+
+		if pastDuration.Seconds() > halfMaxAge {
+			toa.logger.Log(logging.LevelDebug, "The IDP token reached %d%% of it's expiration. Renewing now...", int32(toa.Config.Provider.TokenRenewalThreshold*100))
+			return true
+		}
+	}
+
+	return false
 }
 
 func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, map[string]interface{}, error) {
@@ -189,7 +225,7 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
-	sessionTicket, err := toa.SessionStorage.StoreSession(session.Id, session)
+	sessionTicket, err := toa.SessionStorage.StoreSession(toa.logger, toa.Config, session.Id, session)
 	if err != nil {
 		toa.logger.Log(logging.LevelError, "Failed to store session: %s", err.Error())
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
@@ -198,17 +234,10 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.Session
 
 	toa.logger.Log(logging.LevelDebug, "Session stored. Id %s", session.Id)
 
-	encryptedSessionTicket, err := utils.Encrypt(sessionTicket, toa.Config.Secret)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to encrypt session ticket: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), encryptedSessionTicket)
+	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), sessionTicket)
 }
 
-func createSessionCookie(config *Config) *http.Cookie {
+func createSessionCookie(config *config.Config) *http.Cookie {
 	return &http.Cookie{
 		Name:     getSessionCookieName(config),
 		Value:    "",

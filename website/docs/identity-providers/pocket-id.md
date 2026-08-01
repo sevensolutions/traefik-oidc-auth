@@ -2,7 +2,7 @@
 # Pocket ID
 A simple and easy-to-use OIDC provider that allows users to authenticate exclusively using [passkeys](https://fidoalliance.org/passkeys/).
 
-https://github.com/stonith404/pocket-id
+[https://github.com/pocket-id/pocket-id](https://github.com/pocket-id/pocket-id)
 
 ## Setup Pocket ID
 
@@ -28,4 +28,23 @@ http:
             ClientId: "<YourClientId>"
             ClientSecret: "<YourClientSecret>"
           Scopes: ["openid", "profile", "email"]  # "groups" also supported
+```
+
+### With groups authorization
+
+```yml
+http:
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          Provider:
+            Url: "https://pocket-id.mydomain.com/"
+            ClientId: "<YourClientId>"
+            ClientSecret: "<YourClientSecret>"
+          Scopes: ["openid", "profile", "email", "groups"]
+          Authorization:
+            AssertClaims:
+              - Name: groups
+                AnyOf: ["name_of_the_group_you_want_to_authorize"]
 ```

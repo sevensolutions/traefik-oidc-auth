@@ -3,13 +3,16 @@ package src
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
-func setChunkedCookies(config *Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
+func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
 	cookieChunks := utils.ChunkString(cookieValue, 3072)
 
 	baseCookie := createSessionCookie(config)
@@ -90,7 +93,7 @@ func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]str
 	}
 	return cookieNames, nil
 }
-func clearChunkedCookie(config *Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
+func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
 	if err != nil {
 		return err
@@ -136,12 +139,56 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 	return cookie
 }
 
-func getCodeVerifierCookieName(config *Config) string {
+func getCodeVerifierCookieName(config *config.Config) string {
 	return makeCookieName(config, "CodeVerifier")
 }
-func getSessionCookieName(config *Config) string {
+
+func getSessionCookieName(config *config.Config) string {
 	return makeCookieName(config, "Session")
 }
-func makeCookieName(config *Config, name string) string {
+
+func makeCookieName(config *config.Config, name string) string {
 	return fmt.Sprintf("%s.%s", config.CookieNamePrefix, name)
+}
+
+// clearLegacyCodeVerifierCookies expires PKCE cookies left by older builds.
+// Temporary upgrade hygiene — safe to delete once those builds are gone.
+//
+// Browsers treat Domain=host and host-only (no Domain) as different cookies.
+// We expire both. See makeCookieExpireImmediately for MaxAge=-1 behavior.
+func clearLegacyCodeVerifierCookies(config *config.Config, rw http.ResponseWriter, req *http.Request, callbackURL *url.URL) {
+	if callbackURL == nil {
+		return
+	}
+
+	prefix := getCodeVerifierCookieName(config)
+	path := callbackURL.Path
+	// Hostname() strips any port. Domain with a port is invalid for Set-Cookie;
+	// older code used url.Host and often ended up with host-only cookies instead.
+	hostname := callbackURL.Hostname()
+
+	names := map[string]struct{}{prefix: {}}
+	for _, c := range req.Cookies() {
+		if c.Name == prefix || strings.HasPrefix(c.Name, prefix+".") {
+			names[c.Name] = struct{}{}
+		}
+	}
+
+	for name := range names {
+		domains := []string{""} // host-only
+		if hostname != "" {
+			domains = append(domains, hostname)
+		}
+		for _, domain := range domains {
+			http.SetCookie(rw, makeCookieExpireImmediately(&http.Cookie{
+				Name:     name,
+				Value:    "",
+				Secure:   true,
+				HttpOnly: true,
+				Path:     path,
+				Domain:   domain,
+				SameSite: http.SameSiteDefaultMode,
+			}))
+		}
+	}
 }

@@ -2,16 +2,18 @@
 
 This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
 
+We're using *bun* which can be installed by following the [official instructions](https://bun.com/docs/installation).
+
 ### Installation
 
 ```
-$ npm i
+$ bun install
 ```
 
 ### Local Development
 
 ```
-$ npm start
+$ bun start
 ```
 
 This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
@@ -19,7 +21,7 @@ This command starts a local development server and opens up a browser window. Mo
 ### Build
 
 ```
-$ npm run build
+$ bun run build
 ```
 
 This command generates static content into the `build` directory and can be served using any static contents hosting service.

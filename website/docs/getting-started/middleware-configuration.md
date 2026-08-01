@@ -6,6 +6,16 @@ sidebar_position: 3
 
 ## Plugin Config Block
 
+:::warning Breaking changes in `0.21.0`
+- The single `UnauthorizedBehavior` option that previously controlled the response for both unauthenticated requests (no/invalid session, HTTP 401) and unauthorized requests (valid session, but failing the `Authorization` rules, HTTP 403) has been split into two separate options:
+  - `UnauthenticatedBehavior` now controls the 401 case.
+  - `UnauthorizedBehavior` now controls only the 403 case.
+
+  If you're upgrading from a version prior to `0.21.0`, move your existing `UnauthorizedBehavior` value as-is to `UnauthenticatedBehavior` to keep the exact same behavior as before. No change is needed for the 403 case unless you want to opt into the new `Challenge` behavior there (e.g. to enable step-up authentication, see [`AuthorizationParams`](#plugin-config-block) and [Authorization](./authorization.md)).
+
+- Wildcard matching in `ValidPostLoginRedirectUris`/`ValidPostLogoutRedirectUris` (including a bare `*`) now requires explicitly setting the `TOA_ENABLE_REDIRECT_URI_WILDCARDS` environment variable -- without it, every entry is matched as an exact string, per the OIDC/OAuth2 spec. See [Redirect Uri Wildcards](#redirect-uri-wildcards) below.
+:::
+
 :::caution
 It is highly recommended to change the default encryption-secret by providing your own 32-character secret using the `Secret`-option.
 You can generate a random one here: https://it-tools.tech/token-generator?length=32
@@ -22,6 +32,16 @@ If a variable is not defined, the provided value is used as-is.
 Please note that you can only use a single environment variable using this syntax and it **does not allow templating**.
 So something like this wouldn't work: `https://auth.${MY_DOMAIN}/auth/${CLIENT_ID}`.  
 But: If you're using YAML-files for configuration you can use [traefik's templating](https://doc.traefik.io/traefik/providers/file/#go-templating).
+
+Alternatively, you can read the value from a file using `${file:/path/to/file}`. This is useful for secrets
+(eg. `ClientSecret` or `Secret`) when using Docker/Kubernetes secrets mounted as files, since environment
+variables set on a container can be read by anyone with access to `docker inspect`, while a mounted secret
+file cannot. The file content is trimmed of surrounding whitespace/newlines. Eg.:
+```yml
+Secret: "${file:/run/secrets/oidc_secret}"
+Provider:
+  ClientSecret: "${file:/run/secrets/oidc_client_secret}"
+```
 :::
 
 | Name | Required | Type | Default | Description |
@@ -29,24 +49,42 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `LogLevel`* | no | `string` | `WARN` | Defines the logging level of the plugin. Can be one of `DEBUG`, `INFO`, `WARN`, `ERROR`. |
 | `Secret`* | no | `string` | `MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ`| A secret used for encryption. Must be a 32 character string. It is strongly suggested to change this. |
 | `Provider` | yes | [`Provider`](#provider) | *none* | Identity Provider Configuration. See *Provider* block. |
-| `Scopes` | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. |
+| `Scopes` | no | `string[]` | `["openid", "profile", "email"]` | A list of scopes to request from the IDP. Please note that `openid` is always required. |
 | `CallbackUri`* | no | `string` | `/oidc/callback` | Defines the callback url used by the IDP. This needs to be registered in your IDP. This may be either a relative URL or an absolute URL -- see also [Callback URLs](./callback-uri.md) |
-| `LoginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthorizedBehavior`-configuration.  |
+| `LoginUri`* | no | `string` | *none* | An optional url, which should trigger the login-flow. The response of every other url is defined by the `UnauthenticatedBehavior`/`UnauthorizedBehavior`-configuration.  |
 | `PostLoginRedirectUri`* | no | `string` | *none* | An optional static redirect url where the user should be redirected after login. By default the user will be redirected to the url which triggered the login-flow. |
-| `ValidPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
+| `ValidPostLoginRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the login-endpoint. Per the OIDC/OAuth2 spec, the uri has to match exactly. Wildcards (including a single `*` matching anything) are an opt-in -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. |
 | `LogoutUri`* | no | `string` | `/logout` | The url which should trigger the logout-flow. See [here](./how-it-works.md#logout) for more details. |
 | `PostLogoutRedirectUri`* | no | `string` | `/` | The url where the user should be redirected after logout. |
-| `ValidPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. The uri has to match exactly. Optionally you can use a `*` to match any character of `a-z, A-Z, 0-9, -, _`. You can also specify a single `*` which is a full wildcard but this is not recommended. |
+| `ValidPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. Per the OIDC/OAuth2 spec, the uri has to match exactly. Wildcards (including a single `*` matching anything) are an opt-in -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. |
 | `CookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookie* where the name can be set individually. |
 | `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
 | `AuthorizationCookie` | no | [`AuthorizationCookie`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookie* block. |
-| `UnauthorizedBehavior`* | no | `string` | `Auto` | Defines the behavior for unauthenticated requests. `Challenge` means the user will be redirected to the IDP's login page, `Unauthorized` will return a 401 status response, and `Auto` will automatically choose based on request type (HTML requests get redirected, AJAX requests get 401). |
+| `UnauthenticatedBehavior`* | no | `string` | `Auto` | Defines the behavior for unauthenticated requests, i.e. requests without a valid session. `Challenge` means the user will be redirected to the IDP's login page, `Unauthorized` will return a 401 status response, `Forward` will send the request as unauthenticated to the upstream service, and `Auto` will automatically choose based on request type (HTML requests get redirected, AJAX requests get 401). |
+| `UnauthorizedBehavior`* | no | `string` | `Unauthorized` | Defines the behavior for unauthorized requests, i.e. requests with a valid session that don't pass the `Authorization` rules. `Unauthorized` (the default) returns a 403 status response, and `Forward` will send the request as unauthorized to the upstream service. `Challenge` means HTML requests will be redirected to the IDP's login page once per session to try and satisfy the authorization requirements (e.g. step-up authentication); non-HTML requests, or a request whose session already went through this redirect and is still not authorized, get a 403 response instead. This is opt-in only, since silently re-authenticating via an existing IDP SSO session usually can't change the outcome of a failed claim check, which the once-per-session limit guards against turning into a redirect loop. |
 | `Authorization` | no | [`Authorization`](#authorization) | *none* | Authorization Configuration. See *Authorization* block. |
 | `Headers` | no | [`Header`](#header) | *none* | Supplies a list of headers which will be attached to the upstream request. See *Header* block. |
 | `BypassAuthenticationRule`* | no | `string` | *none* | Specifies an optional rule to bypass authentication. See [Bypass Authentication Rule](./bypass-authentication-rule.md) for more details. |
 | `ErrorPages` | no | [`ErrorPages`](#error-pages) | *none* | Allows you to customize some error pages. See *ErrorPages* block. |
+| `RequestedResources` | no | `string[]`| *none* | An array of resource URIs according to [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) for which the token should be requested. | 
+| `AuthorizationParams` | no | `map[string]string`| *none* | Additional query parameters to send to the IDP's authorization endpoint, eg. `acr_values` to request a specific authentication context (step-up authentication) or a default `prompt`. Reserved protocol parameters (`response_type`, `client_id`, `redirect_uri`, `state`, `scope`, `resource`) cannot be overridden this way and are ignored with a warning. A `prompt` query parameter on the incoming `/login` request still takes precedence over the configured value. |
 
+### Redirect Uri Wildcards {#redirect-uri-wildcards}
+
+:::caution
+Per the OIDC/OAuth2 spec, a redirect uri must match one of the registered ones exactly. Wildcard support below is an explicit, security-relevant opt-in: set the `TOA_ENABLE_REDIRECT_URI_WILDCARDS` environment variable (on the Traefik process, not a per-middleware config option) to `true` or `1`. Without it, every entry in `ValidPostLoginRedirectUris`/`ValidPostLogoutRedirectUris` -- including a bare `*` -- is matched as a literal string, so `*` only matches a *redirect_uri* that is literally `*`. If an entry contains `*` while the flag is off, a warning is logged at startup to flag the likely misconfiguration.
+:::
+
+Entries in `ValidPostLoginRedirectUris` and `ValidPostLogoutRedirectUris` can be either a full url (eg. `https://example.com/app`) or just a path (eg. `/app`), and each can contain wildcards once `TOA_ENABLE_REDIRECT_URI_WILDCARDS` is set to `true` or `1`:
+
+- In the **host** part, `*` matches exactly one subdomain label and never crosses a `.` on its own. Eg. `https://*.example.com` matches `https://app.example.com`, but not `https://app.sub.example.com`.
+- In the **path** part, a `*` is only a wildcard when it's the very last character. It then matches everything below that point, no matter how many segments it spans. Eg. `/good/*` matches `/good/index.html` as well as `/good/something/else`, and also matches `/good` itself. The incoming uri's query string and fragment aren't considered when deciding whether it matches, but are otherwise preserved unchanged in the accepted value -- eg. an SPA's hash route (`/app/#/dashboard`) survives a redirect through `/app/*`. A `*` anywhere else in the path is matched literally.
+- A single `*` on its own is a full wildcard matching anything, but this is not recommended since it effectively disables redirect uri validation.
+- A `*` glued directly onto the end of a host with nothing after it (eg. `https://example.com*`) never matches anything -- it's ambiguous with a missing `/` before an intended path wildcard, so it's rejected rather than silently treated as a host wildcard. Use `https://example.com/*` instead. The exception is a `*` right after a port separator (eg. `https://example.com:*`), which unambiguously means "any port" -- on its own it only matches a uri with no path at all; combine it with a path wildcard as `https://example.com:*/*` to allow any port together with any path.
+- Wildcards are only honored on an incoming redirect uri that doesn't try to walk up the directory tree (eg. `/good/../secret`), doesn't hide its real host behind user-info (eg. `https://good.example.com@evil.com`), and isn't a protocol-relative reference (eg. `//evil.com/good`). Such a uri has to match one of the valid uris exactly instead.
+
+A path-only entry (without a scheme/host) only matches a path-only *redirect_uri*/*post_logout_redirect_uri* value, and a full-url entry only matches a full-url value -- they're never mixed.
 
 ## Provider Block {#provider}
 
@@ -67,6 +105,7 @@ But: If you're using YAML-files for configuration you can use [traefik's templat
 | `ValidAudience`* | no | `string` | *ClientId* | The audience which must be present in the JWT-token. Defaults to the configured client id. |
 | `TokenValidation`* | no | `string` | `IdToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. `Introspection` may not work when using PKCE. |
 | `UseClaimsFromUserInfo`* | no | `bool` | `false` | When enabled, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims. The userinfo claims are merged directly into the token claims, with userinfo values overriding token values for non-security-critical claims. |
+| `TokenRenewalThreshold` | no | `float` | `0.75` | The percentage of the token's lifetime after which it should be renewed before expiration. The value must be between 0.5 and 1.0. |
 
 :::warning
 When using `UseClaimsFromUserInfo`, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims.
@@ -91,7 +130,7 @@ When `CheckOnEveryRequest` is enabled, this will greatly increase the hit rate o
 ## AuthorizationHeader Block {#authorization-header}
 
 By specifying this configuration, a request can send an externally generated access token via this header to authenticate the request.
-In this case no session will be created by the middleware. You may also want to set `UnauthorizedBehavior` to `Unauthorized`.
+In this case no session will be created by the middleware. Since these requests are usually made by non-browser clients, you may also want to set `UnauthenticatedBehavior` and `UnauthorizedBehavior` to `Unauthorized`, so a missing/invalid token results in a plain 401/403 response instead of a redirect to the IDP's login page.
 
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
@@ -110,7 +149,7 @@ This works exactly the same as [AuthorizationHeader](#authorization-header), but
 | Name | Required | Type | Default | Description |
 |---|---|---|---|---|
 | `AssertClaims` | no | [`ClaimAssertion[]`](#claim-assertion) | *none* | ClaimAssertion Configuration. See *ClaimAssertion* block. |
-| `CheckOnEveryRequest` | no | `bool` | `false` |  When set to true, authorization is checked on every single request. When set to false, authorization is only checked when the user logs in and the session is being created. When using external authentication using ˋAuthorizationHeaderˋ or ˋAuthorizationCookieˋ this is always treated as true.
+| `CheckOnEveryRequest` | no | `bool` | `false` |  When set to true, authorization is checked on every single request. When set to false, authorization is only checked when the user logs in and the session is being created, and the result is cached for the lifetime of the session. When using external authentication using ˋAuthorizationHeaderˋ or ˋAuthorizationCookieˋ this is always treated as true. See [When is authorization checked?](./authorization.md#when-is-authorization-checked) for details, including what happens if the initial check fails.
 
 
 ## ClaimAssertion Block {#claim-assertion}
@@ -137,16 +176,18 @@ So instead of `Name: "my:zitadel:grants"`, use `Name: "['my:zitadel:grants']"`.
 
 ## Header Block {#header}
 
-| Name | Required | Type | Default | Description |
-|---|---|---|---|---|
-| `Name` | yes | `string` | *none* | The name of the header which should be added to the upstream request. |
-| `Value` | yes | `string` | *none* | The value of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Please see the info below. |
+| Name          | Required           | Type     | Default    | Description                                                                                                                                                      |
+|---------------|--------------------|----------|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Name`        | yes                | `string` | *none*     | The name of the header which should be added to the upstream request.                                                                                            |
+| `Value`       | if `Values` absent | `string` | *none*     | The value of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Please see the info below.                                              |
+| `Values`      | if `Value` absent  | `string` | *none*     | The values of the header, which can use [Go-Templates](https://pkg.go.dev/text/template). Should evaluate to valid json array of strings.                        |
+| `IncludeWhen` | no                 | `string` | Authorized | Whether the header is sent to public routes or if `UnauthorizedBehavior` is set to `Forward`. Available options are `Always`, `Authorized`, `Public`, `Forward`. |
 
 By using Go-Templates you have access to the following attributes:
 
 | Template | Description |
 |---|---|
-| `{{ .accessToken }}` | The OAuth Access Token |
+| `{{ .accessToken }}` | The OAuth Access Token. The access token gets renewed automatically after `TokenRenewalThreshold` percent of it's lifetime has passed. This means that when sending this token upstream, it is still valid for at least `1 - TokenRenewalThreshold` percent of it's lifetime. |
 | `{{ .idToken }}` | The OAuth Id Token |
 | `{{ .refreshToken }}` | The OAuth Refresh Token |
 | `{{ .claims.* }}` | Replace `*` with the name or path to your desired claim. If `UseClaimsFromUserInfo` is enabled, the claims from the `userinfo_endpoint` are merged directly into the token claims and accessible via `{{ .claims.* }}`. |
@@ -164,12 +205,33 @@ Headers:
 
 The outer curly braces and backticks are used to escape the inner curly braces.
 
-Note that this *only* applies for configuring Traefik from a YAML file, where it performs its own template expansion.  If you are using the Kubernetes CRDs, you should *not* escape, just template as usual:
+Note that this *only* applies for configuring Traefik from a YAML file, where it performs it's own template expansion.  If you are using the Kubernetes CRDs, you should *not* escape, just template as usual:
 
 ```yml
 Headers:
   - Name: X-Oidc-Groups-Json-Array
     Value: '[{{with .claims.groups}}{{ range $i, $g := . }}{{if $i}},{{end}}"{{js $g}}"{{end}}{{end}}]'
+```
+
+Some additional helper functions are available in the templates:
+
+| Name             | Description                                                                              |
+|------------------|------------------------------------------------------------------------------------------|
+| `withPrefix`     | Prefixes each value in the slice with a given string.                                    |
+| `withSuffix`     | Suffixes each value in the slice with a given string.                                    |
+| `mapToJsonArray` | Maps each value to a JSON array element, escaping any special characters in the process. |
+
+If using `Values` templating, value should be a valid string of JSON array with only strings as values. Each value is mapped to an individual header.
+It can be used to pass multiple headers with the same name, for example, for a Kubernetes impersonation request:
+
+```yml
+Headers:
+  - Name: "Authorization"
+    Value: "Bearer {{ .accessToken }}"
+  - Name: "Impersonate-User"
+    Value: "prefix:{{ .claims.preferred_username }}"
+  - Name: "Impersonate-Group"
+    Values: '{{ .claims.groups | withPrefix "prefix:" | mapToJsonArray }}'
 ```
 :::
 

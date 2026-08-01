@@ -1,6 +1,9 @@
 # Dependencies
 /node_modules
 
+# We're using bun, so we ignore the lock files of the npm package manager
+package-lock.json
+
 # Production
 /build
 

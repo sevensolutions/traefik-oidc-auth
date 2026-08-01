@@ -46,7 +46,11 @@ We will then take care of the issue as soon as possible.
 ## I Want To Contribute
 
 > ### Legal Notice <!-- omit in toc -->
-> When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project licence.
+> When contributing to this project, you must agree that you have authored or fully reviewed and understood 100% of the content (see our [AI Policy](./AI_POLICY.md) if you used any AI assistance), that you have the necessary rights to the content and that the content you contribute may be provided under the project licence.
+
+### Using AI
+
+If you're using any kind of AI on this codebase, please read ./AI_POLICY.md
 
 ### Reporting Bugs
 

@@ -25,6 +25,7 @@ http:
               Value: "sub"
             - Name: "Authorization"
               Value: "{{`Bearer {{ .accessToken }}`}}"
+              # IncludeWhen: "Public"
             - Name: "IdToken"
               Value: "{{`Bearer {{ .idToken }}`}}"
           AuthorizationHeader:
@@ -32,7 +33,11 @@ http:
           AuthorizationCookie:
             Name: "CustomAuth"
           #BypassAuthenticationRule: "Header(`cache-control`, `no-cache`) || HeaderRegexp(`X-Real-Ip`, `^172\\.18\\.`)"
+          #UnauthenticatedBehavior: "Unauthorized"
           #UnauthorizedBehavior: "Unauthorized"
+          #AuthorizationParams:
+          #  acr_values: "aal2"
+          #  prompt: "login"
           # Authorization:
           #   AssertClaims:
           #     - Name: roles
@@ -40,7 +45,7 @@ http:
           #     - Name: some.nested.key
           #       AnyOf: ["some value"]
           # If set, only the /login endpoint will initiate the login flow
-          #LoginUri: "/login"
+          LoginUri: "/login"
           #ValidPostLoginRedirectUris: ["https://google.at"]
           #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"

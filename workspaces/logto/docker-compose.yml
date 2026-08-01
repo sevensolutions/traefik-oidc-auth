@@ -1,0 +1,52 @@
+services:
+  logto:
+    depends_on:
+      logto_postgres:
+        condition: service_healthy
+    image: svhd/logto:latest
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
+    ports:
+      - 3001:3001
+      - 3002:3002
+    environment:
+      - TRUST_PROXY_HEADER=1
+      - DB_URL=postgres://postgres:postgres@logto_postgres:5432/logto
+      - ENDPOINT
+      - ADMIN_ENDPOINT
+  logto_postgres:
+    image: postgres:17-alpine
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - logto_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  traefik:
+    image: "traefik:v3.5.0"
+    ports:
+      - "9080:80"
+      - "8080:8080"
+    extra_hosts:
+      - "127-0-0-1.sslip.io:172.17.0.1" # To make OIDC discovery work correctly
+    volumes:
+      - "../configs/traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "../configs/http.yml:/etc/traefik/configs/http.yml:ro"
+      - "../..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      PROVIDER_URL: http://127-0-0-1.sslip.io:3001/oidc
+      CLIENT_ID: jgmgnr8u8vjfiris276nm
+      CLIENT_SECRET: RqqG1VswoFZM6wDqrqFAdrwIrnTjOgKP
+      VALIDATE_AUDIENCE: true
+
+  whoami:
+    image: "traefik/whoami:latest"
+
+volumes:
+  logto_postgres_data:

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
 )
@@ -19,8 +20,8 @@ import (
 func newGetUserInfoTest(t *testing.T, handler http.HandlerFunc) (*TraefikOidcAuth, *httptest.Server) {
 	server := httptest.NewServer(handler)
 
-	config := &Config{
-		Provider: &ProviderConfig{},
+	config := &config.Config{
+		Provider: &config.ProviderConfig{},
 		Scopes:   []string{"openid"},
 	}
 
