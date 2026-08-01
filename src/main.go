@@ -355,7 +355,7 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
-		token, err := exchangeAuthCode(toa, req, authCode)
+		token, err := exchangeAuthCode(toa, req, authCode, state.CodeVerifier)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
@@ -429,17 +429,9 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		toa.storeSessionAndAttachCookie(session, rw)
 
-		http.SetCookie(rw, &http.Cookie{
-			Name:     getCodeVerifierCookieName(toa.Config),
-			Value:    "",
-			Expires:  time.Now().Add(-24 * time.Hour),
-			MaxAge:   -1,
-			Secure:   true,
-			HttpOnly: true,
-			Path:     toa.CallbackURL.Path,
-			Domain:   toa.CallbackURL.Host,
-			SameSite: http.SameSiteDefaultMode,
-		})
+		if toa.Config.Provider.UsePkceBool {
+			clearLegacyCodeVerifierCookies(toa.Config, rw, req, toa.CallbackURL)
+		}
 
 		if redirectUrl != "" {
 			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
@@ -676,12 +668,14 @@ func (toa *TraefikOidcAuth) needsDoubleRedirect(req *http.Request) bool {
 
 // Protocol-critical parameters that AuthorizationParams must not be allowed to override.
 var reservedAuthorizationParams = map[string]bool{
-	"response_type": true,
-	"client_id":     true,
-	"redirect_uri":  true,
-	"state":         true,
-	"scope":         true,
-	"resource":      true,
+	"response_type":         true,
+	"client_id":             true,
+	"redirect_uri":          true,
+	"state":                 true,
+	"scope":                 true,
+	"resource":              true,
+	"code_challenge":        true,
+	"code_challenge_method": true,
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool) {
@@ -693,13 +687,6 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		Action:      "Login",
 		RedirectUrl: redirectUrl,
 		IsChallenge: isChallenge,
-	}
-
-	stateBase64, err := oidc.EncodeState(&state, toa.Config.Secret)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
@@ -716,7 +703,6 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
-		"state":         {stateBase64},
 		"resource":      toa.Config.RequestedResources,
 	}
 
@@ -750,27 +736,22 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 		codeChallenge := base64.RawURLEncoding.EncodeToString(sha2.Sum(nil))
 
-		urlValues.Add("code_challenge_method", "S256")
-		urlValues.Add("code_challenge", codeChallenge)
+		urlValues.Set("code_challenge_method", "S256")
+		urlValues.Set("code_challenge", codeChallenge)
 
-		encryptedCodeVerifier, err := utils.Encrypt(codeVerifier, toa.Config.Secret)
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		// Plaintext verifier in state; EncodeState encrypts the whole blob (#284).
+		state.CodeVerifier = codeVerifier
 
-		// TODO: Make configurable
-		// TODO does this need domain tweaks?  it is in the login flow
-		http.SetCookie(rw, &http.Cookie{
-			Name:     getCodeVerifierCookieName(toa.Config),
-			Value:    encryptedCodeVerifier,
-			Secure:   true,
-			HttpOnly: true,
-			Path:     toa.CallbackURL.Path,
-			Domain:   toa.CallbackURL.Host,
-			SameSite: http.SameSiteDefaultMode,
-		})
+		clearLegacyCodeVerifierCookies(toa.Config, rw, req, toa.CallbackURL)
 	}
+
+	stateBase64, err := oidc.EncodeState(&state, toa.Config.Secret)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	urlValues.Set("state", stateBase64)
 
 	authorizationEndpointUrl.RawQuery = urlValues.Encode()
 
