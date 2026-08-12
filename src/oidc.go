@@ -255,11 +255,21 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResp
 		"client_id":     {toa.Config.Provider.ClientId},
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"refresh_token": {refreshToken},
-		"resources":     toa.Config.RequestedResources,
+		"resource":      toa.Config.RequestedResources,
 	}
 
 	if toa.Config.Provider.ClientSecret != "" {
 		urlValues.Add("client_secret", toa.Config.Provider.ClientSecret)
+	}
+
+	if toa.ClientJwtPrivateKey != nil {
+		clientAssertionToken, err := toa.getClientAssertionJwtToken()
+		if err != nil {
+			return nil, err
+		}
+
+		urlValues.Add("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+		urlValues.Add("client_assertion", clientAssertionToken)
 	}
 
 	resp, err := toa.httpClient.PostForm(toa.DiscoveryDocument.TokenEndpoint, urlValues)
