@@ -183,6 +183,13 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(cfg.Scopes, ", "))
 	logger.Log(logging.LevelDebug, "SessionCookie: %v", cfg.SessionCookie)
 
+	switch cfg.Provider.TokenValidation {
+	case "AccessToken", "IdToken", "Introspection":
+	default:
+		logger.Log(logging.LevelError, "Invalid TokenValidation \"%s\". Must be one of AccessToken, IdToken or Introspection.", cfg.Provider.TokenValidation)
+		return nil, errors.New("invalid TokenValidation")
+	}
+
 	if cfg.Provider.TokenRenewalThreshold < 0.5 || cfg.Provider.TokenRenewalThreshold > 1.0 {
 		logger.Log(logging.LevelError, "Invalid TokenRenewalThreshold. The value must be >= 0.5 and <= 1.0.")
 		return nil, errors.New("invalid TokenRenewalThreshold")
