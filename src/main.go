@@ -364,15 +364,15 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		usedToken := ""
 
-		if toa.Config.Provider.TokenValidation == "AccessToken" {
+		switch toa.Config.Provider.TokenValidation {
+		case "AccessToken", "Introspection":
 			usedToken = token.AccessToken
-		} else if toa.Config.Provider.TokenValidation == "IdToken" {
+		case "IdToken":
 			usedToken = token.IdToken
-		} else if toa.Config.Provider.TokenValidation == "Introspection" {
-			usedToken = token.AccessToken
-		} else {
-			toa.logger.Log(logging.LevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+		default:
+			toa.logger.Log(logging.LevelError, "Invalid value '%s' for TokenValidation", toa.Config.Provider.TokenValidation)
+			http.Error(rw, "Invalid TokenValidation configuration", http.StatusInternalServerError)
+			return
 		}
 
 		redactedToken := usedToken
