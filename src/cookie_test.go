@@ -191,6 +191,65 @@ func TestReadChunkedCookieWithNoCount(t *testing.T) {
 	}
 }
 
+func TestReadChunkedCookieWithOutOfRangeCount(t *testing.T) {
+	for _, chunkCount := range []string{"-1", "1000000000"} {
+		req, err := http.NewRequest("GET", "https://example.com", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.AddCookie(&http.Cookie{
+			Name:  "TraefikOidcAuth.Session.Chunks",
+			Value: chunkCount,
+		})
+
+		cookieValue, err := readChunkedCookie(req, "TraefikOidcAuth.Session")
+
+		if err == nil || cookieValue != "" {
+			t.Errorf("expected a chunk count of %s to be rejected, got value %q and error %v", chunkCount, cookieValue, err)
+		}
+	}
+}
+
+func TestClearChunkedCookieWithOutOfRangeCount(t *testing.T) {
+	cfg := &config.Config{
+		CookieNamePrefix: "TraefikOidcAuth",
+		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.Chunks", Value: "1000000000"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.1", Value: "111"})
+
+	rw := newMockResponseWriter()
+
+	if err := clearChunkedCookie(cfg, rw, req, "TraefikOidcAuth.Session"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	headers := rw.HeaderMap.Values("Set-Cookie")
+
+	if len(headers) != 3 {
+		t.Fatalf("expected the 3 cookies present on the request to be cleared, got %d: %v", len(headers), headers)
+	}
+
+	for _, name := range []string{"TraefikOidcAuth.Session=", "TraefikOidcAuth.Session.Chunks=", "TraefikOidcAuth.Session.1="} {
+		found := false
+		for _, raw := range headers {
+			if strings.HasPrefix(raw, name) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected %s to be cleared, got %v", name, headers)
+		}
+	}
+}
+
 type mockResponseWriter struct {
 	HeaderMap http.Header
 }
