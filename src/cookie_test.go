@@ -227,9 +227,7 @@ func TestClearChunkedCookieWithOutOfRangeCount(t *testing.T) {
 
 	rw := newMockResponseWriter()
 
-	if err := clearChunkedCookie(cfg, rw, req, "TraefikOidcAuth.Session"); err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	clearChunkedCookie(cfg, rw, req, "TraefikOidcAuth.Session")
 
 	headers := rw.HeaderMap.Values("Set-Cookie")
 

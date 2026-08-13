@@ -86,7 +86,7 @@ func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
 
 	return chunkCount, nil
 }
-func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
+func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) {
 	baseCookie := createSessionCookie(config)
 	baseCookie.Value = ""
 	makeCookieExpireImmediately(baseCookie)
@@ -96,8 +96,6 @@ func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http
 		c.Name = name
 		http.SetCookie(rw, &c)
 	}
-
-	return nil
 }
 
 func presentChunkedCookieNames(req *http.Request, cookieName string) []string {
