@@ -272,16 +272,6 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 			}
 
 			if header.Value != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Value)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
@@ -291,27 +281,19 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, err.Error())
 				}
 			} else if header.Values != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Values)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
 				if err != nil {
 					req.Header.Set(header.Name, err.Error())
+					continue
 				}
 
 				var values []string
 				err = json.Unmarshal(renderedValue.Bytes(), &values)
 				if err != nil {
 					req.Header.Set(header.Name, err.Error())
+					continue
 				}
 
 				if len(values) > 0 {

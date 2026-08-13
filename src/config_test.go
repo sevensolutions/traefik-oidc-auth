@@ -36,3 +36,35 @@ func TestNew_AcceptsKnownTokenValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestNew_ParsesHeaderTemplatesUpfront(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.Headers = []config.HeaderConfig{
+		{Name: "X-Subject", Value: "{{ .claims.sub }}"},
+		{Name: "X-Roles", Values: "{{ .claims.roles | mapToJsonArray }}"},
+		{Name: "X-Empty"},
+	}
+
+	if _, err := New(context.Background(), http.NotFoundHandler(), cfg, "test"); err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.Headers[0].Template == nil || cfg.Headers[1].Template == nil {
+		t.Error("expected the header templates to be parsed while loading the config")
+	}
+
+	if cfg.Headers[2].Template != nil {
+		t.Error("expected no template for a header without a value")
+	}
+}
+
+func TestNew_RejectsInvalidHeaderTemplate(t *testing.T) {
+	cfg := newTestConfig()
+	cfg.Headers = []config.HeaderConfig{
+		{Name: "X-Broken", Value: "{{ .claims.sub "},
+	}
+
+	if _, err := New(context.Background(), http.NotFoundHandler(), cfg, "test"); err == nil {
+		t.Fatal("expected an invalid header template to be rejected")
+	}
+}
