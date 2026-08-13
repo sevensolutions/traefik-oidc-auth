@@ -127,6 +127,10 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse, nil
 }
 
+func (toa *TraefikOidcAuth) clockSkewTolerance() time.Duration {
+	return time.Duration(toa.Config.Provider.ClockSkewTolerance) * time.Second
+}
+
 func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[string]interface{}, error) {
 	claims := jwt.MapClaims{}
 
@@ -137,6 +141,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 
 	options := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
+		jwt.WithLeeway(toa.clockSkewTolerance()),
 	}
 
 	if toa.Config.Provider.ValidateIssuerBool {
@@ -360,7 +365,9 @@ func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject strin
 			return nil, err
 		}
 
-		options := []jwt.ParserOption{}
+		options := []jwt.ParserOption{
+			jwt.WithLeeway(toa.clockSkewTolerance()),
+		}
 
 		if toa.Config.Provider.ValidateIssuerBool {
 			options = append(options, jwt.WithIssuer(toa.Config.Provider.ValidIssuer))

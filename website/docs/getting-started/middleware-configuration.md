@@ -106,6 +106,7 @@ A path-only entry (without a scheme/host) only matches a path-only *redirect_uri
 | `TokenValidation`* | no | `string` | `IdToken` | Specifies which token or method should be used to validate the authentication cookie. Can be either `AccessToken`, `IdToken` or `Introspection`. `Introspection` may not work when using PKCE. |
 | `UseClaimsFromUserInfo`* | no | `bool` | `false` | When enabled, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims. The userinfo claims are merged directly into the token claims, with userinfo values overriding token values for non-security-critical claims. |
 | `TokenRenewalThreshold` | no | `float` | `0.75` | The percentage of the token's lifetime after which it should be renewed before expiration. The value must be between 0.5 and 1.0. |
+| `ClockSkewTolerance` | no | `int` | `30` | How much clock difference between traefik and your provider is tolerated, in seconds, when the `exp`, `nbf` and `iat` claims of a token are validated. The value must be between 0 and 300. Raise this if you see *token is not valid yet* or *token is expired* errors even though both clocks look roughly correct. |
 
 :::warning
 When using `UseClaimsFromUserInfo`, an additional request to the provider's `userinfo_endpoint` is made to validate the token and to retrieve additional claims.
