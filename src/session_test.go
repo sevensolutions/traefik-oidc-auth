@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -141,5 +142,24 @@ func TestValidateSessionTicket_FailsWhenRenewalFailsForAnExpiredToken(t *testing
 
 	if sessionState != nil {
 		t.Errorf("expected no session, got %v", sessionState)
+	}
+}
+
+func TestValidateToken_MissingToken(t *testing.T) {
+	toa := &TraefikOidcAuth{
+		logger: logging.CreateLogger(logging.LevelError),
+		Config: &config.Config{
+			Provider: &config.ProviderConfig{TokenValidation: "IdToken"},
+		},
+	}
+
+	ok, _, err := toa.validateToken(&session.SessionState{AccessToken: "only-an-access-token"})
+
+	if ok {
+		t.Fatal("expected a session without an id token to be rejected")
+	}
+
+	if err == nil || !strings.Contains(err.Error(), "id_token") {
+		t.Errorf("expected the error to name the missing token, got %v", err)
 	}
 }
