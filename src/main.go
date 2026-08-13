@@ -489,7 +489,7 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
 
 	if toa.DiscoveryDocument.EndSessionEndpoint == "" {
-		toa.logger.Log(logging.LevelWarn, "The provider doesn't provide an end_session_endpoint. Only the local session has been terminated.")
+		toa.logger.Log(logging.LevelWarn, "The provider doesn't provide an end_session_endpoint, so the session at the provider can't be ended. The local session has been cleared.")
 		http.Redirect(rw, req, redirectUri, http.StatusFound)
 		return
 	}

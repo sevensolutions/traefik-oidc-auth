@@ -35,7 +35,7 @@ func CreateConfig() *config.Config {
 			ValidateAudienceBool:      true,
 			TokenValidation:           "IdToken",
 			TokenRenewalThreshold:     0.75,
-			ClockSkewTolerance:        30,
+			ClockSkewTolerance:        0,
 			UseClaimsFromUserInfoBool: false,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.

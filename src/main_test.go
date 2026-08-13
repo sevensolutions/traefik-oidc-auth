@@ -76,7 +76,9 @@ func TestHandleLogout_WithoutEndSessionEndpoint(t *testing.T) {
 	toa := newLogoutTest("")
 
 	req := httptest.NewRequest("GET", "https://app.example.com/logout", nil)
-	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session", Value: "some-ticket"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.Chunks", Value: "2"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.1", Value: "some"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.2", Value: "ticket"})
 	rw := httptest.NewRecorder()
 
 	toa.handleLogout(rw, req, &session.SessionState{IdToken: "some-id-token"})
@@ -87,19 +89,16 @@ func TestHandleLogout_WithoutEndSessionEndpoint(t *testing.T) {
 		t.Errorf("expected a redirect to the post logout redirect uri, got %q", location)
 	}
 
-	if strings.Contains(location, "id_token_hint") {
-		t.Errorf("expected no id token in the redirect, got %q", location)
-	}
-
-	if !strings.Contains(rw.Header().Get("Set-Cookie"), "TraefikOidcAuth.Session=") {
-		t.Errorf("expected the session cookie to be cleared, got %v", rw.Header().Values("Set-Cookie"))
-	}
+	assertSessionCookiesCleared(t, rw)
 }
 
 func TestHandleLogout_WithEndSessionEndpoint(t *testing.T) {
 	toa := newLogoutTest("https://idp.example.com/end-session")
 
 	req := httptest.NewRequest("GET", "https://app.example.com/logout", nil)
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.Chunks", Value: "2"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.1", Value: "some"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.2", Value: "ticket"})
 	rw := httptest.NewRecorder()
 
 	toa.handleLogout(rw, req, &session.SessionState{IdToken: "some-id-token"})
@@ -115,5 +114,59 @@ func TestHandleLogout_WithEndSessionEndpoint(t *testing.T) {
 
 	if got := location.Query().Get("id_token_hint"); got != "some-id-token" {
 		t.Errorf("expected the id token to be sent as a hint, got %q", got)
+	}
+
+	assertSessionCookiesCleared(t, rw)
+}
+
+func TestHandleLogout_RejectsAnUnlistedRedirectUri(t *testing.T) {
+	toa := newLogoutTest("https://idp.example.com/end-session")
+
+	req := httptest.NewRequest("GET", "https://app.example.com/logout?redirect_uri=https://evil.example.com/", nil)
+	rw := httptest.NewRecorder()
+
+	toa.handleLogout(rw, req, &session.SessionState{IdToken: "some-id-token"})
+
+	if rw.Code != http.StatusBadRequest {
+		t.Errorf("expected an unlisted redirect uri to be rejected, got status %d", rw.Code)
+	}
+
+	if location := rw.Header().Get("Location"); location != "" {
+		t.Errorf("expected no redirect, got %q", location)
+	}
+}
+
+func TestHandleLogout_AcceptsAListedRedirectUri(t *testing.T) {
+	toa := newLogoutTest("")
+	toa.Config.ValidPostLogoutRedirectUris = []string{"/bye"}
+
+	req := httptest.NewRequest("GET", "https://app.example.com/logout?post_logout_redirect_uri=/bye", nil)
+	rw := httptest.NewRecorder()
+
+	toa.handleLogout(rw, req, &session.SessionState{IdToken: "some-id-token"})
+
+	if got := rw.Header().Get("Location"); got != "https://app.example.com/bye" {
+		t.Errorf("expected a redirect to the listed uri, got %q", got)
+	}
+}
+
+func assertSessionCookiesCleared(t *testing.T, rw *httptest.ResponseRecorder) {
+	t.Helper()
+
+	cleared := make(map[string]bool)
+
+	for _, raw := range rw.Header().Values("Set-Cookie") {
+		name, _, _ := strings.Cut(strings.Split(raw, ";")[0], "=")
+
+		lower := strings.ToLower(raw)
+		if strings.Contains(lower, "max-age=0") || strings.Contains(lower, "max-age=-1") {
+			cleared[name] = true
+		}
+	}
+
+	for _, name := range []string{"TraefikOidcAuth.Session", "TraefikOidcAuth.Session.Chunks", "TraefikOidcAuth.Session.1", "TraefikOidcAuth.Session.2"} {
+		if !cleared[name] {
+			t.Errorf("expected %s to be cleared, got %v", name, rw.Header().Values("Set-Cookie"))
+		}
 	}
 }

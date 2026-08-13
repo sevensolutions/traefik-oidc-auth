@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -463,6 +464,7 @@ func TestRenewToken_SendsResourceAndClientAssertion(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	var mu sync.Mutex
 	var form url.Values
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -470,7 +472,10 @@ func TestRenewToken_SendsResourceAndClientAssertion(t *testing.T) {
 			t.Error(err)
 			return
 		}
+
+		mu.Lock()
 		form = req.PostForm
+		mu.Unlock()
 
 		rw.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(rw).Encode(oidc.OidcTokenResponse{AccessToken: "new-access-token"})
@@ -492,6 +497,9 @@ func TestRenewToken_SendsResourceAndClientAssertion(t *testing.T) {
 	if _, err := toa.renewToken("some-refresh-token"); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	if got := form.Get("resource"); got != "https://api.example.com" {
 		t.Errorf("expected the requested resource to be sent as resource, got %q", got)
