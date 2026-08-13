@@ -163,3 +163,21 @@ func TestValidateToken_MissingToken(t *testing.T) {
 		t.Errorf("expected the error to name the missing token, got %v", err)
 	}
 }
+
+func TestGetSessionForRequest_WithoutSessionCookie(t *testing.T) {
+	toa := &TraefikOidcAuth{
+		logger: logging.CreateLogger(logging.LevelError),
+		Config: &config.Config{
+			CookieNamePrefix: "TraefikOidcAuth",
+			Provider:         &config.ProviderConfig{TokenValidation: "IdToken"},
+		},
+	}
+
+	req := httptest.NewRequest("GET", "https://app.example.com/", nil)
+
+	_, _, _, err := toa.getSessionForRequest(req)
+
+	if err != errNoSessionCookie {
+		t.Errorf("expected a missing session cookie to be reported as such, got %v", err)
+	}
+}

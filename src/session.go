@@ -13,6 +13,8 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
 )
 
+var errNoSessionCookie = errors.New("no session cookie is present")
+
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
 	// Use AuthorizationHeader, if present
 	if toa.Config.AuthorizationHeader != nil && toa.Config.AuthorizationHeader.Name != "" {
@@ -66,10 +68,14 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 	sessionTicket, err := readChunkedCookie(req, getSessionCookieName(toa.Config))
 
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
+		if err == http.ErrNoCookie {
+			return nil, false, nil, errNoSessionCookie
+		}
+
+		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", err.Error())
 	}
 	if sessionTicket == "" {
-		return nil, false, nil, fmt.Errorf("no session cookie is present")
+		return nil, false, nil, errNoSessionCookie
 	}
 
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
