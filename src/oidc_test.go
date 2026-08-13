@@ -595,3 +595,23 @@ func TestValidateTokenLocally_RejectsBeyondClockSkew(t *testing.T) {
 		t.Error("expected an expired token to be rejected")
 	}
 }
+
+func TestIntrospectToken_BadStatusCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.Error(rw, `{"active":true}`, http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	toa := &TraefikOidcAuth{
+		logger:            logging.CreateLogger(logging.LevelError),
+		httpClient:        server.Client(),
+		Config:            &config.Config{Provider: &config.ProviderConfig{}},
+		DiscoveryDocument: &oidc.OidcDiscovery{IntrospectionEndpoint: server.URL},
+	}
+
+	active, _, err := toa.introspectToken("some-token")
+
+	if active || err == nil {
+		t.Errorf("expected a failed introspection request to be an error, got active=%v err=%v", active, err)
+	}
+}

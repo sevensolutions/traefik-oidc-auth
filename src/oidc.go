@@ -236,6 +236,12 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		toa.logger.Log(logging.LevelError, "introspectToken: received bad HTTP response from Provider (Status: %d): %s", resp.StatusCode, string(body))
+		return false, nil, errors.New("invalid status code")
+	}
+
 	var introspectResponse map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
 
