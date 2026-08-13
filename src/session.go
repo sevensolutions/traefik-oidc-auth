@@ -113,10 +113,15 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
-			newTokens, err := toa.renewToken(session.RefreshToken)
+			newTokens, renewErr := toa.renewToken(session.RefreshToken)
 
-			if err != nil {
-				return nil, nil, nil, err
+			if renewErr != nil {
+				if success && err == nil {
+					toa.logger.Log(logging.LevelWarn, "Failed to renew the tokens before they expire, continuing with the current session: %s", renewErr.Error())
+					return session, claims, nil, nil
+				}
+
+				return nil, nil, nil, renewErr
 			}
 
 			session.AccessToken = newTokens.AccessToken
