@@ -375,6 +375,12 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 			return
 		}
 
+		if usedToken == "" {
+			toa.logger.Log(logging.LevelError, "The identity provider didn't return an %s, which is required by TokenValidation '%s'. If you've customized the Scopes, make sure 'openid' is one of them.", validatedTokenName(toa.Config.Provider.TokenValidation), toa.Config.Provider.TokenValidation)
+			http.Error(rw, "Returned token is not valid", http.StatusInternalServerError)
+			return
+		}
+
 		redactedToken := usedToken
 		if len(redactedToken) > 16 {
 			redactedToken = redactedToken[0:16] + " *** REDACTED ***"
