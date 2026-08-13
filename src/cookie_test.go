@@ -211,7 +211,7 @@ func TestReadChunkedCookieWithOutOfRangeCount(t *testing.T) {
 	}
 }
 
-func TestClearChunkedCookieWithOutOfRangeCount(t *testing.T) {
+func TestClearChunkedCookieClearsEveryPresentChunk(t *testing.T) {
 	cfg := &config.Config{
 		CookieNamePrefix: "TraefikOidcAuth",
 		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
@@ -245,6 +245,76 @@ func TestClearChunkedCookieWithOutOfRangeCount(t *testing.T) {
 		if !found {
 			t.Errorf("expected %s to be cleared, got %v", name, headers)
 		}
+	}
+}
+
+func TestClearChunkedCookieIsBounded(t *testing.T) {
+	cfg := &config.Config{
+		CookieNamePrefix: "TraefikOidcAuth",
+		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 5000; i++ {
+		req.AddCookie(&http.Cookie{Name: fmt.Sprintf("TraefikOidcAuth.Session.%d", i+1), Value: "x"})
+	}
+
+	rw := newMockResponseWriter()
+
+	clearChunkedCookie(cfg, rw, req, "TraefikOidcAuth.Session")
+
+	headers := rw.HeaderMap.Values("Set-Cookie")
+
+	if len(headers) > maxCookieChunks+2 {
+		t.Errorf("expected at most %d cleared cookies, got %d", maxCookieChunks+2, len(headers))
+	}
+}
+
+func TestSetChunkedCookiesRejectsAnOversizedValue(t *testing.T) {
+	cfg := &config.Config{
+		CookieNamePrefix: "TraefikOidcAuth",
+		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
+	}
+
+	rw := newMockResponseWriter()
+
+	tooLong := randomFixedLengthString(cookieChunkSize*maxCookieChunks + 1)
+
+	if err := setChunkedCookies(cfg, rw, "TraefikOidcAuth.Session", tooLong); err == nil {
+		t.Fatal("expected a value that needs more chunks than can be read back to be rejected")
+	}
+
+	if len(rw.HeaderMap.Values("Set-Cookie")) != 0 {
+		t.Error("expected no cookie to be written for an oversized value")
+	}
+
+	stillFits := randomFixedLengthString(cookieChunkSize * maxCookieChunks)
+
+	if err := setChunkedCookies(cfg, rw, "TraefikOidcAuth.Session", stillFits); err != nil {
+		t.Errorf("expected the largest readable value to be accepted, got %v", err)
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, raw := range rw.HeaderMap.Values("Set-Cookie") {
+		name, value, _ := strings.Cut(strings.Split(raw, ";")[0], "=")
+		req.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+
+	readBack, err := readChunkedCookie(req, "TraefikOidcAuth.Session")
+	if err != nil {
+		t.Fatalf("expected the largest accepted value to be readable again, got %v", err)
+	}
+
+	if readBack != stillFits {
+		t.Error("expected the value read back to match the value written")
 	}
 }
 

@@ -17,8 +17,12 @@ const (
 	maxCookieChunks = 32
 )
 
-func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
+func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) error {
 	cookieChunks := utils.ChunkString(cookieValue, cookieChunkSize)
+
+	if len(cookieChunks) > maxCookieChunks {
+		return fmt.Errorf("the session needs %d cookie chunks but only %d are supported", len(cookieChunks), maxCookieChunks)
+	}
 
 	baseCookie := createSessionCookie(config)
 	baseCookie.Name = cookieName
@@ -40,6 +44,8 @@ func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName
 			http.SetCookie(rw, c)
 		}
 	}
+
+	return nil
 }
 func readChunkedCookie(req *http.Request, cookieName string) (string, error) {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
@@ -103,6 +109,10 @@ func presentChunkedCookieNames(req *http.Request, cookieName string) []string {
 	prefix := cookieName + "."
 
 	for _, c := range req.Cookies() {
+		if len(names) >= maxCookieChunks+2 {
+			break
+		}
+
 		if strings.HasPrefix(c.Name, prefix) {
 			names = append(names, c.Name)
 		}

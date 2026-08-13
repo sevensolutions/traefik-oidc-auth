@@ -276,7 +276,12 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.Session
 
 	toa.logger.Log(logging.LevelDebug, "Session stored. Id %s", session.Id)
 
-	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), sessionTicket)
+	err = setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), sessionTicket)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Failed to store the session in a cookie: %s", err.Error())
+		http.Error(rw, "Failed to store the session", http.StatusInternalServerError)
+		return
+	}
 }
 
 func createSessionCookie(config *config.Config) *http.Cookie {
