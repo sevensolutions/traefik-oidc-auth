@@ -13,6 +13,11 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
 )
 
+const renewalRetryInterval = 30 * time.Second
+
+var errNoSessionCookie = errors.New("no session cookie is present")
+var errNoSession = errors.New("no session was found for the session ticket")
+
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
 	// Use AuthorizationHeader, if present
 	if toa.Config.AuthorizationHeader != nil && toa.Config.AuthorizationHeader.Name != "" {
@@ -66,10 +71,14 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 	sessionTicket, err := readChunkedCookie(req, getSessionCookieName(toa.Config))
 
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", strings.TrimLeft(err.Error(), "http: "))
+		if err == http.ErrNoCookie {
+			return nil, false, nil, errNoSessionCookie
+		}
+
+		return nil, false, nil, fmt.Errorf("unable to read session cookie: %s", err.Error())
 	}
 	if sessionTicket == "" {
-		return nil, false, nil, fmt.Errorf("no session cookie is present")
+		return nil, false, nil, errNoSessionCookie
 	}
 
 	session, claims, updatedSession, err := validateSessionTicket(toa, sessionTicket)
@@ -98,7 +107,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 	if session == nil {
 		toa.logger.Log(logging.LevelDebug, "No session found")
-		return nil, nil, nil, nil
+		return nil, nil, nil, errNoSession
 	}
 
 	success, claims, err := toa.validateToken(session)
@@ -110,15 +119,28 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 
 	if !success || err != nil || idpTokenExpiresSoon {
+		renewalIsOptional := success && err == nil
+
+		if renewalIsOptional && renewalFailedRecently(session) {
+			return session, claims, nil, nil
+		}
+
 		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
-			newTokens, err := toa.renewToken(session.RefreshToken)
+			newTokens, renewErr := toa.renewToken(session.RefreshToken)
 
-			if err != nil {
-				return nil, nil, nil, err
+			if renewErr != nil {
+				if renewalIsOptional && renewErr != errRefreshTokenRejected {
+					toa.logger.Log(logging.LevelWarn, "Failed to renew the tokens before they expire, continuing with the current session: %s", renewErr.Error())
+					session.RenewalFailedAt = time.Now()
+					return session, claims, session, nil
+				}
+
+				return nil, nil, nil, renewErr
 			}
 
+			session.RenewalFailedAt = time.Time{}
 			session.AccessToken = newTokens.AccessToken
 
 			if newTokens.RefreshToken != "" {
@@ -164,6 +186,14 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	return session, claims, nil, nil
 }
 
+func renewalFailedRecently(session *session.SessionState) bool {
+	if session.RenewalFailedAt.IsZero() {
+		return false
+	}
+
+	return time.Since(session.RenewalFailedAt) < renewalRetryInterval
+}
+
 func checkIdpTokenExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {
 	if session.TokenExpiresIn > 0 {
 		pastDuration := time.Since(session.RefreshedAt)
@@ -197,6 +227,10 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 		}
 	}
 
+	if token == "" {
+		return false, nil, fmt.Errorf("the session contains no %s, which is required by TokenValidation '%s'", validatedTokenName(toa.Config.Provider.TokenValidation), toa.Config.Provider.TokenValidation)
+	}
+
 	if toa.Config.Provider.TokenValidation == "Introspection" {
 		return toa.introspectToken(token)
 	}
@@ -224,6 +258,14 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 	return ok, claims, err
 }
 
+func validatedTokenName(tokenValidation string) string {
+	if tokenValidation == "IdToken" {
+		return "id_token"
+	}
+
+	return "access_token"
+}
+
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
 	sessionTicket, err := toa.SessionStorage.StoreSession(toa.logger, toa.Config, session.Id, session)
 	if err != nil {
@@ -234,7 +276,12 @@ func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.Session
 
 	toa.logger.Log(logging.LevelDebug, "Session stored. Id %s", session.Id)
 
-	setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), sessionTicket)
+	err = setChunkedCookies(toa.Config, rw, getSessionCookieName(toa.Config), sessionTicket)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Failed to store the session in a cookie: %s", err.Error())
+		http.Error(rw, "Failed to store the session", http.StatusInternalServerError)
+		return
+	}
 }
 
 func createSessionCookie(config *config.Config) *http.Cookie {

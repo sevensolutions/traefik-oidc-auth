@@ -28,6 +28,7 @@ func WriteError(logger *logging.Logger, page *ErrorPageConfig, rw http.ResponseW
 		if err != nil {
 			logger.Log(logging.LevelError, "Error while rendering unauthorized page: %s", err.Error())
 			http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
 
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")

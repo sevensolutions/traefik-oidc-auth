@@ -127,6 +127,10 @@ func exchangeAuthCode(oidcAuth *TraefikOidcAuth, req *http.Request, authCode str
 	return tokenResponse, nil
 }
 
+func (toa *TraefikOidcAuth) clockSkewTolerance() time.Duration {
+	return time.Duration(toa.Config.Provider.ClockSkewTolerance) * time.Second
+}
+
 func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[string]interface{}, error) {
 	claims := jwt.MapClaims{}
 
@@ -137,6 +141,7 @@ func (toa *TraefikOidcAuth) validateTokenLocally(tokenString string) (bool, map[
 
 	options := []jwt.ParserOption{
 		jwt.WithExpirationRequired(),
+		jwt.WithLeeway(toa.clockSkewTolerance()),
 	}
 
 	if toa.Config.Provider.ValidateIssuerBool {
@@ -231,6 +236,12 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		toa.logger.Log(logging.LevelError, "introspectToken: received bad HTTP response from Provider (Status: %d): %s", resp.StatusCode, string(body))
+		return false, nil, errors.New("invalid status code")
+	}
+
 	var introspectResponse map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&introspectResponse)
 
@@ -249,17 +260,29 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 	}
 }
 
+var errRefreshTokenRejected = errors.New("the provider rejected the refresh token")
+
 func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResponse, error) {
 	urlValues := url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"refresh_token": {refreshToken},
-		"resources":     toa.Config.RequestedResources,
+		"resource":      toa.Config.RequestedResources,
 	}
 
 	if toa.Config.Provider.ClientSecret != "" {
 		urlValues.Add("client_secret", toa.Config.Provider.ClientSecret)
+	}
+
+	if toa.ClientJwtPrivateKey != nil {
+		clientAssertionToken, err := toa.getClientAssertionJwtToken()
+		if err != nil {
+			return nil, err
+		}
+
+		urlValues.Add("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+		urlValues.Add("client_assertion", clientAssertionToken)
 	}
 
 	resp, err := toa.httpClient.PostForm(toa.DiscoveryDocument.TokenEndpoint, urlValues)
@@ -272,7 +295,12 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResp
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		toa.logger.Log(logging.LevelError, "renewToken: received bad HTTP response from Provider: %s", string(body))
+		toa.logger.Log(logging.LevelError, "renewToken: received bad HTTP response from Provider (Status: %d): %s", resp.StatusCode, string(body))
+
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != http.StatusTooManyRequests {
+			return nil, errRefreshTokenRejected
+		}
+
 		return nil, errors.New("invalid status code")
 	}
 
@@ -350,7 +378,9 @@ func (toa *TraefikOidcAuth) getUserInfo(accessToken string, idTokenSubject strin
 			return nil, err
 		}
 
-		options := []jwt.ParserOption{}
+		options := []jwt.ParserOption{
+			jwt.WithLeeway(toa.clockSkewTolerance()),
+		}
 
 		if toa.Config.Provider.ValidateIssuerBool {
 			options = append(options, jwt.WithIssuer(toa.Config.Provider.ValidIssuer))

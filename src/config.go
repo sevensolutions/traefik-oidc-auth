@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
@@ -34,6 +35,7 @@ func CreateConfig() *config.Config {
 			ValidateAudienceBool:      true,
 			TokenValidation:           "IdToken",
 			TokenRenewalThreshold:     0.75,
+			ClockSkewTolerance:        0,
 			UseClaimsFromUserInfoBool: false,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
@@ -183,9 +185,21 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	logger.Log(logging.LevelDebug, "Scopes: %s", strings.Join(cfg.Scopes, ", "))
 	logger.Log(logging.LevelDebug, "SessionCookie: %v", cfg.SessionCookie)
 
+	switch cfg.Provider.TokenValidation {
+	case "AccessToken", "IdToken", "Introspection":
+	default:
+		logger.Log(logging.LevelError, "Invalid TokenValidation \"%s\". Must be one of AccessToken, IdToken or Introspection.", cfg.Provider.TokenValidation)
+		return nil, errors.New("invalid TokenValidation")
+	}
+
 	if cfg.Provider.TokenRenewalThreshold < 0.5 || cfg.Provider.TokenRenewalThreshold > 1.0 {
 		logger.Log(logging.LevelError, "Invalid TokenRenewalThreshold. The value must be >= 0.5 and <= 1.0.")
 		return nil, errors.New("invalid TokenRenewalThreshold")
+	}
+
+	if cfg.Provider.ClockSkewTolerance < 0 || cfg.Provider.ClockSkewTolerance > 300 {
+		logger.Log(logging.LevelError, "Invalid ClockSkewTolerance. The value must be >= 0 and <= 300 seconds.")
+		return nil, errors.New("invalid ClockSkewTolerance")
 	}
 
 	var conditionalAuth *rules.RequestCondition
@@ -236,11 +250,29 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 
 	}
 
-	for _, header := range cfg.Headers {
+	for i := range cfg.Headers {
+		header := &cfg.Headers[i]
+
 		if header.Value != "" && header.Values != "" {
 			logger.Log(logging.LevelError, "Invalid Header: you can only use one of Value or Values, not both")
 			return nil, errors.New("invalid Header")
 		}
+
+		templateSource := header.Value
+		if templateSource == "" {
+			templateSource = header.Values
+		}
+		if templateSource == "" {
+			continue
+		}
+
+		tpl, err := newTemplate().Parse(templateSource)
+		if err != nil {
+			logger.Log(logging.LevelError, "Invalid template for header %s: %s", header.Name, err.Error())
+			return nil, err
+		}
+
+		header.Template = tpl
 	}
 
 	// Per the OIDC/OAuth2 spec a redirect uri must match exactly. Wildcard matching is an
@@ -277,6 +309,7 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 
 	httpClient := &http.Client{
 		Transport: httpTransport,
+		Timeout:   30 * time.Second,
 	}
 
 	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")

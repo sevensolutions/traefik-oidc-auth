@@ -191,6 +191,133 @@ func TestReadChunkedCookieWithNoCount(t *testing.T) {
 	}
 }
 
+func TestReadChunkedCookieWithOutOfRangeCount(t *testing.T) {
+	for _, chunkCount := range []string{"-1", "1000000000"} {
+		req, err := http.NewRequest("GET", "https://example.com", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.AddCookie(&http.Cookie{
+			Name:  "TraefikOidcAuth.Session.Chunks",
+			Value: chunkCount,
+		})
+
+		cookieValue, err := readChunkedCookie(req, "TraefikOidcAuth.Session")
+
+		if err == nil || cookieValue != "" {
+			t.Errorf("expected a chunk count of %s to be rejected, got value %q and error %v", chunkCount, cookieValue, err)
+		}
+	}
+}
+
+func TestClearChunkedCookieClearsEveryPresentChunk(t *testing.T) {
+	cfg := &config.Config{
+		CookieNamePrefix: "TraefikOidcAuth",
+		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.Chunks", Value: "1000000000"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.1", Value: "111"})
+
+	rw := newMockResponseWriter()
+
+	clearChunkedCookie(cfg, rw, req, "TraefikOidcAuth.Session")
+
+	headers := rw.HeaderMap.Values("Set-Cookie")
+
+	if len(headers) != 3 {
+		t.Fatalf("expected the 3 cookies present on the request to be cleared, got %d: %v", len(headers), headers)
+	}
+
+	for _, name := range []string{"TraefikOidcAuth.Session=", "TraefikOidcAuth.Session.Chunks=", "TraefikOidcAuth.Session.1="} {
+		found := false
+		for _, raw := range headers {
+			if strings.HasPrefix(raw, name) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected %s to be cleared, got %v", name, headers)
+		}
+	}
+}
+
+func TestClearChunkedCookieIsBounded(t *testing.T) {
+	cfg := &config.Config{
+		CookieNamePrefix: "TraefikOidcAuth",
+		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 5000; i++ {
+		req.AddCookie(&http.Cookie{Name: fmt.Sprintf("TraefikOidcAuth.Session.%d", i+1), Value: "x"})
+	}
+
+	rw := newMockResponseWriter()
+
+	clearChunkedCookie(cfg, rw, req, "TraefikOidcAuth.Session")
+
+	headers := rw.HeaderMap.Values("Set-Cookie")
+
+	if len(headers) > maxCookieChunks+2 {
+		t.Errorf("expected at most %d cleared cookies, got %d", maxCookieChunks+2, len(headers))
+	}
+}
+
+func TestSetChunkedCookiesRejectsAnOversizedValue(t *testing.T) {
+	cfg := &config.Config{
+		CookieNamePrefix: "TraefikOidcAuth",
+		SessionCookie:    &config.SessionCookieConfig{Path: "/"},
+	}
+
+	rw := newMockResponseWriter()
+
+	tooLong := randomFixedLengthString(cookieChunkSize*maxCookieChunks + 1)
+
+	if err := setChunkedCookies(cfg, rw, "TraefikOidcAuth.Session", tooLong); err == nil {
+		t.Fatal("expected a value that needs more chunks than can be read back to be rejected")
+	}
+
+	if len(rw.HeaderMap.Values("Set-Cookie")) != 0 {
+		t.Error("expected no cookie to be written for an oversized value")
+	}
+
+	stillFits := randomFixedLengthString(cookieChunkSize * maxCookieChunks)
+
+	if err := setChunkedCookies(cfg, rw, "TraefikOidcAuth.Session", stillFits); err != nil {
+		t.Errorf("expected the largest readable value to be accepted, got %v", err)
+	}
+
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, raw := range rw.HeaderMap.Values("Set-Cookie") {
+		name, value, _ := strings.Cut(strings.Split(raw, ";")[0], "=")
+		req.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+
+	readBack, err := readChunkedCookie(req, "TraefikOidcAuth.Session")
+	if err != nil {
+		t.Fatalf("expected the largest accepted value to be readable again, got %v", err)
+	}
+
+	if readBack != stillFits {
+		t.Error("expected the value read back to match the value written")
+	}
+}
+
 type mockResponseWriter struct {
 	HeaderMap http.Header
 }
@@ -257,5 +384,29 @@ func TestClearLegacyCodeVerifierCookies_ExpiresHostnameAndHostOnly(t *testing.T)
 	if !hasHostname || !hasHostOnly {
 		t.Fatalf("missing domain variants hostname=%v hostOnly=%v headers=%v",
 			hasHostname, hasHostOnly, headers)
+	}
+}
+
+func TestReadChunkedCookieReportsTruncation(t *testing.T) {
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.Chunks", Value: "2"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.1", Value: "111"})
+
+	_, err = readChunkedCookie(req, "TraefikOidcAuth.Session")
+
+	if err == nil {
+		t.Fatal("expected a truncated session cookie to be an error")
+	}
+
+	if err == http.ErrNoCookie {
+		t.Error("expected a truncated session cookie to be told apart from a missing one")
+	}
+
+	if !strings.Contains(err.Error(), "truncated") {
+		t.Errorf("expected the error to mention the truncation, got %v", err)
 	}
 }

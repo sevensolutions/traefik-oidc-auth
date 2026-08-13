@@ -179,7 +179,11 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+		if err == errNoSessionCookie || err == errNoSession {
+			toa.logger.Log(logging.LevelDebug, "No session is present for the request.")
+		} else {
+			toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+		}
 
 		// Clear the session cookie
 		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
@@ -267,17 +271,11 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 				continue
 			}
 
+			if (header.Value != "" || header.Values != "") && header.Template == nil {
+				return fmt.Errorf("header %s has no parsed template", header.Name)
+			}
+
 			if header.Value != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Value)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
@@ -287,27 +285,21 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, err.Error())
 				}
 			} else if header.Values != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Values)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
 				if err != nil {
-					req.Header.Set(header.Name, err.Error())
+					toa.logger.Log(logging.LevelError, "Failed to render the values of header %s: %s", header.Name, err.Error())
+					req.Header.Del(header.Name)
+					continue
 				}
 
 				var values []string
 				err = json.Unmarshal(renderedValue.Bytes(), &values)
 				if err != nil {
-					req.Header.Set(header.Name, err.Error())
+					toa.logger.Log(logging.LevelError, "The values of header %s didn't render to a json array: %s", header.Name, err.Error())
+					req.Header.Del(header.Name)
+					continue
 				}
 
 				if len(values) > 0 {
@@ -364,15 +356,21 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		usedToken := ""
 
-		if toa.Config.Provider.TokenValidation == "AccessToken" {
+		switch toa.Config.Provider.TokenValidation {
+		case "AccessToken", "Introspection":
 			usedToken = token.AccessToken
-		} else if toa.Config.Provider.TokenValidation == "IdToken" {
+		case "IdToken":
 			usedToken = token.IdToken
-		} else if toa.Config.Provider.TokenValidation == "Introspection" {
-			usedToken = token.AccessToken
-		} else {
-			toa.logger.Log(logging.LevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+		default:
+			toa.logger.Log(logging.LevelError, "Invalid value '%s' for TokenValidation", toa.Config.Provider.TokenValidation)
+			http.Error(rw, "Invalid TokenValidation configuration", http.StatusInternalServerError)
+			return
+		}
+
+		if usedToken == "" {
+			toa.logger.Log(logging.LevelError, "The identity provider didn't return an %s, which is required by TokenValidation '%s'. If you've customized the Scopes, make sure 'openid' is one of them.", validatedTokenName(toa.Config.Provider.TokenValidation), toa.Config.Provider.TokenValidation)
+			http.Error(rw, "Returned token is not valid", http.StatusInternalServerError)
+			return
 		}
 
 		redactedToken := usedToken
@@ -467,13 +465,6 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 
-	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	callbackUri := toa.GetAbsoluteCallbackURL(req).String()
 	redirectUri := utils.EnsureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
@@ -483,16 +474,31 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}
 
 	if redirectUriFromQuery != "" {
-		redirectUriFromQuery, err = utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris, toa.RedirectUriWildcardsEnabled)
+		validatedRedirectUri, err := utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris, toa.RedirectUriWildcardsEnabled)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "%s", err.Error())
 			http.Error(rw, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if redirectUriFromQuery != "" {
-			redirectUri = utils.EnsureAbsoluteUrl(req, redirectUriFromQuery)
+		if validatedRedirectUri != "" {
+			redirectUri = utils.EnsureAbsoluteUrl(req, validatedRedirectUri)
 		}
+	}
+
+	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+
+	if toa.DiscoveryDocument.EndSessionEndpoint == "" {
+		toa.logger.Log(logging.LevelWarn, "The provider doesn't provide an end_session_endpoint, so the session at the provider can't be ended. The local session has been cleared.")
+		http.Redirect(rw, req, redirectUri, http.StatusFound)
+		return
+	}
+
+	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Error while parsing the EndSessionEndpoint: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	state := &oidc.OidcState{
