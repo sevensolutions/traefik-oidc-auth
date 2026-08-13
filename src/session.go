@@ -13,7 +13,10 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/session"
 )
 
+const renewalRetryInterval = 30 * time.Second
+
 var errNoSessionCookie = errors.New("no session cookie is present")
+var errNoSession = errors.New("no session was found for the session ticket")
 
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
 	// Use AuthorizationHeader, if present
@@ -104,7 +107,7 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 	if session == nil {
 		toa.logger.Log(logging.LevelDebug, "No session found")
-		return nil, nil, nil, nil
+		return nil, nil, nil, errNoSession
 	}
 
 	success, claims, err := toa.validateToken(session)
@@ -116,20 +119,28 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 
 	if !success || err != nil || idpTokenExpiresSoon {
+		renewalIsOptional := success && err == nil
+
+		if renewalIsOptional && renewalFailedRecently(session) {
+			return session, claims, nil, nil
+		}
+
 		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
 			newTokens, renewErr := toa.renewToken(session.RefreshToken)
 
 			if renewErr != nil {
-				if success && err == nil {
+				if renewalIsOptional && renewErr != errRefreshTokenRejected {
 					toa.logger.Log(logging.LevelWarn, "Failed to renew the tokens before they expire, continuing with the current session: %s", renewErr.Error())
-					return session, claims, nil, nil
+					session.RenewalFailedAt = time.Now()
+					return session, claims, session, nil
 				}
 
 				return nil, nil, nil, renewErr
 			}
 
+			session.RenewalFailedAt = time.Time{}
 			session.AccessToken = newTokens.AccessToken
 
 			if newTokens.RefreshToken != "" {
@@ -173,6 +184,14 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 
 	return session, claims, nil, nil
+}
+
+func renewalFailedRecently(session *session.SessionState) bool {
+	if session.RenewalFailedAt.IsZero() {
+		return false
+	}
+
+	return time.Since(session.RenewalFailedAt) < renewalRetryInterval
 }
 
 func checkIdpTokenExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {

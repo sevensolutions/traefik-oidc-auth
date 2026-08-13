@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/sevensolutions/traefik-oidc-auth/src/config"
 	"github.com/sevensolutions/traefik-oidc-auth/src/logging"
 	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
@@ -109,25 +110,91 @@ func newRenewalTest(t *testing.T, tokenIsActive bool) *TraefikOidcAuth {
 	return toa
 }
 
-func TestValidateSessionTicket_KeepsValidSessionWhenRenewalFails(t *testing.T) {
-	toa := newRenewalTest(t, true)
+func newLocalValidationRenewalTest(t *testing.T, renewalStatusCode int) (*TraefikOidcAuth, *session.SessionState, *int) {
+	t.Helper()
 
-	sessionState, claims, updatedSession, err := validateSessionTicket(toa, "ticket")
+	privateKey, err := generateRSAKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	renewalAttempts := 0
+
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		renewalAttempts++
+		http.Error(rw, `{"error":"invalid_grant"}`, renewalStatusCode)
+	}))
+	t.Cleanup(tokenServer.Close)
+
+	state := &session.SessionState{
+		Id:             "session-1",
+		AccessToken:    signTestToken(t, privateKey, jwt.MapClaims{"sub": "user-1", "exp": time.Now().Add(10 * time.Minute).Unix()}),
+		RefreshToken:   "current-refresh-token",
+		RefreshedAt:    time.Now().Add(-50 * time.Second),
+		TokenExpiresIn: 60,
+	}
+
+	toa := &TraefikOidcAuth{
+		logger:     logging.CreateLogger(logging.LevelError),
+		httpClient: http.DefaultClient,
+		Config: &config.Config{
+			Provider: &config.ProviderConfig{
+				TokenValidation:       "AccessToken",
+				TokenRenewalThreshold: 0.75,
+			},
+		},
+		SessionStorage:    &fixedSessionStorage{state: state},
+		Jwks:              &oidc.JwksHandler{},
+		DiscoveryDocument: &oidc.OidcDiscovery{TokenEndpoint: tokenServer.URL},
+	}
+
+	jwksServer := setupJWKS(t, toa, privateKey)
+	t.Cleanup(jwksServer.Close)
+
+	return toa, state, &renewalAttempts
+}
+
+func TestValidateSessionTicket_KeepsSessionWhenRenewalFailsTemporarily(t *testing.T) {
+	toa, _, renewalAttempts := newLocalValidationRenewalTest(t, http.StatusInternalServerError)
+
+	sessionState, _, updatedSession, err := validateSessionTicket(toa, "ticket")
 
 	if err != nil {
-		t.Fatalf("expected the still valid session to be kept, got %v", err)
+		t.Fatalf("expected a temporary renewal failure to keep the session, got %v", err)
 	}
 
-	if sessionState == nil || sessionState.AccessToken != "current-access-token" {
-		t.Errorf("expected the current access token to be kept, got %v", sessionState)
+	if sessionState == nil {
+		t.Fatal("expected the current session to be kept")
 	}
 
-	if claims == nil {
-		t.Error("expected the claims of the current token")
+	if updatedSession == nil || updatedSession.RenewalFailedAt.IsZero() {
+		t.Error("expected the failed renewal to be recorded on the session")
 	}
 
-	if updatedSession != nil {
-		t.Error("expected no session update when nothing was renewed")
+	if *renewalAttempts != 1 {
+		t.Errorf("expected one renewal attempt, got %d", *renewalAttempts)
+	}
+
+	if _, _, _, err := validateSessionTicket(toa, "ticket"); err != nil {
+		t.Fatalf("expected the session to still be usable, got %v", err)
+	}
+
+	if *renewalAttempts != 1 {
+		t.Errorf("expected the renewal not to be retried on the next request, got %d attempts", *renewalAttempts)
+	}
+}
+
+func TestValidateSessionTicket_DropsSessionWhenRefreshTokenIsRejected(t *testing.T) {
+	toa, _, _ := newLocalValidationRenewalTest(t, http.StatusBadRequest)
+
+	sessionState, _, _, err := validateSessionTicket(toa, "ticket")
+
+	if err == nil {
+		t.Fatal("expected a rejected refresh token to end the session")
+	}
+
+	if sessionState != nil {
+		t.Errorf("expected no session, got %v", sessionState)
 	}
 }
 

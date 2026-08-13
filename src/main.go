@@ -179,7 +179,7 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		if err == errNoSessionCookie {
+		if err == errNoSessionCookie || err == errNoSession {
 			toa.logger.Log(logging.LevelDebug, "No session is present for the request.")
 		} else {
 			toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
