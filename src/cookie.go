@@ -14,7 +14,7 @@ import (
 
 const (
 	cookieChunkSize = 3072
-	maxCookieChunks = 32
+	maxCookieChunks = 16
 )
 
 func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) error {
