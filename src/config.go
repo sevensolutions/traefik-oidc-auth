@@ -243,11 +243,29 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 
 	}
 
-	for _, header := range cfg.Headers {
+	for i := range cfg.Headers {
+		header := &cfg.Headers[i]
+
 		if header.Value != "" && header.Values != "" {
 			logger.Log(logging.LevelError, "Invalid Header: you can only use one of Value or Values, not both")
 			return nil, errors.New("invalid Header")
 		}
+
+		templateSource := header.Value
+		if templateSource == "" {
+			templateSource = header.Values
+		}
+		if templateSource == "" {
+			continue
+		}
+
+		tpl, err := newTemplate().Parse(templateSource)
+		if err != nil {
+			logger.Log(logging.LevelError, "Invalid template for header %s: %s", header.Name, err.Error())
+			return nil, err
+		}
+
+		header.Template = tpl
 	}
 
 	// Per the OIDC/OAuth2 spec a redirect uri must match exactly. Wildcard matching is an

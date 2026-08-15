@@ -267,17 +267,11 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 				continue
 			}
 
+			if (header.Value != "" || header.Values != "") && header.Template == nil {
+				return fmt.Errorf("header %s has no parsed template", header.Name)
+			}
+
 			if header.Value != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Value)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
@@ -287,27 +281,21 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, err.Error())
 				}
 			} else if header.Values != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Values)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
 				if err != nil {
-					req.Header.Set(header.Name, err.Error())
+					toa.logger.Log(logging.LevelError, "Failed to render the values of header %s: %s", header.Name, err.Error())
+					req.Header.Del(header.Name)
+					continue
 				}
 
 				var values []string
 				err = json.Unmarshal(renderedValue.Bytes(), &values)
 				if err != nil {
-					req.Header.Set(header.Name, err.Error())
+					toa.logger.Log(logging.LevelError, "The values of header %s didn't render to a json array: %s", header.Name, err.Error())
+					req.Header.Del(header.Name)
+					continue
 				}
 
 				if len(values) > 0 {
