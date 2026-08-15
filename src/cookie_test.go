@@ -259,3 +259,27 @@ func TestClearLegacyCodeVerifierCookies_ExpiresHostnameAndHostOnly(t *testing.T)
 			hasHostname, hasHostOnly, headers)
 	}
 }
+
+func TestReadChunkedCookieReportsTruncation(t *testing.T) {
+	req, err := http.NewRequest("GET", "https://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.Chunks", Value: "2"})
+	req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.Session.1", Value: "111"})
+
+	_, err = readChunkedCookie(req, "TraefikOidcAuth.Session")
+
+	if err == nil {
+		t.Fatal("expected a truncated session cookie to be an error")
+	}
+
+	if err == http.ErrNoCookie {
+		t.Error("expected a truncated session cookie to be told apart from a missing one")
+	}
+
+	if !strings.Contains(err.Error(), "truncated") {
+		t.Errorf("expected the error to mention the truncation, got %v", err)
+	}
+}

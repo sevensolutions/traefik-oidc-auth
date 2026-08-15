@@ -56,7 +56,7 @@ func readChunkedCookie(req *http.Request, cookieName string) (string, error) {
 	for i := 0; i < chunkCount; i++ {
 		cookie, err := req.Cookie(fmt.Sprintf("%s.%d", cookieName, i+1))
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("chunk %d of %d is missing, the session cookie was truncated", i+1, chunkCount)
 		}
 
 		value += cookie.Value
