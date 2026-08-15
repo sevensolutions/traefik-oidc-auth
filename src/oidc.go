@@ -254,6 +254,8 @@ func (toa *TraefikOidcAuth) introspectToken(token string) (bool, map[string]inte
 	}
 }
 
+var errRefreshTokenRejected = errors.New("the provider rejected the refresh token")
+
 func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResponse, error) {
 	urlValues := url.Values{
 		"grant_type":    {"refresh_token"},
@@ -277,7 +279,12 @@ func (toa *TraefikOidcAuth) renewToken(refreshToken string) (*oidc.OidcTokenResp
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		toa.logger.Log(logging.LevelError, "renewToken: received bad HTTP response from Provider: %s", string(body))
+		toa.logger.Log(logging.LevelError, "renewToken: received bad HTTP response from Provider (Status: %d): %s", resp.StatusCode, string(body))
+
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != http.StatusTooManyRequests {
+			return nil, errRefreshTokenRejected
+		}
+
 		return nil, errors.New("invalid status code")
 	}
 
