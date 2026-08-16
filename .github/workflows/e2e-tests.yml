@@ -11,6 +11,9 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # so it can comment the test report
     defaults:
       run:
         working-directory: ./e2e
@@ -52,18 +55,15 @@ jobs:
         with:
           report-path: './e2e/ctrf/*.json'
           github-report: true
-        if: always()
-
-      - name: Publish Test Report with Insights
-        uses: ctrf-io/github-test-reporter@v1
-        with:
-          report-path: './e2e/ctrf/*.json'
+          pull-request: true
           summary-delta-report: true
           insights-report: true
           flaky-rate-report: true
           fail-rate-report: true
           slowest-report: true
           upload-artifact: true
+          update-comment: true
+          comment-tag: 'e2e-test-report'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: always()
