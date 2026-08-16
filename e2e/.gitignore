@@ -1,5 +1,6 @@
 node_modules/
 /test-results/
+/ctrf/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
