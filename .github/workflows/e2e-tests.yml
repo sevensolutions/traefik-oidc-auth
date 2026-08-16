@@ -50,14 +50,14 @@ jobs:
       - name: Publish Test Report
         uses: ctrf-io/github-test-reporter@v1
         with:
-          report-path: './ctrf/*.json'
+          report-path: './e2e/ctrf/*.json'
           github-report: true
         if: always()
 
       - name: Publish Test Report with Insights
         uses: ctrf-io/github-test-reporter@v1
         with:
-          report-path: './ctrf/*.json'
+          report-path: './e2e/ctrf/*.json'
           summary-delta-report: true
           insights-report: true
           flaky-rate-report: true

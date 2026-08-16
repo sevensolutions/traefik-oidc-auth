@@ -25,7 +25,7 @@ export default defineConfig({
   reporter: [
     ['html'],
     ['playwright-ctrf-json-reporter', {
-      outputDir: './e2e/ctrf'
+      outputDir: './ctrf'
     }]
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
