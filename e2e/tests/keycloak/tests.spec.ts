@@ -123,6 +123,65 @@ test("logout", async ({ page }) => {
   expect(logoutResponse?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
 });
 
+test("login and logout using Redis session storage", async ({ page }) => {
+  await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    oidc-auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+          SessionStorageType: Redis
+          Redis:
+            Address: "redis:6379"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["oidc-auth@file"]
+`);
+
+  await expectGotoOkay(page, "http://localhost:9080");
+
+  const response = await login(page, "admin", "admin", "http://localhost:9080");
+
+  expect(response.status()).toBe(200);
+
+  // With Redis storage the cookie should only hold a short, opaque session id (a UUID), not the
+  // large encrypted blob Cookie storage would produce - this confirms Redis storage is actually
+  // in effect rather than the config being silently ignored.
+  const cookies = await page.context().cookies();
+  const sessionCookies = cookies.filter(c => c.name.startsWith("TraefikOidcAuth.Session"));
+
+  expect(sessionCookies).toHaveLength(1);
+  expect(sessionCookies[0].value).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+
+  const logoutResponse = await page.goto("http://localhost:9080/logout");
+
+  // After logout we should be at the login page again
+  expect(logoutResponse?.url()).toMatch(/http:\/\/localhost:8000\/realms\/master\/protocol\/openid-connect\/auth.*/);
+
+  // Logging back in should work too, proving the plugin can round-trip through Redis more than once.
+  await expectGotoOkay(page, "http://localhost:9080");
+
+  const secondLoginResponse = await login(page, "admin", "admin", "http://localhost:9080");
+
+  expect(secondLoginResponse.status()).toBe(200);
+});
+
 test("test two services is seamless", async ({ page }) => {
   await configureTraefik(`
 http:

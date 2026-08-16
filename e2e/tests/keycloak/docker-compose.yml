@@ -1,4 +1,9 @@
 services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.2.5
     restart: unless-stopped
