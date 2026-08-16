@@ -1,12 +1,8 @@
-// Package redisclient is a minimal, in-process, pure-Go Redis client. It is NOT a wrapper
-// around the redis-cli binary or any other subprocess - it opens its own net.Conn/tls.Conn TCP
-// socket and speaks the RESP2 wire protocol directly, the same way net/http speaks HTTP for the
-// OIDC provider calls elsewhere in this codebase.
-//
+// Package redisclient is a minimal, pure-Go Redis client.
 // This exists because traefik-oidc-auth runs inside Traefik via yaegi (a Go interpreter), which
-// only supports pure-Go code built from its bundled stdlib symbol table - no cgo, no unsafe, no
-// large third-party dependency trees. The official redis/go-redis client can't be interpreted by
-// yaegi, so this package implements only the handful of commands session storage actually needs
+// only supports pure-Go code built from its bundled stdlib symbol table - no cgo, no unsafe, etc.
+// The official redis/go-redis client can't be interpreted by yaegi,
+// so this package implements only the handful of commands session storage actually needs
 // (SET, GET, DEL, AUTH, SELECT, PING) using nothing but net, crypto/tls, bufio, strconv and
 // strings - packages already proven to work under yaegi elsewhere in this plugin.
 package redisclient

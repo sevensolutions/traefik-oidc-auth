@@ -318,7 +318,7 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		// non-zero MaxAge longer than the Redis TTL), the cookie may still be presented after its
 		// backing Redis entry was reaped for inactivity, forcing an unexpected re-login.
 		if cfg.SessionCookie != nil && cfg.SessionCookie.MaxAge > 0 && cfg.Redis.SessionTimeout > 0 && cfg.Redis.SessionTimeout < cfg.SessionCookie.MaxAge {
-			logger.Log(logging.LevelWarn, "Redis.SessionTimeout (%ds) is shorter than SessionCookie.MaxAge (%ds) -- the session cookie may outlive its backing Redis entry, forcing an unexpected re-login. Consider setting Redis.SessionTimeout to at least SessionCookie.MaxAge.", cfg.Redis.SessionTimeout, cfg.SessionCookie.MaxAge)
+			logger.Log(logging.LevelWarn, "Redis.SessionTimeout (%ds) is shorter than SessionCookie.MaxAge (%ds). The session cookie may outlive its backing Redis entry, forcing an unexpected re-login. Consider setting Redis.SessionTimeout to at least SessionCookie.MaxAge.", cfg.Redis.SessionTimeout, cfg.SessionCookie.MaxAge)
 		}
 		// Dialing happens lazily on first use, so a momentarily unreachable Redis doesn't fail
 		// plugin startup - errors surface per-request instead, same as any other session storage error.
