@@ -77,6 +77,13 @@ func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.Se
 	if err != nil {
 		return nil, false, claims, fmt.Errorf("failed to validate session ticket: %s", err.Error())
 	}
+	if session == nil {
+		// A storage backend may legitimately report "no session" without an error (eg. a Redis
+		// miss - the ticket doesn't error out because it's just an opaque id, not an encrypted
+		// blob whose decryption would fail). Callers of getSessionForRequest all key off err, so
+		// this has to surface as one, the same as every other "no usable session" case above.
+		return nil, false, claims, fmt.Errorf("no session found for the given session ticket")
+	}
 
 	if toa.logger.MinLevel == logging.LevelDebug {
 		tokenExpiresText := ""

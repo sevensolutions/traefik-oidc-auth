@@ -465,6 +465,13 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *session.SessionState) {
 	toa.logger.Log(logging.LevelInfo, "Logging out...")
 
+	// Best-effort server-side revocation (a no-op for storage backends with no server-side
+	// state, e.g. Cookie). Logged but not fatal - don't block the user's logout on a transient
+	// storage error; the browser cookie itself is still cleared later, in handleCallback.
+	if err := toa.SessionStorage.ClearSession(toa.logger, toa.Config, session.Id); err != nil {
+		toa.logger.Log(logging.LevelWarn, "Failed to clear session from storage: %s", err.Error())
+	}
+
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 
 	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)

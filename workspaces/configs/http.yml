@@ -49,6 +49,9 @@ http:
           #ValidPostLoginRedirectUris: ["https://google.at"]
           #ValidPostLogoutRedirectUris: ["https://google.at"]
           #PostLoginRedirectUri: "/"
+          SessionStorageType: "Redis"
+          Redis:
+            Address: "redis:6379"
 
   routers:
     whoami:

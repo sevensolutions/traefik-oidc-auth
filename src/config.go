@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -43,6 +44,7 @@ func CreateConfig() *config.Config {
 		LogoutUri:             "/logout",
 		PostLogoutRedirectUri: "/",
 		CookieNamePrefix:      "TraefikOidcAuth",
+		SessionStorageType:    config.SessionStorageTypeCookie,
 		SessionCookie: &config.SessionCookieConfig{
 			Path:     "/",
 			Domain:   "",
@@ -50,6 +52,13 @@ func CreateConfig() *config.Config {
 			HttpOnly: true,
 			SameSite: "default",
 			MaxAge:   0,
+		},
+		Redis: &config.RedisSessionStorageConfig{
+			Database:       0,
+			KeyPrefix:      "TraefikOidcAuth:Session:",
+			SessionTimeout: 86400, // 24h sliding TTL, refreshed on every session store/renewal
+			PoolSize:       10,
+			DialTimeout:    5,
 		},
 		AuthorizationHeader:     &config.AuthorizationHeaderConfig{},
 		AuthorizationCookie:     &config.AuthorizationCookieConfig{},
@@ -93,6 +102,21 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	cfg.LogoutUri = utils.ExpandEnvironmentVariableString(cfg.LogoutUri)
 	cfg.PostLogoutRedirectUri = utils.ExpandEnvironmentVariableString(cfg.PostLogoutRedirectUri)
 	cfg.CookieNamePrefix = utils.ExpandEnvironmentVariableString(cfg.CookieNamePrefix)
+	cfg.SessionStorageType = utils.ExpandEnvironmentVariableString(cfg.SessionStorageType)
+	if cfg.Redis != nil {
+		cfg.Redis.Address = utils.ExpandEnvironmentVariableString(cfg.Redis.Address)
+		cfg.Redis.Username = utils.ExpandEnvironmentVariableString(cfg.Redis.Username)
+		cfg.Redis.Password = utils.ExpandEnvironmentVariableString(cfg.Redis.Password)
+		cfg.Redis.KeyPrefix = utils.ExpandEnvironmentVariableString(cfg.Redis.KeyPrefix)
+		cfg.Redis.TLSBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Redis.TLS, cfg.Redis.TLSBool)
+		if err != nil {
+			return nil, err
+		}
+		cfg.Redis.InsecureSkipVerifyBool, err = utils.ExpandEnvironmentVariableBoolean(cfg.Redis.InsecureSkipVerify, cfg.Redis.InsecureSkipVerifyBool)
+		if err != nil {
+			return nil, err
+		}
+	}
 	cfg.UnauthenticatedBehavior = utils.ExpandEnvironmentVariableString(cfg.UnauthenticatedBehavior)
 	cfg.UnauthorizedBehavior = utils.ExpandEnvironmentVariableString(cfg.UnauthorizedBehavior)
 	cfg.BypassAuthenticationRule = utils.ExpandEnvironmentVariableString(cfg.BypassAuthenticationRule)
@@ -279,6 +303,31 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		Transport: httpTransport,
 	}
 
+	var sessionStorage session.SessionStorage
+
+	switch cfg.SessionStorageType {
+	case "", config.SessionStorageTypeCookie:
+		sessionStorage = session.CreateCookieSessionStorage()
+	case config.SessionStorageTypeRedis:
+		if cfg.Redis == nil || cfg.Redis.Address == "" {
+			logger.Log(logging.LevelError, "SessionStorageType is Redis but Redis.Address is not configured")
+			return nil, errors.New("SessionStorageType is Redis but Redis.Address is not configured")
+		}
+		// Redis.SessionTimeout is a sliding idle timeout, refreshed on every StoreSession call, so
+		// an active session never actually hits it. But if the browser cookie can outlive it (a
+		// non-zero MaxAge longer than the Redis TTL), the cookie may still be presented after its
+		// backing Redis entry was reaped for inactivity, forcing an unexpected re-login.
+		if cfg.SessionCookie != nil && cfg.SessionCookie.MaxAge > 0 && cfg.Redis.SessionTimeout > 0 && cfg.Redis.SessionTimeout < cfg.SessionCookie.MaxAge {
+			logger.Log(logging.LevelWarn, "Redis.SessionTimeout (%ds) is shorter than SessionCookie.MaxAge (%ds) -- the session cookie may outlive its backing Redis entry, forcing an unexpected re-login. Consider setting Redis.SessionTimeout to at least SessionCookie.MaxAge.", cfg.Redis.SessionTimeout, cfg.SessionCookie.MaxAge)
+		}
+		// Dialing happens lazily on first use, so a momentarily unreachable Redis doesn't fail
+		// plugin startup - errors surface per-request instead, same as any other session storage error.
+		sessionStorage = session.CreateRedisSessionStorage(cfg.Redis)
+	default:
+		logger.Log(logging.LevelError, "Invalid SessionStorageType '%s'", cfg.SessionStorageType)
+		return nil, fmt.Errorf("invalid SessionStorageType '%s'", cfg.SessionStorageType)
+	}
+
 	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")
 
 	return &TraefikOidcAuth{
@@ -289,7 +338,7 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 		ClientJwtPrivateKey:         clientAssertionPrivateKey,
 		CallbackURL:                 parsedCallbackURL,
 		Config:                      cfg,
-		SessionStorage:              session.CreateCookieSessionStorage(),
+		SessionStorage:              sessionStorage,
 		BypassAuthenticationRule:    conditionalAuth,
 		RedirectUriWildcardsEnabled: redirectUriWildcardsEnabled,
 	}, nil
