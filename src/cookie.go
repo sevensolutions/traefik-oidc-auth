@@ -12,8 +12,17 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
-func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) {
-	cookieChunks := utils.ChunkString(cookieValue, 3072)
+const (
+	cookieChunkSize = 3072
+	maxCookieChunks = 16
+)
+
+func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) error {
+	cookieChunks := utils.ChunkString(cookieValue, cookieChunkSize)
+
+	if len(cookieChunks) > maxCookieChunks {
+		return fmt.Errorf("the session needs %d cookie chunks but only %d are supported", len(cookieChunks), maxCookieChunks)
+	}
 
 	baseCookie := createSessionCookie(config)
 	baseCookie.Name = cookieName
@@ -35,6 +44,8 @@ func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName
 			http.SetCookie(rw, c)
 		}
 	}
+
+	return nil
 }
 func readChunkedCookie(req *http.Request, cookieName string) (string, error) {
 	chunkCount, err := getChunkedCookieCount(req, cookieName)
@@ -75,49 +86,39 @@ func getChunkedCookieCount(req *http.Request, cookieName string) (int, error) {
 		return 0, err
 	}
 
-	return chunkCount, nil
-}
-func getChunkedCookieNames(req *http.Request, cookieName string) (map[string]struct{}, error) {
-	cookieNames := make(map[string]struct{})
-	chunkCount, err := getChunkedCookieCount(req, cookieName)
-	if err != nil {
-		return nil, err
-	}
-	if chunkCount == 0 {
-		cookieNames[cookieName] = struct{}{}
-	} else {
-		cookieNames[cookieName+".Chunks"] = struct{}{}
-		for i := 0; i < chunkCount; i++ {
-			cookieNames[fmt.Sprintf("%s.%d", cookieName, i+1)] = struct{}{}
-		}
-	}
-	return cookieNames, nil
-}
-func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) error {
-	chunkCount, err := getChunkedCookieCount(req, cookieName)
-	if err != nil {
-		return err
+	if chunkCount < 0 || chunkCount > maxCookieChunks {
+		return 0, fmt.Errorf("cookie %s.Chunks contains an out of range chunk count of %d", cookieName, chunkCount)
 	}
 
+	return chunkCount, nil
+}
+func clearChunkedCookie(config *config.Config, rw http.ResponseWriter, req *http.Request, cookieName string) {
 	baseCookie := createSessionCookie(config)
-	baseCookie.Name = cookieName
 	baseCookie.Value = ""
 	makeCookieExpireImmediately(baseCookie)
 
-	if chunkCount == 0 {
-		http.SetCookie(rw, baseCookie)
-	} else {
-		c := baseCookie
-		c.Name = cookieName + ".Chunks"
-		http.SetCookie(rw, c)
+	for _, name := range presentChunkedCookieNames(req, cookieName) {
+		c := *baseCookie
+		c.Name = name
+		http.SetCookie(rw, &c)
+	}
+}
 
-		for i := 0; i < chunkCount; i++ {
-			c.Name = fmt.Sprintf("%s.%d", cookieName, i+1)
-			http.SetCookie(rw, c)
+func presentChunkedCookieNames(req *http.Request, cookieName string) []string {
+	names := []string{cookieName}
+	prefix := cookieName + "."
+
+	for _, c := range req.Cookies() {
+		if len(names) >= maxCookieChunks+2 {
+			break
+		}
+
+		if strings.HasPrefix(c.Name, prefix) {
+			names = append(names, c.Name)
 		}
 	}
 
-	return nil
+	return names
 }
 
 func parseCookieSameSite(sameSite string) http.SameSite {
