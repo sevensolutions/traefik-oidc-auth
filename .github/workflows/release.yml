@@ -63,7 +63,7 @@ jobs:
           file="sbom-${{ steps.version.outputs.tag }}.cdx.json"
           # The plugin is Yaegi-interpreted, never compiled, so this is generated
           # from the go.mod/go.sum module graph rather than from a built binary.
-          cyclonedx-gomod mod -licenses -json -output "$file" ./src
+          cyclonedx-gomod mod -licenses -json -output "$file" .
 
           echo "file=$file" >> "$GITHUB_OUTPUT"
 
