@@ -34,6 +34,7 @@ func CreateConfig() *config.Config {
 			ValidateAudienceBool:      true,
 			TokenValidation:           "IdToken",
 			TokenRenewalThreshold:     0.75,
+			ClockSkewTolerance:        0,
 			UseClaimsFromUserInfoBool: false,
 		},
 		// Note: It looks like we're not allowed to specify a default value for arrays here.
@@ -186,6 +187,11 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	if cfg.Provider.TokenRenewalThreshold < 0.5 || cfg.Provider.TokenRenewalThreshold > 1.0 {
 		logger.Log(logging.LevelError, "Invalid TokenRenewalThreshold. The value must be >= 0.5 and <= 1.0.")
 		return nil, errors.New("invalid TokenRenewalThreshold")
+	}
+
+	if cfg.Provider.ClockSkewTolerance < 0 || cfg.Provider.ClockSkewTolerance > 300 {
+		logger.Log(logging.LevelError, "Invalid ClockSkewTolerance. The value must be >= 0 and <= 300 seconds.")
+		return nil, errors.New("invalid ClockSkewTolerance")
 	}
 
 	var conditionalAuth *rules.RequestCondition
