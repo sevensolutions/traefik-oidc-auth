@@ -1,6 +1,7 @@
 package src
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -48,5 +49,24 @@ func TestSessionIdpTokenExpiration(t *testing.T) {
 
 	if !expiresSoon {
 		t.Fail()
+	}
+}
+
+func TestValidateToken_MissingToken(t *testing.T) {
+	toa := &TraefikOidcAuth{
+		logger: logging.CreateLogger(logging.LevelError),
+		Config: &config.Config{
+			Provider: &config.ProviderConfig{TokenValidation: "IdToken"},
+		},
+	}
+
+	ok, _, err := toa.validateToken(&session.SessionState{AccessToken: "only-an-access-token"})
+
+	if ok {
+		t.Fatal("expected a session without an id token to be rejected")
+	}
+
+	if err == nil || !strings.Contains(err.Error(), "id_token") {
+		t.Errorf("expected the error to name the missing token, got %v", err)
 	}
 }

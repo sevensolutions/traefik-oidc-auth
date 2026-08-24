@@ -208,6 +208,10 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 		}
 	}
 
+	if token == "" {
+		return false, nil, fmt.Errorf("the session contains no %s, which is required by TokenValidation '%s'", validatedTokenName(toa.Config.Provider.TokenValidation), toa.Config.Provider.TokenValidation)
+	}
+
 	if toa.Config.Provider.TokenValidation == "Introspection" {
 		return toa.introspectToken(token)
 	}
@@ -233,6 +237,14 @@ func (toa *TraefikOidcAuth) validateToken(session *session.SessionState) (bool, 
 	}
 
 	return ok, claims, err
+}
+
+func validatedTokenName(tokenValidation string) string {
+	if tokenValidation == "IdToken" {
+		return "id_token"
+	}
+
+	return "access_token"
 }
 
 func (toa *TraefikOidcAuth) storeSessionAndAttachCookie(session *session.SessionState, rw http.ResponseWriter) {
