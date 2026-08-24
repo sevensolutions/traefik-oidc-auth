@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
@@ -302,6 +303,7 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 
 	httpClient := &http.Client{
 		Transport: httpTransport,
+		Timeout:   30 * time.Second,
 	}
 
 	logger.Log(logging.LevelInfo, "Configuration loaded successfully, starting OIDC Auth middleware...")

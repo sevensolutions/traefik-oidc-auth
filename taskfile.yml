@@ -44,7 +44,7 @@ tasks:
     desc: 'Run all go unit tests'
     dir: 'src'
     cmds:
-      - go test
+      - go test -race ./...
   test:e2e:
     desc: 'Run all end to end tests'
     dir: 'e2e'
