@@ -179,7 +179,11 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+		if err == errNoSessionCookie || err == errNoSession {
+			toa.logger.Log(logging.LevelDebug, "No session is present for the request.")
+		} else {
+			toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+		}
 
 		// Clear the session cookie
 		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
