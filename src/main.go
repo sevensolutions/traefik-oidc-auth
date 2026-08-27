@@ -465,13 +465,6 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html
 
-	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Error while parsing the AuthorizationEndpoint: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	callbackUri := toa.GetAbsoluteCallbackURL(req).String()
 	redirectUri := utils.EnsureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
 
@@ -481,16 +474,31 @@ func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Reque
 	}
 
 	if redirectUriFromQuery != "" {
-		redirectUriFromQuery, err = utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris, toa.RedirectUriWildcardsEnabled)
+		validatedRedirectUri, err := utils.ValidateRedirectUri(redirectUriFromQuery, toa.Config.ValidPostLogoutRedirectUris, toa.RedirectUriWildcardsEnabled)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "%s", err.Error())
 			http.Error(rw, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		if redirectUriFromQuery != "" {
-			redirectUri = utils.EnsureAbsoluteUrl(req, redirectUriFromQuery)
+		if validatedRedirectUri != "" {
+			redirectUri = utils.EnsureAbsoluteUrl(req, validatedRedirectUri)
 		}
+	}
+
+	clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+
+	if toa.DiscoveryDocument.EndSessionEndpoint == "" {
+		toa.logger.Log(logging.LevelWarn, "The provider doesn't provide an end_session_endpoint, so the session at the provider can't be ended. The local session has been cleared.")
+		http.Redirect(rw, req, redirectUri, http.StatusFound)
+		return
+	}
+
+	endSessionURL, err := url.Parse(toa.DiscoveryDocument.EndSessionEndpoint)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Error while parsing the EndSessionEndpoint: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	state := &oidc.OidcState{
