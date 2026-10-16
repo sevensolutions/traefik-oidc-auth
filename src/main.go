@@ -340,7 +340,31 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	redirectUrl := state.RedirectUrl
 
 	if state.Action == "Login" {
-		authCode := req.URL.Query().Get("code")
+		query := req.URL.Query()
+
+		// The identity provider redirects back with an error instead of a code when it can't or won't
+		// complete the login, see https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
+		if idpError := query.Get("error"); idpError != "" {
+			errorDescription := query.Get("error_description")
+			toa.logger.Log(logging.LevelWarn, "The identity provider returned an error: %s (%s)", idpError, errorDescription)
+
+			// Keycloak returns this when the login flow of this browser tab has expired, but the browser
+			// already has an SSO session (e.g. another tab logged in meanwhile). A fresh authorization
+			// request completes without a prompt, which is also what keycloak-js does.
+			if idpError == "temporarily_unavailable" && errorDescription == "authentication_expired" && !state.Retried {
+				toa.redirectToProviderWithRetry(rw, req, redirectUrl, state.IsChallenge, true)
+				return
+			}
+
+			if idpError == "access_denied" {
+				toa.writeUnauthorizedError(rw, req)
+			} else {
+				toa.writeUnauthenticatedError(rw, req)
+			}
+			return
+		}
+
+		authCode := query.Get("code")
 		if authCode == "" {
 			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
@@ -677,6 +701,12 @@ var reservedAuthorizationParams = map[string]bool{
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool) {
+	toa.redirectToProviderWithRetry(rw, req, redirectUrl, isChallenge, false)
+}
+
+// redirectToProviderWithRetry is redirectToProvider, but also records in the state whether this login
+// was restarted from the callback (see OidcState.Retried).
+func (toa *TraefikOidcAuth) redirectToProviderWithRetry(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool, retried bool) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
 
 	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
@@ -685,6 +715,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		Action:      "Login",
 		RedirectUrl: redirectUrl,
 		IsChallenge: isChallenge,
+		Retried:     retried,
 	}
 
 	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
