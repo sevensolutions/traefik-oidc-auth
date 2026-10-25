@@ -13,6 +13,7 @@ export async function configureTraefik(yaml: string) {
     fs.writeFileSync(filePath, yaml);
 
     // Wait some time for traefik to reload the config
-    await new Promise(r => setTimeout(r, 2000));
+    // Note: Traefik has a throttle duration of 2s.
+    await new Promise(r => setTimeout(r, 2500));
   }
 }

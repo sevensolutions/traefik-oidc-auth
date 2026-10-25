@@ -11,11 +11,21 @@ type OidcState struct {
 	Action      string `json:"action"`
 	RedirectUrl string `json:"redirect_url"`
 
+	// CodeVerifier is the PKCE code_verifier for this login flow.
+	// Stored plaintext here; EncodeState encrypts the whole state blob.
+	// Carried in state so parallel login redirects cannot overwrite each other via a shared cookie.
+	CodeVerifier string `json:"cv,omitempty"`
+
 	// Set when this login was triggered by UnauthorizedBehavior's Challenge (an authorization
 	// re-check that failed), as opposed to a plain unauthenticated login. Carried through the
 	// callback so the resulting session can be marked as having already attempted a challenge,
 	// regardless of which middleware instance's rules end up handling the callback.
 	IsChallenge bool `json:"is_challenge"`
+
+	// Set when this login was restarted from the callback after the identity provider reported that
+	// the previous login flow had expired. A second failure is not retried again, so the callback
+	// cannot turn into a redirect loop.
+	Retried bool `json:"retried,omitempty"`
 }
 
 // EncodeState serializes and encrypts the state so it can be safely round-tripped through the

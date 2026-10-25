@@ -179,7 +179,11 @@ func (toa *TraefikOidcAuth) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		toa.next.ServeHTTP(rw, req)
 		return
 	} else {
-		toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+		if err == errNoSessionCookie || err == errNoSession {
+			toa.logger.Log(logging.LevelDebug, "No session is present for the request.")
+		} else {
+			toa.logger.Log(logging.LevelInfo, "Verifying token: %s", err.Error())
+		}
 
 		// Clear the session cookie
 		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
@@ -267,17 +271,11 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 				continue
 			}
 
+			if (header.Value != "" || header.Values != "") && header.Template == nil {
+				return fmt.Errorf("header %s has no parsed template", header.Name)
+			}
+
 			if header.Value != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Value)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
@@ -287,27 +285,21 @@ func (toa *TraefikOidcAuth) attachHeaders(req *http.Request, session *session.Se
 					req.Header.Set(header.Name, err.Error())
 				}
 			} else if header.Values != "" {
-				if header.Template == nil {
-					tpl, err := newTemplate().Parse(header.Values)
-
-					if err != nil {
-						return err
-					}
-
-					header.Template = tpl
-				}
-
 				var renderedValue bytes.Buffer
 				err := header.Template.Execute(&renderedValue, evalContext)
 
 				if err != nil {
-					req.Header.Set(header.Name, err.Error())
+					toa.logger.Log(logging.LevelError, "Failed to render the values of header %s: %s", header.Name, err.Error())
+					req.Header.Del(header.Name)
+					continue
 				}
 
 				var values []string
 				err = json.Unmarshal(renderedValue.Bytes(), &values)
 				if err != nil {
-					req.Header.Set(header.Name, err.Error())
+					toa.logger.Log(logging.LevelError, "The values of header %s didn't render to a json array: %s", header.Name, err.Error())
+					req.Header.Del(header.Name)
+					continue
 				}
 
 				if len(values) > 0 {
@@ -348,14 +340,38 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	redirectUrl := state.RedirectUrl
 
 	if state.Action == "Login" {
-		authCode := req.URL.Query().Get("code")
+		query := req.URL.Query()
+
+		// The identity provider redirects back with an error instead of a code when it can't or won't
+		// complete the login, see https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
+		if idpError := query.Get("error"); idpError != "" {
+			errorDescription := query.Get("error_description")
+			toa.logger.Log(logging.LevelWarn, "The identity provider returned an error: %s (%s)", idpError, errorDescription)
+
+			// Keycloak returns this when the login flow of this browser tab has expired, but the browser
+			// already has an SSO session (e.g. another tab logged in meanwhile). A fresh authorization
+			// request completes without a prompt, which is also what keycloak-js does.
+			if idpError == "temporarily_unavailable" && errorDescription == "authentication_expired" && !state.Retried {
+				toa.redirectToProviderWithRetry(rw, req, redirectUrl, state.IsChallenge, true)
+				return
+			}
+
+			if idpError == "access_denied" {
+				toa.writeUnauthorizedError(rw, req)
+			} else {
+				toa.writeUnauthenticatedError(rw, req)
+			}
+			return
+		}
+
+		authCode := query.Get("code")
 		if authCode == "" {
 			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
 			return
 		}
 
-		token, err := exchangeAuthCode(toa, req, authCode)
+		token, err := exchangeAuthCode(toa, req, authCode, state.CodeVerifier)
 		if err != nil {
 			toa.logger.Log(logging.LevelError, "Exchange Auth Code: %s", err.Error())
 			http.Error(rw, "Failed to exchange auth code", http.StatusInternalServerError)
@@ -364,15 +380,21 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		usedToken := ""
 
-		if toa.Config.Provider.TokenValidation == "AccessToken" {
+		switch toa.Config.Provider.TokenValidation {
+		case "AccessToken", "Introspection":
 			usedToken = token.AccessToken
-		} else if toa.Config.Provider.TokenValidation == "IdToken" {
+		case "IdToken":
 			usedToken = token.IdToken
-		} else if toa.Config.Provider.TokenValidation == "Introspection" {
-			usedToken = token.AccessToken
-		} else {
-			toa.logger.Log(logging.LevelError, "Invalid value '%s' for VerificationToken", toa.Config.Provider.TokenValidation)
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
+		default:
+			toa.logger.Log(logging.LevelError, "Invalid value '%s' for TokenValidation", toa.Config.Provider.TokenValidation)
+			http.Error(rw, "Invalid TokenValidation configuration", http.StatusInternalServerError)
+			return
+		}
+
+		if usedToken == "" {
+			toa.logger.Log(logging.LevelError, "The identity provider didn't return an %s, which is required by TokenValidation '%s'. If you've customized the Scopes, make sure 'openid' is one of them.", validatedTokenName(toa.Config.Provider.TokenValidation), toa.Config.Provider.TokenValidation)
+			http.Error(rw, "Returned token is not valid", http.StatusInternalServerError)
+			return
 		}
 
 		redactedToken := usedToken
@@ -429,17 +451,9 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		toa.storeSessionAndAttachCookie(session, rw)
 
-		http.SetCookie(rw, &http.Cookie{
-			Name:     getCodeVerifierCookieName(toa.Config),
-			Value:    "",
-			Expires:  time.Now().Add(-24 * time.Hour),
-			MaxAge:   -1,
-			Secure:   true,
-			HttpOnly: true,
-			Path:     toa.CallbackURL.Path,
-			Domain:   toa.CallbackURL.Host,
-			SameSite: http.SameSiteDefaultMode,
-		})
+		if toa.Config.Provider.UsePkceBool {
+			clearLegacyCodeVerifierCookies(toa.Config, rw, req, toa.CallbackURL)
+		}
 
 		if redirectUrl != "" {
 			redirectUrl = utils.EnsureAbsoluteUrl(req, redirectUrl)
@@ -676,15 +690,23 @@ func (toa *TraefikOidcAuth) needsDoubleRedirect(req *http.Request) bool {
 
 // Protocol-critical parameters that AuthorizationParams must not be allowed to override.
 var reservedAuthorizationParams = map[string]bool{
-	"response_type": true,
-	"client_id":     true,
-	"redirect_uri":  true,
-	"state":         true,
-	"scope":         true,
-	"resource":      true,
+	"response_type":         true,
+	"client_id":             true,
+	"redirect_uri":          true,
+	"state":                 true,
+	"scope":                 true,
+	"resource":              true,
+	"code_challenge":        true,
+	"code_challenge_method": true,
 }
 
 func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool) {
+	toa.redirectToProviderWithRetry(rw, req, redirectUrl, isChallenge, false)
+}
+
+// redirectToProviderWithRetry is redirectToProvider, but also records in the state whether this login
+// was restarted from the callback (see OidcState.Retried).
+func (toa *TraefikOidcAuth) redirectToProviderWithRetry(rw http.ResponseWriter, req *http.Request, redirectUrl string, isChallenge bool, retried bool) {
 	toa.logger.Log(logging.LevelInfo, "Redirecting to OIDC provider...")
 
 	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
@@ -693,13 +715,7 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		Action:      "Login",
 		RedirectUrl: redirectUrl,
 		IsChallenge: isChallenge,
-	}
-
-	stateBase64, err := oidc.EncodeState(&state, toa.Config.Secret)
-	if err != nil {
-		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
-		http.Error(rw, err.Error(), http.StatusInternalServerError)
-		return
+		Retried:     retried,
 	}
 
 	toa.logger.Log(logging.LevelDebug, "AuthorizationEndPoint: %s", toa.DiscoveryDocument.AuthorizationEndpoint)
@@ -716,7 +732,6 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		"scope":         {strings.Join(toa.Config.Scopes, " ")},
 		"client_id":     {toa.Config.Provider.ClientId},
 		"redirect_uri":  {callbackUrl},
-		"state":         {stateBase64},
 		"resource":      toa.Config.RequestedResources,
 	}
 
@@ -750,27 +765,22 @@ func (toa *TraefikOidcAuth) redirectToProvider(rw http.ResponseWriter, req *http
 		}
 		codeChallenge := base64.RawURLEncoding.EncodeToString(sha2.Sum(nil))
 
-		urlValues.Add("code_challenge_method", "S256")
-		urlValues.Add("code_challenge", codeChallenge)
+		urlValues.Set("code_challenge_method", "S256")
+		urlValues.Set("code_challenge", codeChallenge)
 
-		encryptedCodeVerifier, err := utils.Encrypt(codeVerifier, toa.Config.Secret)
-		if err != nil {
-			http.Error(rw, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		// Plaintext verifier in state; EncodeState encrypts the whole blob (#284).
+		state.CodeVerifier = codeVerifier
 
-		// TODO: Make configurable
-		// TODO does this need domain tweaks?  it is in the login flow
-		http.SetCookie(rw, &http.Cookie{
-			Name:     getCodeVerifierCookieName(toa.Config),
-			Value:    encryptedCodeVerifier,
-			Secure:   true,
-			HttpOnly: true,
-			Path:     toa.CallbackURL.Path,
-			Domain:   toa.CallbackURL.Host,
-			SameSite: http.SameSiteDefaultMode,
-		})
+		clearLegacyCodeVerifierCookies(toa.Config, rw, req, toa.CallbackURL)
 	}
+
+	stateBase64, err := oidc.EncodeState(&state, toa.Config.Secret)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Failed to serialize state: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	urlValues.Set("state", stateBase64)
 
 	authorizationEndpointUrl.RawQuery = urlValues.Encode()
 

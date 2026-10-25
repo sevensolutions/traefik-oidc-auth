@@ -28,6 +28,11 @@ tasks:
     dir: 'workspaces/logto'
     cmds:
       - docker compose up
+  run:authentik:
+    desc: 'Start traefik with the Authentik identity provider'
+    dir: 'workspaces/authentik'
+    cmds:
+      - docker compose up
 
   run:website:
     desc: 'Start the website in development mode'

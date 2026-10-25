@@ -1,0 +1,83 @@
+services:
+  authentik_postgresql:
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_PASSWORD: authentik
+      POSTGRES_USER: authentik
+    healthcheck:
+      interval: 30s
+      retries: 5
+      start_period: 20s
+      test:
+      - CMD-SHELL
+      - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      timeout: 5s
+    image: docker.io/library/postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+    - database:/var/lib/postgresql/data
+  authentik_server:
+    command: server
+    depends_on:
+      authentik_postgresql:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: authentik_postgresql
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_SECRET_KEY: 2OYU6l6QEkT0lgzbwEsg77O4TxTu3Hoa
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2026.8.1}
+    ports:
+    - ${COMPOSE_PORT_HTTP:-9000}:9000
+    - ${COMPOSE_PORT_HTTPS:-9443}:9443
+    restart: unless-stopped
+    shm_size: 512mb
+    volumes:
+    - ./data:/data
+    - ./custom-templates:/templates
+  authentik_worker:
+    command: worker
+    depends_on:
+      authentik_postgresql:
+        condition: service_healthy
+    environment:
+      AUTHENTIK_POSTGRESQL__HOST: authentik_postgresql
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_SECRET_KEY: 2OYU6l6QEkT0lgzbwEsg77O4TxTu3Hoa
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2026.8.1}
+    restart: unless-stopped
+    shm_size: 512mb
+    user: root
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./data:/data
+    - ./certs:/certs
+    - ./custom-templates:/templates
+
+  traefik:
+    image: "traefik:v3.5.0"
+    ports:
+      - "9080:80"
+      - "8080:8080"
+    extra_hosts:
+      - "127-0-0-1.sslip.io:172.17.0.1" # To make OIDC discovery work correctly
+    volumes:
+      - "../configs/traefik-config.yml:/etc/traefik/traefik.yml:ro"
+      - "../configs/http.yml:/etc/traefik/configs/http.yml:ro"
+      - "../..:/plugins-local/src/github.com/sevensolutions/traefik-oidc-auth:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      PROVIDER_URL: http://127-0-0-1.sslip.io:9000/application/o/traefik/
+      CLIENT_ID: 0xTAadASlhNdR3vLYZe8gZexScmGiEygYMrLO3sM
+      CLIENT_SECRET: jQF7Iy6SgfRlhPdDJUC6x2dpSek140E07de5nHbVtNuDOdRQt9kQGi3Im3PMpExu2YNtAxKN1SSTMkaHHeNJyTI7pa527uMG9dGo7088XVUfI8pvlD0SMiUW2UYH5thm
+      VALIDATE_AUDIENCE: true
+
+  whoami:
+    image: "traefik/whoami:latest"
+
+volumes:
+  database:
+    driver: local
