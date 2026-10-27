@@ -149,6 +149,9 @@ func (h *JwksHandler) Keyfunc(token *jwt.Token) (any, error) {
 }
 
 func (h *JwksHandler) getRsaKey(kid string) (*rsa.PublicKey, error) {
+	h.Lock.RLock()
+	defer h.Lock.RUnlock()
+
 	k := h.findRsaKey(kid)
 
 	if k != nil {
@@ -158,6 +161,9 @@ func (h *JwksHandler) getRsaKey(kid string) (*rsa.PublicKey, error) {
 	return nil, errors.New("unknown kid " + kid)
 }
 func (h *JwksHandler) getEcdsaKey(kid string) (*ecdsa.PublicKey, error) {
+	h.Lock.RLock()
+	defer h.Lock.RUnlock()
+
 	k := h.findEcdsaKey(kid)
 
 	if k != nil {
