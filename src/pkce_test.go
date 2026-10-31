@@ -161,6 +161,10 @@ func (m *memSessionStorage) TryGetSession(logger *logging.Logger, cfg *config.Co
 	return nil, nil
 }
 
+func (m *memSessionStorage) ClearSession(logger *logging.Logger, cfg *config.Config, sessionId string) error {
+	return nil
+}
+
 func newCallbackTestAuth(t *testing.T, usePkce bool, tokenURL, introspectURL string) *TraefikOidcAuth {
 	t.Helper()
 	toa := newPkceTestAuth(t)

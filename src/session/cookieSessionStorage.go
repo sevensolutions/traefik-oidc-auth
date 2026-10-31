@@ -44,3 +44,9 @@ func (storage *CookieSessionStorage) TryGetSession(logger *logging.Logger, confi
 
 	return state, nil
 }
+
+// ClearSession is a no-op: the cookie itself IS the session state, there's nothing server-side
+// to delete. The caller is responsible for clearing the cookie.
+func (storage *CookieSessionStorage) ClearSession(logger *logging.Logger, config *config.Config, sessionId string) error {
+	return nil
+}

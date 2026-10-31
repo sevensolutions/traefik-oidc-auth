@@ -6,6 +6,7 @@ import {
   ListChecks,
   KeyRound,
   RefreshCw,
+  Database,
   ArrowUpFromLine,
   GitBranchPlus,
   FileWarning,
@@ -42,6 +43,13 @@ const FEATURES = [
     title: 'Token Auto-Renewal',
     description:
       'Tokens are transparently refreshed before they expire, keeping sessions alive without user interruption.',
+  },
+  {
+    Icon: Database,
+    color: '#14b8a6',
+    title: 'Redis Session Storage',
+    description:
+      'Store sessions in Redis instead of cookies to support multiple Traefik replicas.',
   },
   {
     Icon: ArrowUpFromLine,

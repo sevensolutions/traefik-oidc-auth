@@ -10,6 +10,7 @@ const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 
 const (
 	SessionStorageTypeCookie string = "Cookie"
+	SessionStorageTypeRedis  string = "Redis"
 )
 
 type Config struct {
@@ -37,7 +38,8 @@ type Config struct {
 	PostLogoutRedirectUri       string   `json:"post_logout_redirect_uri"`
 	ValidPostLogoutRedirectUris []string `json:"valid_post_logout_redirect_uris"`
 
-	SessionStorageType string `json:"session_storage_type"`
+	SessionStorageType string                     `json:"session_storage_type"`
+	Redis              *RedisSessionStorageConfig `json:"redis"`
 
 	CookieNamePrefix        string                     `json:"cookie_name_prefix"`
 	SessionCookie           *SessionCookieConfig       `json:"session_cookie"`
@@ -102,6 +104,37 @@ type SessionCookieConfig struct {
 	HttpOnly bool   `json:"http_only"`
 	SameSite string `json:"same_site"`
 	MaxAge   int    `json:"max_age"`
+}
+
+// RedisSessionStorageConfig configures the "Redis" SessionStorageType, which stores session
+// state server-side in Redis instead of embedding it in the session cookie. This is what makes
+// it safe to run multiple Traefik replicas with no shared memory - Cookie storage keeps every
+// replica's view of a session limited to whatever the browser sends back.
+type RedisSessionStorageConfig struct {
+	// host:port of the Redis server.
+	Address  string `json:"address"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Database int    `json:"database"`
+
+	TLS     string `json:"tls"`
+	TLSBool bool   `json:"tls_bool"`
+
+	InsecureSkipVerify     string `json:"insecure_skip_verify"`
+	InsecureSkipVerifyBool bool   `json:"insecure_skip_verify_bool"`
+
+	// Prefix prepended to every Redis key this middleware writes.
+	KeyPrefix string `json:"key_prefix"`
+
+	// TTL, in seconds, applied to a session's Redis entry every time it's (re-)stored. Acts as a
+	// sliding expiration: an active session keeps extending it, an abandoned one is reaped by Redis.
+	SessionTimeout int `json:"session_timeout"`
+
+	// Max number of pooled connections to Redis.
+	PoolSize int `json:"pool_size"`
+
+	// Timeout, in seconds, for establishing a new connection to Redis.
+	DialTimeout int `json:"dial_timeout"`
 }
 
 type AuthorizationHeaderConfig struct {
