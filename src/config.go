@@ -26,7 +26,6 @@ import (
 func CreateConfig() *config.Config {
 	return &config.Config{
 		LogLevel: logging.LevelWarn,
-		Secret:   config.DefaultSecret,
 		Provider: &config.ProviderConfig{
 			UsePkceBool:               false,
 			InsecureSkipVerifyBool:    false,
@@ -141,8 +140,9 @@ func New(uctx context.Context, next http.Handler, cfg *config.Config, name strin
 	cfg.ErrorPages.Unauthorized.FilePath = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthorized.FilePath)
 	cfg.ErrorPages.Unauthorized.RedirectTo = utils.ExpandEnvironmentVariableString(cfg.ErrorPages.Unauthorized.RedirectTo)
 
-	if cfg.Secret == config.DefaultSecret {
-		logger.Log(logging.LevelWarn, "You're using the default secret! It is highly recommended to change the secret by specifying a random 32 character value using the Secret-option.")
+	if cfg.Secret == "" || cfg.Secret == config.DefaultSecret {
+		logger.Log(logging.LevelError, "No secret or the publicly known example secret was configured. Please specify a random 32 character value using the Secret-option.")
+		return nil, errors.New("invalid secret")
 	}
 
 	secret := []byte(cfg.Secret)

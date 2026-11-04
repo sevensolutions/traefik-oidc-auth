@@ -6,6 +6,8 @@ import (
 	"github.com/sevensolutions/traefik-oidc-auth/src/errorPages"
 )
 
+// DefaultSecret was used as a default in earlier versions and is published in the docs.
+// It is rejected at startup because anyone could forge sessions with it.
 const DefaultSecret = "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ"
 
 const (

@@ -14,7 +14,7 @@ http:
       plugin:
         traefik-oidc-auth:
           LogLevel: DEBUG
-          Secret: "MLFs4TT99kOOq8h3UAVRtYoCTDYXiRcZ" # Please change this secret for your setup
+          Secret: "<random-32-character-secret>" # Generate with eg. https://it-tools.tech/token-generator?length=32
           Provider:
             Url: "${PROVIDER_URL}"
             ClientId: "${CLIENT_ID}"
