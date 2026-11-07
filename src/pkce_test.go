@@ -29,6 +29,12 @@ func newPkceTestAuth(t *testing.T) *TraefikOidcAuth {
 			Secret:           "0123456789abcdef0123456789abcdef",
 			CookieNamePrefix: "TraefikOidcAuth",
 			Scopes:           []string{"openid"},
+			SessionCookie: &config.SessionCookieConfig{
+				Path:     "/",
+				Secure:   true,
+				HttpOnly: true,
+				SameSite: "default",
+			},
 			Provider: &config.ProviderConfig{
 				ClientId:    "test-client",
 				UsePkceBool: true,
@@ -214,8 +220,9 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 			toa := newCallbackTestAuth(t, tc.usePkce, server.URL+"/token", server.URL+"/introspect")
 
 			state := &oidc.OidcState{
-				Action:      "Login",
-				RedirectUrl: "https://app.example.com/",
+				Action:         "Login",
+				RedirectUrl:    "https://app.example.com/",
+				BrowserBinding: testBrowserBinding,
 			}
 			if tc.usePkce {
 				state.CodeVerifier = "pkce-verifier-value-for-callback-test-01234567"
@@ -228,6 +235,7 @@ func TestHandleCallback_ClearsLegacyCookiesOnlyWhenPkceEnabled(t *testing.T) {
 			rw := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "https://app.example.com/oidc/callback?code=abc&state="+url.QueryEscape(stateB64), nil)
 			req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.CodeVerifier", Value: "legacy"})
+			req.AddCookie(&http.Cookie{Name: "TraefikOidcAuth.BrowserBinding", Value: testBrowserBinding})
 
 			toa.handleCallback(rw, req)
 

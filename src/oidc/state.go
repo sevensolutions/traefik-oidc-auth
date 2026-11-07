@@ -16,15 +16,22 @@ type OidcState struct {
 	// Carried in state so parallel login redirects cannot overwrite each other via a shared cookie.
 	CodeVerifier string `json:"cv,omitempty"`
 
+	// BrowserBinding ties this state to the browser it was issued to, by matching the value of the
+	// browser binding cookie on the callback. Otherwise a callback URL captured from one browser could be
+	// completed in another one (login CSRF). The state alone can't prove that, since it's handed to the
+	// browser and the identity provider as an opaque bearer value. Only enforced for the Login action.
+	BrowserBinding string `json:"bb,omitempty"`
+
 	// Set when this login was triggered by UnauthorizedBehavior's Challenge (an authorization
 	// re-check that failed), as opposed to a plain unauthenticated login. Carried through the
 	// callback so the resulting session can be marked as having already attempted a challenge,
 	// regardless of which middleware instance's rules end up handling the callback.
 	IsChallenge bool `json:"is_challenge"`
 
-	// Set when this login was restarted from the callback after the identity provider reported that
-	// the previous login flow had expired. A second failure is not retried again, so the callback
-	// cannot turn into a redirect loop.
+	// Set when this login was restarted from the callback, either because the identity provider
+	// reported that the previous login flow had expired, or because the state wasn't bound to the
+	// browser completing it. A login is restarted only once, so the callback cannot turn into a
+	// redirect loop (e.g. when the browser doesn't store the browser binding cookie).
 	Retried bool `json:"retried,omitempty"`
 }
 
