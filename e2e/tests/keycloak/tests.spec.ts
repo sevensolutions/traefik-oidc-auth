@@ -1023,6 +1023,84 @@ http:
   expect(new URL(response.url()).pathname).toBe("/some/deep/path");
 });
 
+for (const usePkce of [false, true]) {
+  test(`test callback state is bound to the initiating browser (UsePkce: ${usePkce})`, async ({ page, browser }) => {
+    await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: ${usePkce}
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["auth@file"]
+`);
+
+    // The attacker starts a login in their own browser and authenticates at the IdP. Playwright can't
+    // intercept the IdP's redirect to the callback, so we answer the login POST ourselves and keep only
+    // the Location header. This way the authorization code stays unused.
+    let capturedCallbackUrl: string | undefined;
+
+    await page.route(/\/login-actions\/authenticate/, async route => {
+      if (route.request().method() !== "POST")
+        return route.continue();
+
+      const response = await route.fetch({ maxRedirects: 0 });
+      capturedCallbackUrl = response.headers()["location"];
+
+      await route.fulfill({ status: 200, contentType: "text/html", body: "" });
+    });
+
+    await expectGotoOkay(page, "http://localhost:9080/");
+
+    await page.getByRole("textbox", { name: "Username or email" }).fill("bob@example.com");
+    await page.getByRole("textbox", { name: "Password" }).fill("bob123");
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    await expect.poll(() => capturedCallbackUrl).toBeDefined();
+
+    // The victim is a separate browser context (no shared cookies) that opens the attacker's callback URL.
+    const victimContext = await browser.newContext({ ignoreHTTPSErrors: true });
+
+    try {
+      const victimPage = await victimContext.newPage();
+      const response = await victimPage.goto(capturedCallbackUrl!);
+
+      // This browser never started the login flow, so the attacker's code must not be used. Instead the
+      // callback restarts the login, which leaves the victim at the identity provider's login form.
+      let callbackRequest = response!.request();
+      while (callbackRequest.redirectedFrom())
+        callbackRequest = callbackRequest.redirectedFrom()!;
+
+      expect(callbackRequest.url()).toBe(capturedCallbackUrl);
+      expect((await callbackRequest.response())?.status()).toBe(302);
+      await expect(victimPage.getByRole("textbox", { name: "Username or email" })).toBeVisible();
+
+      const cookies = await victimContext.cookies();
+      expect(cookies.filter(c => c.name.startsWith("TraefikOidcAuth.Session"))).toHaveLength(0);
+    }
+    finally {
+      await victimContext.close();
+    }
+  });
+}
+
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------

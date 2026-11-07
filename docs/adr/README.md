@@ -25,3 +25,4 @@ One file per decision: `docs/adr/NNNN-short-title.md`.
 | ADR | Title | Status |
 |-----|-------|--------|
 | [0001](0001-pkce-verifier-in-oidc-state.md) | PKCE code_verifier in OIDC state | Accepted |
+| [0002](0002-browser-bound-login-state.md) | Bind the login state to the browser | Accepted |

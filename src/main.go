@@ -326,14 +326,14 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	base64State := req.URL.Query().Get("state")
 	if base64State == "" {
 		toa.logger.Log(logging.LevelWarn, "State on callback request is missing.")
-		http.Error(rw, "State is missing", http.StatusInternalServerError)
+		http.Error(rw, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
 	state, err := oidc.DecodeState(base64State, toa.Config.Secret)
 	if err != nil {
 		toa.logger.Log(logging.LevelWarn, "State on callback request is invalid.")
-		http.Error(rw, "State is invalid", http.StatusInternalServerError)
+		http.Error(rw, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
@@ -368,6 +368,24 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 		if authCode == "" {
 			toa.logger.Log(logging.LevelWarn, "The identity provider didn't return a code.")
 			http.Error(rw, "Code is missing", http.StatusInternalServerError)
+			return
+		}
+
+		// This has to stay below the handling of identity provider errors, which doesn't create a session.
+		// Otherwise a login form left open for longer than the cookie lives wouldn't be able to recover
+		// from an authentication_expired error anymore.
+		if !isBrowserBindingValid(toa.Config, req, state) {
+			// The code is never exchanged here, as it may belong to someone else (login CSRF). Usually it's
+			// just a login which outlived the cookie or lost a race against a parallel one, so start a new
+			// login bound to this browser. At worst, a victim of a forged callback logs in as themselves.
+			if !state.Retried {
+				toa.logger.Log(logging.LevelWarn, "The login wasn't started by this browser. Restarting the login.")
+				toa.redirectToProviderWithRetry(rw, req, redirectUrl, state.IsChallenge, true)
+				return
+			}
+
+			toa.logger.Log(logging.LevelWarn, "The callback was rejected because the login wasn't started by this browser.")
+			http.Error(rw, "Bad Request", http.StatusBadRequest)
 			return
 		}
 
@@ -676,16 +694,13 @@ func (toa *TraefikOidcAuth) handleLogin(rw http.ResponseWriter, req *http.Reques
 	}
 }
 
+// needsDoubleRedirect reports whether the login has to go through the callback URL first, because that's
+// where the browser binding cookie needs to be set. Otherwise the callback wouldn't receive the cookie.
 func (toa *TraefikOidcAuth) needsDoubleRedirect(req *http.Request) bool {
-	if toa.Config.Provider.UsePkceBool {
-		host := utils.GetFullHost(req)
-		callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
-		if !strings.HasPrefix(callbackUrl, host) {
-			return true
-		}
-	}
+	host := utils.GetFullHost(req)
+	callbackUrl := toa.GetAbsoluteCallbackURL(req).String()
 
-	return false
+	return !strings.HasPrefix(callbackUrl, host+"/")
 }
 
 // Protocol-critical parameters that AuthorizationParams must not be allowed to override.
@@ -772,6 +787,13 @@ func (toa *TraefikOidcAuth) redirectToProviderWithRetry(rw http.ResponseWriter, 
 		state.CodeVerifier = codeVerifier
 
 		clearLegacyCodeVerifierCookies(toa.Config, rw, req, toa.CallbackURL)
+	}
+
+	state.BrowserBinding, err = ensureBrowserBinding(toa.Config, rw, req)
+	if err != nil {
+		toa.logger.Log(logging.LevelError, "Failed to create the browser binding: %s", err.Error())
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	stateBase64, err := oidc.EncodeState(&state, toa.Config.Secret)

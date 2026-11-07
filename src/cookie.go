@@ -1,6 +1,8 @@
 package src
 
 import (
+	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,12 +11,18 @@ import (
 	"time"
 
 	"github.com/sevensolutions/traefik-oidc-auth/src/config"
+	"github.com/sevensolutions/traefik-oidc-auth/src/oidc"
 	"github.com/sevensolutions/traefik-oidc-auth/src/utils"
 )
 
 const (
 	cookieChunkSize = 3072
 	maxCookieChunks = 16
+
+	// How long the browser binding cookie lives, in seconds. It's refreshed whenever a login starts.
+	browserBindingMaxAge = 3600
+	// The number of random bytes in a browser binding. Hex encoded, so the value is twice as long.
+	browserBindingBytes = 32
 )
 
 func setChunkedCookies(config *config.Config, rw http.ResponseWriter, cookieName string, cookieValue string) error {
@@ -142,6 +150,76 @@ func makeCookieExpireImmediately(cookie *http.Cookie) *http.Cookie {
 
 func getCodeVerifierCookieName(config *config.Config) string {
 	return makeCookieName(config, "CodeVerifier")
+}
+
+func getBrowserBindingCookieName(config *config.Config) string {
+	return makeCookieName(config, "BrowserBinding")
+}
+
+// ensureBrowserBinding returns the value binding an OIDC state to this browser and attaches the cookie
+// holding it to the response.
+//
+// An existing value is reused so parallel flows of the same browser don't overwrite each other's
+// binding. The cookie is deliberately not cleared after a login, because another flow of this browser
+// may still be in progress. It just expires.
+func ensureBrowserBinding(config *config.Config, rw http.ResponseWriter, req *http.Request) (string, error) {
+	value := ""
+
+	if cookie, err := req.Cookie(getBrowserBindingCookieName(config)); err == nil && isWellFormedBrowserBinding(cookie.Value) {
+		value = cookie.Value
+	} else {
+		value, err = randomBytesInHex(browserBindingBytes)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// SameSite=Strict would never work here, as the callback is a cross-site navigation coming from the
+	// identity provider. None is only kept for those embedding the application in a cross-site frame.
+	sameSite := http.SameSiteLaxMode
+	if config.SessionCookie.SameSite == "none" {
+		sameSite = http.SameSiteNoneMode
+	}
+
+	// Unlike the session cookie, this one always uses Path=/ because a login can start on any path, and
+	// has no Domain so it's only ever valid for the host which started the login.
+	http.SetCookie(rw, &http.Cookie{
+		Name:     getBrowserBindingCookieName(config),
+		Value:    value,
+		Path:     "/",
+		Secure:   config.SessionCookie.Secure,
+		HttpOnly: true,
+		SameSite: sameSite,
+		MaxAge:   browserBindingMaxAge,
+	})
+
+	return value, nil
+}
+
+// isWellFormedBrowserBinding only accepts values ensureBrowserBinding could have generated.
+func isWellFormedBrowserBinding(value string) bool {
+	if len(value) != browserBindingBytes*2 {
+		return false
+	}
+
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+// isBrowserBindingValid reports whether the given state was issued to the browser sending this request.
+// A state without a binding never matches: states don't expire, so accepting one
+// would allow replaying a state issued by an older version.
+func isBrowserBindingValid(config *config.Config, req *http.Request, state *oidc.OidcState) bool {
+	if state.BrowserBinding == "" {
+		return false
+	}
+
+	cookie, err := req.Cookie(getBrowserBindingCookieName(config))
+	if err != nil {
+		return false
+	}
+
+	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(state.BrowserBinding)) == 1
 }
 
 func getSessionCookieName(config *config.Config) string {
