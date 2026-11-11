@@ -1101,6 +1101,90 @@ http:
   });
 }
 
+// Both ways a callback restarts the login carry the redirect url of the state over into the new one.
+const restartingCallbacks = [
+  { name: "authentication_expired", query: "error=temporarily_unavailable&error_description=authentication_expired" },
+  { name: "browser binding mismatch", query: "code=unused" },
+];
+
+for (const callback of restartingCallbacks) {
+  test(`test callback does not redirect to a spoofed X-Forwarded-Host (${callback.name})`, async ({ page, browser }) => {
+    // Traefik only keeps a client's X-Forwarded-Host when it comes from forwardedHeaders.trustedIPs, eg. a load
+    // balancer which passes it on unchanged. The headers middleware stands in for that on the /spoofed router.
+    await configureTraefik(`
+http:
+  services:
+    whoami:
+      loadBalancer:
+        servers:
+          - url: http://whoami:80
+
+  middlewares:
+    auth:
+      plugin:
+        traefik-oidc-auth:
+          LogLevel: DEBUG
+          Provider:
+            Url: "\${PROVIDER_URL_HTTP}"
+            ClientId: "\${CLIENT_ID}"
+            ClientSecret: "\${CLIENT_SECRET}"
+            UsePkce: false
+    spoof-forwarded-host:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Host: "evil.example.com"
+
+  routers:
+    whoami:
+      entryPoints: ["web"]
+      rule: "HostRegexp(\`.+\`)"
+      service: whoami
+      middlewares: ["auth@file"]
+    whoami-spoofed:
+      entryPoints: ["web"]
+      rule: "PathPrefix(\`/spoofed\`)"
+      service: whoami
+      middlewares: ["spoof-forwarded-host@file", "auth@file"]
+`);
+
+    // The attacker starts a login with the forged host. They only need the state from the redirect to the identity
+    // provider, which points to their host.
+    const loginResponse = await page.request.get("http://localhost:9080/spoofed/", {
+      headers: { Accept: "text/html" },
+      maxRedirects: 0
+    });
+
+    expect(loginResponse.status()).toBe(302);
+    const authorizeUrl = new URL(loginResponse.headers()["location"]);
+    expect(authorizeUrl.searchParams.get("redirect_uri")).toBe("http://evil.example.com/oidc/callback");
+    const state = authorizeUrl.searchParams.get("state")!;
+
+    const victimContext = await browser.newContext({ ignoreHTTPSErrors: true });
+
+    try {
+      // The victim opens a callback url with that state. Their own request carries no forged host, and the
+      // callback restarts the login at the identity provider.
+      const victimPage = await victimContext.newPage();
+      await expectGotoOkay(victimPage, `http://localhost:9080/oidc/callback?state=${encodeURIComponent(state)}&${callback.query}`);
+
+      const callbackResponsePromise = victimPage.waitForResponse(r => r.url().startsWith("http://localhost:9080/oidc/callback"));
+
+      await victimPage.getByRole("textbox", { name: "Username or email" }).fill("admin");
+      await victimPage.getByRole("textbox", { name: "Password" }).fill("admin");
+      await victimPage.getByRole("button", { name: "Sign In" }).click();
+
+      // After logging in, the callback must send the victim to this host instead of the attacker's.
+      const callbackResponse = await callbackResponsePromise;
+      expect(callbackResponse.status()).toBe(302);
+      expect(callbackResponse.headers()["location"]).toBe("http://localhost:9080/");
+      await expect(victimPage).toHaveURL("http://localhost:9080/");
+    }
+    finally {
+      await victimContext.close();
+    }
+  });
+}
+
 //-----------------------------------------------------------------------------
 // Helper functions
 //-----------------------------------------------------------------------------

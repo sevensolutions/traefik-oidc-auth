@@ -146,6 +146,34 @@ func EnsureAbsoluteUrl(req *http.Request, url string) string {
 	}
 }
 
+// IsSameOriginOrRelative reports whether rawUrl is safe to redirect to: a path on this host, or an
+// absolute url with the same scheme and host as fullHost (eg. "https://app.example.com", see GetFullHost).
+func IsSameOriginOrRelative(rawUrl string, fullHost string) bool {
+	// Browsers drop tabs and newlines from urls and treat "\" like "/", so eg. "/\t/evil.com" and
+	// "/\evil.com" would both end up as the protocol-relative "//evil.com".
+	for _, r := range rawUrl {
+		if r < 0x20 || r == 0x7f || r == '\\' {
+			return false
+		}
+	}
+
+	if strings.HasPrefix(rawUrl, "/") {
+		return !strings.HasPrefix(rawUrl, "//")
+	}
+
+	u, err := url.Parse(rawUrl)
+	if err != nil || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+
+	origin, err := url.Parse(fullHost)
+	if err != nil {
+		return false
+	}
+
+	return u.Scheme == strings.ToLower(origin.Scheme) && strings.EqualFold(u.Host, origin.Host)
+}
+
 func ParseBigInt(s string) (*big.Int, error) {
 	b, err := base64.RawURLEncoding.DecodeString(s)
 

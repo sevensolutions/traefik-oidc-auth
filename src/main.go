@@ -339,6 +339,13 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 	redirectUrl := state.RedirectUrl
 
+	// The state is encrypted, so it was issued by this middleware, but the url in it may still come from the
+	// request that started the flow (eg. its X-Forwarded-Host). Only follow it to this host or an allowed uri.
+	if redirectUrl != "" && !toa.isAllowedStateRedirect(req, state.Action, redirectUrl) {
+		toa.logger.Log(logging.LevelWarn, "Ignoring the redirect url in the state because it is not on this host: %s", redirectUrl)
+		redirectUrl = ""
+	}
+
 	if state.Action == "Login" {
 		query := req.URL.Query()
 
@@ -492,6 +499,10 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 
 		// Clear the cookie
 		clearChunkedCookie(toa.Config, rw, req, getSessionCookieName(toa.Config))
+
+		if redirectUrl == "" {
+			redirectUrl = utils.EnsureAbsoluteUrl(req, toa.Config.PostLogoutRedirectUri)
+		}
 	} else if state.Action == "RedirectThenLogin" {
 		toa.redirectToProvider(rw, req, redirectUrl, state.IsChallenge)
 		return
@@ -500,6 +511,26 @@ func (toa *TraefikOidcAuth) handleCallback(rw http.ResponseWriter, req *http.Req
 	toa.logger.Log(logging.LevelInfo, "Redirecting to %s", redirectUrl)
 
 	http.Redirect(rw, req, redirectUrl, http.StatusFound)
+}
+
+// isAllowedStateRedirect reports whether the callback may redirect to redirectUrl from the OIDC state: a url on
+// the host of the callback request, the configured post login/logout redirect uri, or one of the valid ones.
+func (toa *TraefikOidcAuth) isAllowedStateRedirect(req *http.Request, action string, redirectUrl string) bool {
+	if utils.IsSameOriginOrRelative(redirectUrl, utils.GetFullHost(req)) {
+		return true
+	}
+
+	configuredUri, validUris := toa.Config.PostLoginRedirectUri, toa.Config.ValidPostLoginRedirectUris
+	if action == "Logout" {
+		configuredUri, validUris = toa.Config.PostLogoutRedirectUri, toa.Config.ValidPostLogoutRedirectUris
+	}
+
+	if configuredUri != "" && redirectUrl == configuredUri {
+		return true
+	}
+
+	_, err := utils.ValidateRedirectUri(redirectUrl, validUris, toa.RedirectUriWildcardsEnabled)
+	return err == nil
 }
 
 func (toa *TraefikOidcAuth) handleLogout(rw http.ResponseWriter, req *http.Request, session *session.SessionState) {
