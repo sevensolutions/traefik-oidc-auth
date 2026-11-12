@@ -387,3 +387,37 @@ func TestIsHtmlRequest(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestIsSameOriginOrRelative(t *testing.T) {
+	cases := []struct {
+		url  string
+		want bool
+	}{
+		{url: "/", want: true},
+		{url: "/page?a=1#b", want: true},
+		{url: "https://app.example.com", want: true},
+		{url: "https://app.example.com/page", want: true},
+		{url: "https://APP.example.com/page", want: true},
+		{url: "HTTPS://app.example.com/page", want: true},
+
+		{url: "https://evil.com/", want: false},
+		{url: "http://app.example.com/", want: false},
+		{url: "https://app.example.com:8443/", want: false},
+		{url: "https://app.example.com.evil.com/", want: false},
+		{url: "https://app.example.com@evil.com/", want: false},
+		{url: "https://user@app.example.com/", want: false},
+		{url: "//evil.com/", want: false},
+		{url: "/\\evil.com/", want: false},
+		{url: "/\t/evil.com/", want: false},
+		{url: "/\n/evil.com/", want: false},
+		{url: "https:/\\evil.com/", want: false},
+		{url: "javascript:alert(1)", want: false},
+		{url: "evil.com", want: false},
+	}
+
+	for _, tc := range cases {
+		if got := IsSameOriginOrRelative(tc.url, "https://app.example.com"); got != tc.want {
+			t.Errorf("IsSameOriginOrRelative(%q)=%v, want %v", tc.url, got, tc.want)
+		}
+	}
+}
