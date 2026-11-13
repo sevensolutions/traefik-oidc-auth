@@ -16,6 +16,8 @@ import (
 var errNoSessionCookie = errors.New("no session cookie is present")
 var errNoSession = errors.New("no session was found for the session ticket")
 
+const renewalRetryInterval = 30 * time.Second
+
 func (toa *TraefikOidcAuth) getSessionForRequest(req *http.Request) (*session.SessionState, bool, map[string]interface{}, error) {
 	// Use AuthorizationHeader, if present
 	if toa.Config.AuthorizationHeader != nil && toa.Config.AuthorizationHeader.Name != "" {
@@ -121,15 +123,28 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 
 	if !success || err != nil || idpTokenExpiresSoon {
+		renewalIsOptional := success && err == nil
+
+		if renewalIsOptional && renewalFailedRecently(session) {
+			return session, claims, nil, nil
+		}
+
 		if session.RefreshToken != "" {
 			toa.logger.Log(logging.LevelInfo, "Trying to renew tokens...")
 
-			newTokens, err := toa.renewToken(session.RefreshToken)
+			newTokens, renewErr := toa.renewToken(session.RefreshToken)
 
-			if err != nil {
-				return nil, nil, nil, err
+			if renewErr != nil {
+				if renewalIsOptional && renewErr != errRefreshTokenRejected {
+					toa.logger.Log(logging.LevelWarn, "Failed to renew the tokens before they expire, continuing with the current session: %s", renewErr.Error())
+					session.RenewalFailedAt = time.Now()
+					return session, claims, session, nil
+				}
+
+				return nil, nil, nil, renewErr
 			}
 
+			session.RenewalFailedAt = time.Time{}
 			session.AccessToken = newTokens.AccessToken
 
 			if newTokens.RefreshToken != "" {
@@ -173,6 +188,14 @@ func validateSessionTicket(toa *TraefikOidcAuth, sessionTicket string) (*session
 	}
 
 	return session, claims, nil, nil
+}
+
+func renewalFailedRecently(session *session.SessionState) bool {
+	if session.RenewalFailedAt.IsZero() {
+		return false
+	}
+
+	return time.Since(session.RenewalFailedAt) < renewalRetryInterval
 }
 
 func checkIdpTokenExpiresSoon(toa *TraefikOidcAuth, session *session.SessionState) bool {

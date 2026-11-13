@@ -22,6 +22,8 @@ type SessionState struct {
 	IsAuthorized   bool      `json:"is_authorized"`
 	TokenExpiresIn int       `json:"token_expires_in"`
 
+	RenewalFailedAt time.Time `json:"renewal_failed_at"`
+
 	// Set when this session was (re-)established via a redirect triggered by UnauthorizedBehavior's
 	// Challenge, regardless of whether the resulting session ends up authorized - the callback may be
 	// handled by a different, more permissive middleware instance than the one that failed the check.
