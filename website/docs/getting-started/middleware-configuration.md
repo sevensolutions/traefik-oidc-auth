@@ -58,6 +58,8 @@ Provider:
 | `PostLogoutRedirectUri`* | no | `string` | `/` | The url where the user should be redirected after logout. |
 | `ValidPostLogoutRedirectUris` | no | `string[]` | *none* | A list of valid redirect uris when provided by the *redirect_uri* query parameter on the logout-endpoint. Per the OIDC/OAuth2 spec, the uri has to match exactly. Wildcards (including a single `*` matching anything) are an opt-in -- see [Redirect Uri Wildcards](#redirect-uri-wildcards) below. |
 | `CookieNamePrefix`* | no | `string` | `TraefikOidcAuth` | Specifies the prefix for all cookies used internally by the plugin. The final names are concatenated using dot-notation. Eg. `TraefikOidcAuth.Session`, `TraefikOidcAuth.CodeVerifier` etc. Please note that this prefix does not apply to *AuthorizationCookie* where the name can be set individually. |
+| `SessionStorageType`* | no | `string` | `Cookie` | Where session state is stored. `Cookie` (the default) encrypts the entire session into the cookie itself. `Redis` stores session state in Redis instead, keeping only a short opaque session id in the cookie. See [Redis](#redis-session-storage) below. |
+| `Redis` | no | [`Redis`](#redis-session-storage) | *none* | Redis session storage configuration, only used when `SessionStorageType` is `Redis`. See *Redis* block. |
 | `SessionCookie` | no | [`SessionCookie`](#session-cookie) | *none* | SessionCookie Configuration. See *SessionCookieConfig* block. |
 | `AuthorizationHeader` | no | [`AuthorizationHeader`](#authorization-header) | *none* | AuthorizationHeader Configuration. See *AuthorizationHeader* block. |
 | `AuthorizationCookie` | no | [`AuthorizationCookie`](#authorization-cookie) | *none* | AuthorizationCookie Configuration. See *AuthorizationCookie* block. |
@@ -126,6 +128,35 @@ When `CheckOnEveryRequest` is enabled, this will greatly increase the hit rate o
 | `HttpOnly` | no | `bool` | `true` | Whether the cookie should be marked http-only. |
 | `SameSite` | no | `string` | `default` | Can be one of `default`, `none`, `lax`, `strict`. |
 | `MaxAge` | no | `int` | `0` | Cookie time-to-live in seconds.  0 (default) is a ephemeral session cookie. |
+
+## Redis Block {#redis-session-storage}
+
+By default (`SessionStorageType: Cookie`), every replica's view of a session is limited to whatever the browser sends back in its cookie and there's no state shared between replicas. Setting `SessionStorageType: Redis` moves session state into Redis instead. The cookie shrinks to a short, opaque session id, and any Traefik replica that can reach the same Redis instance can serve any session. This is the recommended setup when running more than one Traefik replica.
+
+:::info
+This plugin runs inside Traefik via [yaegi](https://github.com/traefik/yaegi), a Go interpreter, which cannot load the official `redis` client library. Instead, a minimal, dependency-free Redis client is built into the plugin, implementing only the commands session storage needs (`SET`, `GET`, `DEL`, `AUTH`, `SELECT`, `PING`). A single Redis endpoint is supported. Redis Sentinel/Cluster setups are not supported yet.
+:::
+
+```yml
+SessionStorageType: Redis
+Redis:
+  Address: "redis:6379"
+  # Username: "default"
+  # Password: "${REDIS_PASSWORD}"
+```
+
+| Name | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `Address`* | yes | `string` | *none* | The `host:port` of the Redis server. |
+| `Username`* | no | `string` | *none* | Username for Redis ACL authentication. Leave empty for password-only `AUTH`. |
+| `Password`* | no | `string` | *none* | Password for Redis authentication. Leave empty if your Redis server doesn't require authentication. |
+| `Database` | no | `int` | `0` | The numeric Redis database index (`SELECT`) to use. |
+| `TLS`* | no | `bool` | `false` | Connect to Redis over TLS. |
+| `InsecureSkipVerify`* | no | `bool` | `false` | Disables TLS certificate verification when `TLS` is enabled. Only recommended for quick testing. |
+| `KeyPrefix` | no | `string` | `TraefikOidcAuth:Session:` | Prefix prepended to every Redis key this plugin writes. |
+| `SessionTimeout` | no | `int` | `86400` (24h) | TTL, in seconds, applied to a session's Redis entry every time it's (re-)stored. This is a sliding expiration: an active session keeps extending it, an abandoned one is reaped by Redis on its own. If you set a non-zero [`SessionCookie.MaxAge`](#session-cookie), keep this value at least as large otherwise the browser can still present a cookie whose backing Redis entry was already reaped for inactivity, forcing an unexpected re-login. A startup warning is logged if it detects that case. |
+| `PoolSize` | no | `int` | `10` | Max number of pooled connections to Redis. |
+| `DialTimeout` | no | `int` | `5` | Timeout, in seconds, for establishing a new connection to Redis. |
 
 ## AuthorizationHeader Block {#authorization-header}
 

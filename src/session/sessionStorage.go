@@ -11,6 +11,11 @@ import (
 type SessionStorage interface {
 	StoreSession(logger *logging.Logger, config *config.Config, sessionId string, state *SessionState) (string, error)
 	TryGetSession(logger *logging.Logger, config *config.Config, sessionTicket string) (*SessionState, error)
+
+	// ClearSession explicitly invalidates a session server-side, e.g. on logout. Storage
+	// backends with no server-side state (CookieSessionStorage) can no-op this - the caller is
+	// still responsible for clearing the browser cookie itself.
+	ClearSession(logger *logging.Logger, config *config.Config, sessionId string) error
 }
 
 type SessionState struct {
