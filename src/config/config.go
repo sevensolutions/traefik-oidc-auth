@@ -91,6 +91,8 @@ type ProviderConfig struct {
 
 	TokenRenewalThreshold float64 `json:"token_renewal_threshold"`
 
+	ClockSkewTolerance int `json:"clock_skew_tolerance"`
+
 	UseClaimsFromUserInfo     string `json:"use_claims_from_user_info"`
 	UseClaimsFromUserInfoBool bool   `json:"use_claims_from_user_info_bool"`
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/sevensolutions/traefik-oidc-auth/src/config"
@@ -453,4 +454,94 @@ func setupJWKS(t *testing.T, toa *TraefikOidcAuth, privateKey *rsa.PrivateKey) *
 
 	toa.Jwks.Url = jwksServer.URL
 	return jwksServer
+}
+
+func newClockSkewTest(t *testing.T, clockSkewTolerance int) (*TraefikOidcAuth, *rsa.PrivateKey) {
+	t.Helper()
+
+	privateKey, err := generateRSAKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	toa := &TraefikOidcAuth{
+		logger: logging.CreateLogger(logging.LevelError),
+		Config: &config.Config{
+			Provider: &config.ProviderConfig{ClockSkewTolerance: clockSkewTolerance},
+		},
+		httpClient: http.DefaultClient,
+		Jwks:       &oidc.JwksHandler{},
+	}
+
+	jwksServer := setupJWKS(t, toa, privateKey)
+	t.Cleanup(jwksServer.Close)
+
+	return toa, privateKey
+}
+
+func signTestToken(t *testing.T, privateKey *rsa.PrivateKey, claims jwt.MapClaims) string {
+	t.Helper()
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = "test-kid"
+
+	signedToken, err := token.SignedString(privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return signedToken
+}
+
+func TestValidateTokenLocally_ToleratesClockSkew(t *testing.T) {
+	toa, privateKey := newClockSkewTest(t, 30)
+
+	now := time.Now()
+
+	notYetValid := signTestToken(t, privateKey, jwt.MapClaims{
+		"sub": "12345",
+		"nbf": now.Add(10 * time.Second).Unix(),
+		"iat": now.Add(10 * time.Second).Unix(),
+		"exp": now.Add(1 * time.Hour).Unix(),
+	})
+
+	ok, _, err := toa.validateTokenLocally(notYetValid)
+	if !ok || err != nil {
+		t.Errorf("expected a token from a slightly fast clock to be accepted, got %v", err)
+	}
+
+	justExpired := signTestToken(t, privateKey, jwt.MapClaims{
+		"sub": "12345",
+		"exp": now.Add(-10 * time.Second).Unix(),
+	})
+
+	ok, _, err = toa.validateTokenLocally(justExpired)
+	if !ok || err != nil {
+		t.Errorf("expected a token from a slightly slow clock to be accepted, got %v", err)
+	}
+}
+
+func TestValidateTokenLocally_RejectsBeyondClockSkew(t *testing.T) {
+	toa, privateKey := newClockSkewTest(t, 30)
+
+	now := time.Now()
+
+	notYetValid := signTestToken(t, privateKey, jwt.MapClaims{
+		"sub": "12345",
+		"nbf": now.Add(5 * time.Minute).Unix(),
+		"exp": now.Add(1 * time.Hour).Unix(),
+	})
+
+	if ok, _, _ := toa.validateTokenLocally(notYetValid); ok {
+		t.Error("expected a token that is not valid yet to be rejected")
+	}
+
+	expired := signTestToken(t, privateKey, jwt.MapClaims{
+		"sub": "12345",
+		"exp": now.Add(-5 * time.Minute).Unix(),
+	})
+
+	if ok, _, _ := toa.validateTokenLocally(expired); ok {
+		t.Error("expected an expired token to be rejected")
+	}
 }
