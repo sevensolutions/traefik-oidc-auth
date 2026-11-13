@@ -79,14 +79,24 @@ sequenceDiagram
     participant OAuth as OAuth Provider
 
     User->>Traefik: Navigate to /logout
+    Traefik->>Traefik: Clear Session and Cookie
     Traefik-->>User: Redirect to OAuth Provider for logout
     User->>OAuth: Follow redirect (end_session_endpoint)
     OAuth->>OAuth: Clear SSO session
     OAuth->>User: Redirect to Plugin Callback (/oidc/callback)
     User->>Traefik: Follow Plugin Callback (/oidc/callback)
-    Traefik->>Traefik: Clear Session and Cookie
     Traefik->>User: Redirect to `PostLogoutRedirectUri`
 ```
+
+The local session is cleared before the user is sent to the provider, so an
+interrupted logout still ends the session on your side.
+
+:::note
+If your provider doesn't publish an `end_session_endpoint` in its discovery document,
+the plugin can't ask it to end the SSO session. In that case it clears the local session
+and redirects to `PostLogoutRedirectUri` right away, and logs a warning. You'll still be
+logged in at the provider, so the next login may complete without a prompt.
+:::
 
 :::tip
 The configured `PostLogoutRedirectUri` is the default url to which the user will be redirected after the logout is completed.
