@@ -9,6 +9,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"sync"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -453,4 +455,80 @@ func setupJWKS(t *testing.T, toa *TraefikOidcAuth, privateKey *rsa.PrivateKey) *
 
 	toa.Jwks.Url = jwksServer.URL
 	return jwksServer
+}
+
+func TestIntrospectToken_BadStatusCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.Error(rw, `{"active":true}`, http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	toa := &TraefikOidcAuth{
+		logger:            logging.CreateLogger(logging.LevelError),
+		httpClient:        server.Client(),
+		Config:            &config.Config{Provider: &config.ProviderConfig{}},
+		DiscoveryDocument: &oidc.OidcDiscovery{IntrospectionEndpoint: server.URL},
+	}
+
+	active, _, err := toa.introspectToken("some-token")
+
+	if active || err == nil {
+		t.Errorf("expected a failed introspection request to be an error, got active=%v err=%v", active, err)
+	}
+}
+
+func TestRenewToken_SendsResourceAndClientAssertion(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var mu sync.Mutex
+	var form url.Values
+
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		if err := req.ParseForm(); err != nil {
+			t.Error(err)
+			return
+		}
+
+		mu.Lock()
+		form = req.PostForm
+		mu.Unlock()
+
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(oidc.OidcTokenResponse{AccessToken: "new-access-token"})
+	}))
+	defer server.Close()
+
+	toa := &TraefikOidcAuth{
+		logger:     logging.CreateLogger(logging.LevelError),
+		httpClient: server.Client(),
+		Config: &config.Config{
+			Provider:           &config.ProviderConfig{ClientId: "my-client", ClientJwtPrivateKeyId: "my-key-id"},
+			Scopes:             []string{"openid"},
+			RequestedResources: []string{"https://api.example.com"},
+		},
+		ClientJwtPrivateKey: privateKey,
+		DiscoveryDocument:   &oidc.OidcDiscovery{TokenEndpoint: server.URL},
+	}
+
+	if _, err := toa.renewToken("some-refresh-token"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if got := form.Get("resource"); got != "https://api.example.com" {
+		t.Errorf("expected the requested resource to be sent as resource, got %q", got)
+	}
+
+	if form.Get("client_assertion") == "" {
+		t.Error("expected a client assertion to be sent")
+	}
+
+	if got := form.Get("client_assertion_type"); got != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
+		t.Errorf("unexpected client_assertion_type %q", got)
+	}
 }
